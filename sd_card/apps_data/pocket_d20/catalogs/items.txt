@@ -1,0 +1,127 @@
+# Pocket d20 SRD 5.2.1 starter item catalog. Add one custom or add-on item per line.
+Club
+Dagger
+Greatclub
+Handaxe
+Javelin
+Light Hammer
+Mace
+Quarterstaff
+Sickle
+Spear
+Dart
+Light Crossbow
+Shortbow
+Sling
+Battleaxe
+Flail
+Glaive
+Greataxe
+Greatsword
+Halberd
+Lance
+Longsword
+Maul
+Morningstar
+Pike
+Rapier
+Scimitar
+Shortsword
+Trident
+Warhammer
+War Pick
+Whip
+Blowgun
+Hand Crossbow
+Heavy Crossbow
+Longbow
+Musket
+Pistol
+Padded Armor
+Leather Armor
+Studded Leather Armor
+Hide Armor
+Chain Shirt
+Scale Mail
+Breastplate
+Half Plate Armor
+Ring Mail
+Chain Mail
+Splint Armor
+Plate Armor
+Shield
+Arrows
+Bolts
+Bullets
+Backpack
+Bedroll
+Bell
+Blanket
+Book
+Bottle
+Bucket
+Caltrops
+Case
+Chain
+Chest
+Climber's Kit
+Clothes
+Component Pouch
+Crowbar
+Flask
+Grappling Hook
+Healer's Kit
+Holy Symbol
+Hunting Trap
+Ink
+Lantern
+Lock
+Manacles
+Mirror
+Oil
+Parchment
+Piton
+Poisoner's Kit
+Potion of Healing
+Quiver
+Rations
+Rope
+Spellcasting Focus
+Tent
+Tinderbox
+Torch
+Vial
+Waterskin
+Bead of Nourishment
+Cloak of Invisibility
+Elixir of Health
+Energy Bow
+Gloves of Thievery
+Hat of Many Spells
+Potion of Invulnerability
+Potion of Longevity
+Potion of Vitality
+Quarterstaff of the Acrobat
+Rod of Resurrection
+Sending Stones
+Sentinel Shield
+Shield of the Cavalier
+Thunderous Greatclub
+# Publicly named Ravenloft setting items; names only
+Holy Symbol of Ravenkind
+Icon of Ravenloft
+Sunsword
+Tome of Strahd
+# Publicly named Forgotten Realms setting items; names only
+Blackstaff
+Bookmark
+Hazirawn
+Moonblade
+Ring of Winter
+Staff of the Forgotten One
+# Publicly named Eberron options; names only
+Adventurer's Atlas
+All-Purpose Tool
+Boots of the Winding Path
+Repeating Shot Light Crossbow
+Winged Boots

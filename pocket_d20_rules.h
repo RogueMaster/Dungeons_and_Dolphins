@@ -8,6 +8,8 @@ typedef enum {
     PocketRollDisadvantage,
 } PocketRollMode;
 
+#define POCKET_D20_MAX_DAMAGE_ROLLS 80U
+
 typedef struct {
     uint8_t first_die;
     uint8_t second_die;
@@ -24,6 +26,9 @@ typedef struct {
     int16_t modifier;
     int16_t total;
     uint8_t critical;
+    uint8_t weapon_roll_count;
+    uint8_t extra_roll_count;
+    uint8_t rolls[POCKET_D20_MAX_DAMAGE_ROLLS];
 } PocketDamageRoll;
 
 extern const char* const pocket_d20_ability_names[POCKET_D20_ABILITY_COUNT];
@@ -37,7 +42,9 @@ uint8_t pocket_d20_total_level(const PocketCharacter* character);
 uint8_t pocket_d20_proficiency_bonus(const PocketCharacter* character);
 int8_t pocket_d20_saving_throw_modifier(const PocketCharacter* character, uint8_t ability);
 int8_t pocket_d20_skill_modifier(const PocketCharacter* character, uint8_t skill);
+int8_t pocket_d20_skill_base_modifier(const PocketCharacter* character, uint8_t skill);
 int8_t pocket_d20_initiative_modifier(const PocketCharacter* character);
+int16_t pocket_d20_effective_speed(const PocketCharacter* character);
 int8_t pocket_d20_spell_attack_modifier(const PocketCharacter* character);
 int8_t pocket_d20_spell_save_dc(const PocketCharacter* character);
 int8_t pocket_d20_weapon_ability(const PocketCharacter* character, const PocketItem* item);
@@ -46,6 +53,11 @@ int8_t pocket_d20_weapon_attack_modifier(
     const PocketItem* item);
 
 uint16_t pocket_d20_roll_dice(uint8_t count, uint8_t sides);
+uint16_t pocket_d20_roll_dice_values(
+    uint8_t count,
+    uint8_t sides,
+    uint8_t* values,
+    uint8_t capacity);
 PocketAttackRoll pocket_d20_roll_attack(
     const PocketCharacter* character,
     const PocketItem* item,
@@ -56,5 +68,5 @@ PocketDamageRoll pocket_d20_roll_damage(
     bool critical);
 
 void pocket_d20_short_rest(PocketCharacter* character);
+int16_t pocket_d20_spend_hit_die(PocketCharacter* character, uint8_t* die_roll);
 void pocket_d20_long_rest(PocketCharacter* character);
-

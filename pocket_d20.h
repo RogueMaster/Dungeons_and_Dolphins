@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define POCKET_D20_SAVE_VERSION 1U
+#define POCKET_D20_SAVE_VERSION 3U
 
 #define POCKET_D20_NAME_LEN 32U
 #define POCKET_D20_SHORT_LEN 24U
@@ -37,6 +37,13 @@ typedef enum {
     PocketProficiencyProficient,
     PocketProficiencyExpertise,
 } PocketProficiency;
+
+typedef enum {
+    PocketRechargeManual,
+    PocketRechargeShortOrLong,
+    PocketRechargeLong,
+    PocketRechargeCount,
+} PocketRecharge;
 
 typedef enum {
     PocketAttackAbilityAuto,
@@ -89,6 +96,7 @@ typedef struct {
     char name[POCKET_D20_NAME_LEN];
     char detail[POCKET_D20_DETAIL_LEN];
     uint8_t level;
+    uint8_t class_index;
     uint8_t prepared;
     uint8_t ritual;
 } PocketSpell;
@@ -100,6 +108,7 @@ typedef struct {
     int16_t uses_max;
     uint8_t class_index;
     uint8_t class_level_gained;
+    uint8_t recharge;
 } PocketFeature;
 
 typedef struct {
@@ -189,6 +198,7 @@ typedef struct {
     uint8_t spellcasting_ability;
     int8_t spell_attack_misc;
     int8_t spell_save_misc;
+    uint8_t arcane_recovery_used;
     uint8_t spell_slots_current[POCKET_D20_SLOT_COUNT];
     uint8_t spell_slots_max[POCKET_D20_SLOT_COUNT];
 
@@ -208,6 +218,13 @@ typedef struct {
     char languages[POCKET_D20_MAX_LANGUAGES][POCKET_D20_SHORT_LEN];
     uint8_t journal_count;
     PocketJournalEntry journal[POCKET_D20_MAX_JOURNAL];
+
+    int8_t saving_throw_misc[POCKET_D20_ABILITY_COUNT];
+    int8_t skill_misc[POCKET_D20_SKILL_COUNT];
+    uint8_t spell_known[POCKET_D20_MAX_SPELLS];
+    uint8_t spell_always_prepared[POCKET_D20_MAX_SPELLS];
+    uint8_t spell_free_casts_current[POCKET_D20_MAX_SPELLS];
+    uint8_t spell_free_casts_max[POCKET_D20_MAX_SPELLS];
 } PocketCharacter;
 
 typedef struct {

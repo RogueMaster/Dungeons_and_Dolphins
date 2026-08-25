@@ -100,36 +100,55 @@ static int8_t pocket_d20_apply_proficiency(
     return base;
 }
 
+static int8_t pocket_d20_exhaustion_penalty(const PocketCharacter* character) {
+    return (int8_t)(-2 * character->exhaustion);
+}
+
 int8_t pocket_d20_saving_throw_modifier(const PocketCharacter* character, uint8_t ability) {
     if(ability >= POCKET_D20_ABILITY_COUNT) return 0;
     int8_t base = pocket_d20_ability_modifier(character->ability_scores[ability]);
-    return pocket_d20_apply_proficiency(
-        base,
-        character->saving_throw_proficiency[ability],
-        pocket_d20_proficiency_bonus(character));
+    return (int8_t)(pocket_d20_apply_proficiency(
+                        base,
+                        character->saving_throw_proficiency[ability],
+                        pocket_d20_proficiency_bonus(character)) +
+                    character->saving_throw_misc[ability] +
+                    pocket_d20_exhaustion_penalty(character));
 }
 
-int8_t pocket_d20_skill_modifier(const PocketCharacter* character, uint8_t skill) {
+int8_t pocket_d20_skill_base_modifier(const PocketCharacter* character, uint8_t skill) {
     if(skill >= POCKET_D20_SKILL_COUNT) return 0;
     uint8_t ability = pocket_d20_skill_abilities[skill];
     int8_t base = pocket_d20_ability_modifier(character->ability_scores[ability]);
-    return pocket_d20_apply_proficiency(
-        base,
-        character->skill_proficiency[skill],
-        pocket_d20_proficiency_bonus(character));
+    return (int8_t)(pocket_d20_apply_proficiency(
+                        base,
+                        character->skill_proficiency[skill],
+                        pocket_d20_proficiency_bonus(character)) +
+                    character->skill_misc[skill]);
+}
+
+int8_t pocket_d20_skill_modifier(const PocketCharacter* character, uint8_t skill) {
+    return (int8_t)(pocket_d20_skill_base_modifier(character, skill) +
+                    pocket_d20_exhaustion_penalty(character));
 }
 
 int8_t pocket_d20_initiative_modifier(const PocketCharacter* character) {
     return (int8_t)(pocket_d20_ability_modifier(
                         character->ability_scores[PocketAbilityDexterity]) +
-                    character->initiative_misc);
+                    character->initiative_misc +
+                    pocket_d20_exhaustion_penalty(character));
+}
+
+int16_t pocket_d20_effective_speed(const PocketCharacter* character) {
+    int16_t speed = character->speed - (5 * character->exhaustion);
+    return speed > 0 ? speed : 0;
 }
 
 int8_t pocket_d20_spell_attack_modifier(const PocketCharacter* character) {
     uint8_t ability = character->spellcasting_ability;
     if(ability >= POCKET_D20_ABILITY_COUNT) ability = PocketAbilityIntelligence;
     return (int8_t)(pocket_d20_ability_modifier(character->ability_scores[ability]) +
-                    pocket_d20_proficiency_bonus(character) + character->spell_attack_misc);
+                    pocket_d20_proficiency_bonus(character) + character->spell_attack_misc +
+                    pocket_d20_exhaustion_penalty(character));
 }
 
 int8_t pocket_d20_spell_save_dc(const PocketCharacter* character) {
@@ -164,12 +183,25 @@ int8_t pocket_d20_weapon_attack_modifier(
     const PocketItem* item) {
     int8_t result = pocket_d20_weapon_ability(character, item) + item->magic_bonus;
     if(item->proficient) result += pocket_d20_proficiency_bonus(character);
+    result += pocket_d20_exhaustion_penalty(character);
     return result;
 }
 
 uint16_t pocket_d20_roll_dice(uint8_t count, uint8_t sides) {
+    return pocket_d20_roll_dice_values(count, sides, NULL, 0U);
+}
+
+uint16_t pocket_d20_roll_dice_values(
+    uint8_t count,
+    uint8_t sides,
+    uint8_t* values,
+    uint8_t capacity) {
     uint16_t total = 0;
-    for(uint8_t i = 0; i < count; ++i) total += pocket_d20_roll_one(sides);
+    for(uint8_t i = 0; i < count; ++i) {
+        uint8_t roll = pocket_d20_roll_one(sides);
+        total += roll;
+        if(values && i < capacity) values[i] = roll;
+    }
     return total;
 }
 
@@ -203,9 +235,22 @@ PocketDamageRoll pocket_d20_roll_damage(
     uint8_t multiplier = critical ? 2U : 1U;
     uint8_t die = item->damage_die;
     if(item->use_versatile && item->versatile_die >= 2U) die = item->versatile_die;
-    result.weapon_total = (int16_t)pocket_d20_roll_dice(item->damage_dice * multiplier, die);
-    result.extra_total =
-        (int16_t)pocket_d20_roll_dice(item->extra_dice * multiplier, item->extra_die);
+    result.weapon_roll_count = item->damage_dice * multiplier;
+    result.extra_roll_count = item->extra_dice * multiplier;
+    if(result.weapon_roll_count > POCKET_D20_MAX_DAMAGE_ROLLS)
+        result.weapon_roll_count = POCKET_D20_MAX_DAMAGE_ROLLS;
+    if(result.extra_roll_count > POCKET_D20_MAX_DAMAGE_ROLLS - result.weapon_roll_count)
+        result.extra_roll_count = POCKET_D20_MAX_DAMAGE_ROLLS - result.weapon_roll_count;
+    result.weapon_total = (int16_t)pocket_d20_roll_dice_values(
+        result.weapon_roll_count,
+        die,
+        result.rolls,
+        result.weapon_roll_count);
+    result.extra_total = (int16_t)pocket_d20_roll_dice_values(
+        result.extra_roll_count,
+        item->extra_die,
+        result.rolls + result.weapon_roll_count,
+        result.extra_roll_count);
     result.modifier = item->magic_bonus;
     if(item->add_ability_damage) result.modifier += pocket_d20_weapon_ability(character, item);
     result.total = result.weapon_total + result.extra_total + result.modifier;
@@ -215,8 +260,26 @@ PocketDamageRoll pocket_d20_roll_damage(
 }
 
 void pocket_d20_short_rest(PocketCharacter* character) {
-    character->death_successes = 0;
-    character->death_failures = 0;
+    for(uint8_t i = 0; i < character->feature_count; ++i) {
+        if(character->features[i].recharge == PocketRechargeShortOrLong)
+            character->features[i].uses_current = character->features[i].uses_max;
+    }
+}
+
+int16_t pocket_d20_spend_hit_die(PocketCharacter* character, uint8_t* die_roll) {
+    if(character->hp_current < 1 || character->hp_current >= character->hp_max ||
+       character->hit_dice_current == 0U)
+        return -1;
+    uint8_t roll = pocket_d20_roll_one(character->hit_die);
+    int16_t healing = roll + pocket_d20_ability_modifier(
+                                 character->ability_scores[PocketAbilityConstitution]);
+    if(healing < 1) healing = 1;
+    int16_t missing = character->hp_max - character->hp_current;
+    int16_t regained = healing < missing ? healing : missing;
+    character->hp_current += regained;
+    --character->hit_dice_current;
+    if(die_roll) *die_roll = roll;
+    return regained;
 }
 
 void pocket_d20_long_rest(PocketCharacter* character) {
@@ -225,10 +288,15 @@ void pocket_d20_long_rest(PocketCharacter* character) {
     character->death_successes = 0;
     character->death_failures = 0;
     character->hit_dice_current = character->hit_dice_max;
+    if(character->exhaustion) --character->exhaustion;
+    character->arcane_recovery_used = 0U;
     for(uint8_t i = 1U; i < POCKET_D20_SLOT_COUNT; ++i) {
         character->spell_slots_current[i] = character->spell_slots_max[i];
     }
-    for(uint8_t i = 0; i < character->feature_count; ++i) {
-        character->features[i].uses_current = character->features[i].uses_max;
+    for(uint8_t i = 0; i < character->feature_count; ++i)
+        if(character->features[i].recharge != PocketRechargeManual)
+            character->features[i].uses_current = character->features[i].uses_max;
+    for(uint8_t i = 0; i < character->spell_count; ++i) {
+        character->spell_free_casts_current[i] = character->spell_free_casts_max[i];
     }
 }

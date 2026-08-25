@@ -1,0 +1,262 @@
+# Pocket d20 SRD 5.2.1 starter spell catalog. Add one custom or add-on spell per line.
+Acid Arrow
+Acid Splash
+Aid
+Alarm
+Alter Self
+Animal Friendship
+Animate Dead
+Arcane Eye
+Arcane Lock
+Arcanist's Magic Aura
+Aura of Life
+Augury
+Banishment
+Bestow Curse
+Black Tentacles
+Bless
+Blindness/Deafness
+Blink
+Blight
+Blur
+Burning Hands
+Charm Monster
+Charm Person
+Chill Touch
+Chromatic Orb
+Clairvoyance
+Color Spray
+Comprehend Languages
+Confusion
+Continual Flame
+Counterspell
+Cure Wounds
+Dancing Lights
+Darkness
+Darkvision
+Detect Magic
+Detect Thoughts
+Disguise Self
+Dispel Magic
+Dissonant Whispers
+Divine Smite
+Dragon's Breath
+Elementalism
+Enhance Ability
+Enlarge/Reduce
+Ensnaring Strike
+Expeditious Retreat
+False Life
+Fear
+Feather Fall
+Find Familiar
+Fire Bolt
+Fireball
+Flaming Sphere
+Floating Disk
+Fly
+Fog Cloud
+Gaseous Form
+Gentle Repose
+Glyph of Warding
+Grease
+Guidance
+Gust of Wind
+Haste
+Healing Word
+Hex
+Hideous Laughter
+Hold Person
+Hypnotic Pattern
+Ice Knife
+Identify
+Illusory Script
+Invisibility
+Jump
+Levitate
+Light
+Lightning Bolt
+Locate Object
+Longstrider
+Mage Armor
+Mage Hand
+Magic Circle
+Magic Missile
+Magic Mouth
+Magic Weapon
+Major Image
+Mending
+Message
+Mind Spike
+Minor Illusion
+Mirror Image
+Misty Step
+Nondetection
+Phantasmal Force
+Phantom Steed
+Poison Spray
+Power Word Heal
+Prestidigitation
+Protection from Energy
+Protection from Evil and Good
+Ray of Enfeeblement
+Ray of Frost
+Ray of Sickness
+Remove Curse
+Rope Trick
+Scorching Ray
+Searing Smite
+See Invisibility
+Sending
+Shatter
+Shield
+Shocking Grasp
+Silent Image
+Sleep
+Sleet Storm
+Slow
+Sorcerous Burst
+Speak with Dead
+Spider Climb
+Starry Wisp
+Stinking Cloud
+Suggestion
+Summon Dragon
+Thaumaturgy
+Thunderwave
+Tiny Hut
+Tongues
+True Strike
+Tsunami
+Unseen Servant
+Vampiric Touch
+Vitriolic Sphere
+Water Breathing
+Web
+# Forgotten Realms: Heroes of Faerun - 19 spell names only
+Spellfire Flare
+Wardaway
+Death Armor
+Deryan's Helpful Homunculi
+Elminster's Elusion
+Cacophonic Shield
+Conjure Constructs
+Laeral's Silver Lance
+Sylune's Viper
+Backlash
+Doomtide
+Spellfire Storm
+Alustriel's Mooncloak
+Songol's Elemental Suffusion
+Dirge
+Elminster's Effulgent Spheres
+Simbul's Synostodweomer
+Holy Star of Mystra
+Blade of Disaster
+# Ravenloft: The Undead expanded spell-list names; the source adds no dedicated spell chapter
+Bane
+False Life
+Blindness/Deafness
+Phantasmal Force
+Phantom Steed
+Speak with Dead
+Death Ward
+Greater Invisibility
+Antilife Shell
+Cloudkill
+# Xanathar's Guide to Everything - all 95 chapter 3 spell names only
+Control Flames
+Create Bonfire
+Frostbite
+Gust
+Infestation
+Magic Stone
+Mold Earth
+Primal Savagery
+Shape Water
+Thunderclap
+Toll the Dead
+Word of Radiance
+Absorb Elements
+Beast Bond
+Catapult
+Cause Fear
+Ceremony
+Chaos Bolt
+Earth Tremor
+Ice Knife
+Snare
+Zephyr Strike
+Aganazzar's Scorcher
+Dragon's Breath
+Dust Devil
+Earthbind
+Healing Spirit
+Maximilian's Earthen Grasp
+Mind Spike
+Pyrotechnics
+Shadow Blade
+Skywrite
+Snilloc's Snowball Swarm
+Warding Wind
+Catnap
+Enemies Abound
+Erupting Earth
+Flame Arrows
+Life Transference
+Melf's Minute Meteors
+Summon Lesser Demons
+Thunder Step
+Tidal Wave
+Tiny Servant
+Wall of Sand
+Wall of Water
+Charm Monster
+Elemental Bane
+Find Greater Steed
+Guardian of Nature
+Shadow of Moil
+Sickening Radiance
+Storm Sphere
+Summon Greater Demon
+Vitriolic Sphere
+Watery Sphere
+Control Winds
+Danse Macabre
+Dawn
+Enervation
+Far Step
+Holy Weapon
+Immolation
+Infernal Calling
+Maelstrom
+Negative Energy Flood
+Skill Empowerment
+Steel Wind Strike
+Synaptic Static
+Transmute Rock
+Wall of Light
+Wrath of Nature
+Bones of the Earth
+Create Homunculus
+Druid Grove
+Investiture of Flame
+Investiture of Ice
+Investiture of Stone
+Investiture of Wind
+Mental Prison
+Primordial Ward
+Scatter
+Soul Cage
+Tenser's Transformation
+Crown of Stars
+Power Word Pain
+Temple of the Gods
+Whirlwind
+Abi-Dalzim's Horrid Wilting
+Illusory Dragon
+Maddening Darkness
+Mighty Fortress
+Invulnerability
+Mass Polymorph
+Psychic Scream

@@ -1,0 +1,63 @@
+# Pocket d20 SRD 5.2.1 subclasses. Add one custom or add-on subclass per line.
+Path of the Berserker
+College of Lore
+Life Domain
+Circle of the Land
+Champion
+Warrior of the Open Hand
+Oath of Devotion
+Hunter
+Thief
+Draconic Sorcery
+Fiend Patron
+Evoker
+# Forgotten Realms: Heroes of Faerun (names only)
+College of the Moon
+Knowledge Domain
+Banneret
+Oath of the Noble Genies
+Winter Walker
+Scion of the Three
+Spellfire Sorcery
+Bladesinger
+# Ravenloft (names only)
+College of Spirits
+The Undead
+# Eberron: Forge of the Artificer (names only)
+Alchemist
+Armorer
+Artillerist
+Battle Smith
+Cartographer
+# Xanathar's Guide to Everything chapter 1 options (names only)
+Path of the Ancestral Guardian
+Path of the Storm Herald
+Path of the Zealot
+College of Glamour
+College of Swords
+College of Whispers
+Forge Domain
+Grave Domain
+Circle of Dreams
+Circle of the Shepherd
+Arcane Archer
+Cavalier
+Samurai
+Way of the Drunken Master
+Way of the Kensei
+Way of the Sun Soul
+Oath of Conquest
+Oath of Redemption
+Gloom Stalker
+Horizon Walker
+Monster Slayer
+Inquisitive
+Mastermind
+Scout
+Swashbuckler
+Divine Soul
+Shadow Magic
+Storm Sorcery
+The Celestial
+The Hexblade
+War Magic
