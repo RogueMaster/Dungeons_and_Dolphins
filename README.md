@@ -1,147 +1,133 @@
-# Pocket d20 for Flipper Zero
+# Dungeons and Dolphins
 
-Pocket d20 is an offline, buttons-and-screen character companion for 2024 5E play. It is built as an external Flipper Zero application and targets RogueMaster firmware.
+Dungeons and Dolphins is an offline, fifth-edition-compatible character, campaign, dice, and initiative tracker for Flipper Zero. Version 0.5 targets RogueMaster firmware and uses only the screen, directional controls, vibration, sound, and SD-card storage.
 
-The manifest uses the included `icon.png`, a 10x10, 1-bit monochrome d20 icon validated by RogueMaster's FAP build tooling.
+## Full feature list
 
-The included `dist/pocket_d20.fap` version 0.3 was compiled and validated against RogueMaster branch `420`, commit `d3ae1f86bd961852af6969e887a8dd3492a19321` (2026-08-22).
+### Character profiles and saving
 
-## Install
+- Create, switch, and delete up to six independent character profiles.
+- Protect the Main profile from deletion.
+- Store each character in a separate, readable, versioned `.txt` file.
+- Keep stats, classes, spells, equipment, notes, party presets, and active combat isolated per character.
+- Autosave every meaningful edit, including stat, item, spell, currency, class, feature, journal, and initiative changes.
+- Write through a temporary file and retain a backup to reduce save corruption risk.
 
-1. Connect the Flipper Zero or place its microSD card in your computer.
-2. Copy `dist/pocket_d20.fap` to `/ext/apps/Games/pocket_d20.fap`.
-3. On the Flipper, open **Apps > Games > Pocket d20**.
+### Character sheet
 
-The app creates its data directory on first save. Progress is stored under `/ext/apps_data/pocket_d20/`.
+- Character name, player name, species, background, alignment, and other proficiencies.
+- Strength, Dexterity, Constitution, Intelligence, Wisdom, and Charisma scores and modifiers.
+- All six saving throws with proficiency and miscellaneous modifiers.
+- All 18 standard skills grouped by governing ability.
+- Skill proficiency, expertise, miscellaneous modifiers, and calculated totals.
+- Passive Perception, Passive Insight, and Passive Investigation.
+- Armor Class, current and maximum Hit Points, temporary Hit Points, Initiative, Speed, and Inspiration.
+- Proficiency Bonus calculated from combined character level.
+- Hit Point Dice, death saves, Exhaustion, conditions, experience, and milestone leveling.
+- Languages and currency in Copper, Silver, Electrum, Gold, and Platinum pieces.
 
-## What version 0.3 tracks
+### Classes, subclasses, backgrounds, and features
 
-- Up to six independent character profiles. Main is always present, and every profile has its own complete sheet, equipment, spell list, notes, party roster, and active initiative state.
-- Character name, player, species/race, assignable catalog/custom background, alignment, inspiration, XP, and milestone mode.
-- Up to four classes, each with its own class name, subclass, and level. Total character level and proficiency bonus are derived from the combined levels.
-- Up to 20 perks/features. Each feature records its source class, class level gained, notes, current/maximum uses, and Manual, Short/Long Rest, or Long Rest recharge cadence. The SD catalog includes the names of core 2024 class features plus an Artificer starter set.
-- All six ability scores and saving throws, including ability modifiers, save proficiency, final modifiers, and per-save miscellaneous bonuses or penalties.
-- All 18 standard skills grouped by governing ability (STR, DEX, INT, WIS, and CHA), with proficiency/Expertise, final modifiers, and per-skill miscellaneous bonuses or penalties.
-- HP, temporary HP, AC, speed, initiative and its miscellaneous modifier, exhaustion, death saves, hit die, hit dice, Passive Perception, Passive Insight, and Passive Investigation.
-- Automatically derived total character level and Proficiency Bonus.
-- Spellcasting ability, editable spell-attack and spell-save miscellaneous modifiers, final spell attack bonus, spell save DC, and spell slots 1-9.
-- Per-spell Known, Prepared, Always Prepared, Ritual, and free-casts-per-Long-Rest tracking. Free casts have current and maximum values and can be spent directly from the spell record.
-- Up to 24 inventory entries, quantities, weight, equipped/attuned state, and configurable weapon statistics.
-- Standard currency in Copper, Silver, Electrum, Gold, and Platinum pieces (CP/SP/EP/GP/PP).
-- Up to 12 languages and free-form additional proficiencies.
-- Up to 24 quick notes, adventure notes, item notes, and milestones. Item notes can create inventory entries. A milestone can award a level to a chosen class once.
-- Saved party roster and a combat initiative order with rounds and current turn.
-- Generic dice from d2 through d100, modifiers, and d20 advantage/disadvantage, with a timed roll animation.
-- Every roll involving more than one die shows the individual results and their sum; long damage pools are paged.
-- Weapon attack and damage rolls using the character's ability modifier, total-level proficiency bonus, weapon proficiency, magic bonus, damage dice, extra dice, critical hits, versatile mode, and ammunition.
-- Rules-aware Short Rest, Hit Point Die spending, Arcane Recovery, and Long Rest helpers.
-- Immediate autosave after every character-data mutation, including stats, spells, items, inventory, currency, notes, and initiative changes.
+- Track up to four classes per character with independent class, subclass, and level values.
+- Calculate total level and Proficiency Bonus across all class records.
+- Default subclass picker filters every bundled subclass to the selected parent class.
+- Hold OK in the subclass picker to show all entries for custom campaigns and overrides.
+- Assign features and perks to a source class and the class level at which they were gained.
+- Track feature notes, current and maximum uses, and Manual, Short/Long Rest, or Long Rest recharge cadence.
+- Select backgrounds, classes, subclasses, feats, and abilities from bundled SD-card catalogs.
+- Hold OK on supported name fields to enter custom text.
+
+### Spellcasting
+
+- Track spellcasting ability, Spell Attack modifier, Spell Save DC modifier, and calculated totals.
+- Track Known, Prepared, Always Prepared, Ritual, and limited free-cast states independently.
+- Track current and maximum free casts for each spell and restore them on a Long Rest.
+- Track current and maximum spell slots for levels 1 through 9.
+- Default spell picker filters annotated spells by the assigned class and that class's available spell level.
+- Hold OK in the spell picker to switch between Allowed and All views.
+- Include complete standard spell-name, spell-level, and class-list metadata in the SD-card catalog.
+- Arcane Recovery helper restores selected spell slots within a level-based budget and tracks its use.
+- Long Rest restores spell slots; valid exceptions and granted spells can be entered through the All view or custom text.
+
+### Inventory and equipment
+
+- Track item name, notes, quantity, weight, value, charges, and equipped state.
+- Mark items as weapons and store attack ability, proficiency, magic/attack bonus, damage dice, damage bonus, and damage type.
+- Track weapon properties including Finesse, Ranged, Thrown, Versatile, and Two-Handed behavior.
+- Track ammunition and limited-use resources.
+- Create an inventory item directly from a journal entry.
+- Select item names from the bundled catalog or hold OK for custom text.
+- Browse 519 bundled equipment and magic-item records with category, rarity, and source metadata.
+- Item rows show a compact category marker and a magic-item marker on the Flipper display.
+- Selecting a cataloged weapon automatically enables its weapon-tracking fields.
+
+### Dice and attacks
+
+- Roll d4, d6, d8, d10, d12, d20, d100, and configurable multi-die combinations.
+- Normal, Advantage, and Disadvantage d20 modes.
+- Code-drawn multi-frame dice tumble animation with sound and vibration feedback.
+- Display every individual die whenever multiple dice are rolled, plus the dice sum and final modified total.
+- Roll ability checks and saving throws using the active character's calculated modifiers.
+- Roll attacks directly from equipped weapon data.
+- Calculate attack rolls from the selected ability, proficiency, weapon bonus, and other modifiers.
+- Roll normal, versatile, and critical damage.
+- Critical hits double applicable damage dice while adding flat modifiers once.
+- Support configurable extra damage dice for character abilities, magic, poison, and similar effects.
+- Retain roll history details while viewing the result.
+
+### Journal and milestones
+
+- Quick notes, session notes, adventure notes, item notes, and milestones.
+- Editable title and body for each journal entry.
+- Pending and completed milestone states.
+- Milestone level-up action assigned to a selected class.
+- Persistent milestone and journal history per character.
+
+### Initiative tracker
+
+- Saved party roster with names and initiative modifiers.
+- Automatically include the active character.
+- Manually enter or roll initiative values.
+- Add allies, summons, non-player characters, and enemies.
+- Sort highest to lowest and manually resolve ties.
+- Current-turn indicator, Next Turn, Previous Turn, and round counter.
+- Add late arrivals and remove participants during combat.
+- Start, resume, save, and end combat.
+- Keep separate party presets and active encounters for every character profile.
+
+### SD-card catalogs
+
+Copy the included `sd_card/apps_data/pocket_d20/catalogs/` folder to the same path on the Flipper SD card. Catalogs are provided for:
+
+- Classes
+- Subclasses with parent-class metadata
+- Backgrounds
+- Spells with level and class-list metadata
+- Feats
+- Abilities and class features
+- Items
+
+Catalog entries can be extended with additional one-line names. Spell lines may use `Spell|Level|Class, Class`; subclass lines use `Subclass|Parent Class`; item lines use `Name|Category|Rarity|Source`.
 
 ## Controls
 
-- **Up / Down:** move through rows.
-- **Left / Right:** decrease/increase or cycle the selected field. Holding repeats where appropriate.
-- **OK:** open a row, toggle a flag, roll, or confirm.
-- **Back:** return to the previous screen. Back from Home saves and exits.
-- Text fields use the firmware's on-screen keyboard.
+- Up/Down: move through menus or lists.
+- Left/Right: adjust the selected value.
+- Short OK: open, select, toggle, roll, or confirm.
+- Long OK on supported name fields: edit custom text.
+- Long OK in spell or subclass catalogs: toggle filtered and All views.
+- Back: return to the previous screen; from Home, save and exit.
 
-### Characters
+## Installation
 
-- Open **Characters** from Home to see Main and every additional profile.
-- Select **+ New Character** to create and immediately activate a fresh sheet.
-- Press OK on a saved character to autosave the current sheet and switch profiles.
-- Hold OK to delete a non-active secondary character. Main cannot be deleted, and an active character must be switched away from before deletion.
+1. Copy `dist/pocket_d20.fap` to the desired apps folder on the Flipper SD card.
+2. Copy the contents of the included `sd_card/` directory to the root of the SD card.
+3. Launch **Dungeons and Dolphins** from the Flipper application browser.
 
-### Saving throws and skills
+The internal application ID and data directory remain `pocket_d20` so existing deployment paths and firmware integration stay stable during pre-1.0 development.
 
-- Under **Abilities & Saves**, Left/Right normally changes the ability score and OK toggles the save between none and proficient. Hold OK to switch Left/Right into miscellaneous save-modifier editing.
-- That screen explicitly lists all six saves—STR, DEX, CON, INT, WIS, and CHA—with score modifier, proficiency marker, final saving-throw modifier, and editable miscellaneous modifier.
-- Under **Skills**, Left/Right and OK cycle none, proficient, and expertise. Hold OK to switch Left/Right into miscellaneous skill-modifier editing.
-- The Skills list contains all 18 standard skills in STR, DEX, INT, WIS, and CHA groups. Every row starts with its governing ability abbreviation.
-- Every displayed D20 Test total immediately combines its ability modifier, applicable Proficiency Bonus or Expertise, miscellaneous modifier, and the current 2024 Exhaustion penalty.
-- Passive Perception, Insight, and Investigation use shortened labels so their values remain visible. Left/Right on those Vitals rows edits the associated skill's miscellaneous modifier, keeping the passive and active skill calculations in sync.
+## Build verification
 
-### Catalog choices and custom names
+The included FAP was compiled against RogueMaster branch `420`, commit `d3ae1f86bd961852af6969e887a8dd3492a19321`. See `BUILD_VERIFICATION.md` for the exact validation record.
 
-- Short OK on an item, spell, feature/feat, class, subclass, or Background opens a scrollable catalog.
-- Hold OK on the same field to use the on-screen keyboard for a custom name.
-- Built-in starter names work without extra files. The ZIP also contains a ready-to-copy `sd_card/apps_data/pocket_d20/catalogs/` tree with larger SRD lists and public option names from Forgotten Realms, Ravenloft, Eberron, and Xanathar's Guide to Everything.
-- Copy the ZIP's `sd_card/apps_data/pocket_d20/catalogs` folder to `/ext/apps_data/pocket_d20/catalogs/` on the SD card.
-- Catalog files are plain text, one option per line. You can append homebrew or names from add-ons you legally own. Expansion catalogs contain names only; proprietary mechanics, descriptions, and stat blocks are not bundled.
-- Background choices live in their own SD file, `catalogs/backgrounds.txt`; the chosen background is also autosaved in the active character's separate character file.
-
-### Spell tracking
-
-- Open **Magic & Spells** to choose the sheet's spellcasting ability, edit spell attack/save miscellaneous modifiers, review the calculated attack bonus and save DC, and track spell slots.
-- Each spell independently records whether it is Known, Prepared, Always Prepared, and a Ritual.
-- Each spell also records its source class. Opening the spell-name catalog defaults to **Spells: Allowed**, filtering annotated entries by that class's level and spell progression. Hold OK in the catalog to toggle **Spells: All** for unannotated expansion entries, unusual subclass lists, custom classes, or table overrides.
-- Optional spell metadata uses `Spell Name|level|Class1,Class2` in `spells.txt`. A plain name remains valid but appears only in the All view because Pocket d20 will not guess its class eligibility.
-- `K`, `P`, and `A` in the spell list mean Known, Prepared, and Always Prepared. `F` means at least one free cast remains.
-- Set **Free casts max** for spells granted without a spell slot, set the current value, and select **Use one free cast** when cast. A Long Rest restores current free casts to maximum.
-- A Wizard's **Short Rest** opens the Arcane Recovery chooser when the feature is ready and eligible slots have been expended. It enforces a recovery budget of half the Wizard level rounded up, accepts only level 1-5 slots, and becomes available again after a Long Rest.
-
-### Weapon rolls
-
-Open **Combat > Weapon Attacks**. Left/Right cycles Normal, Advantage, and Disadvantage. OK rolls the selected weapon attack. On the result screen:
-
-- **OK:** roll damage; on the damage view, roll it again.
-- **Right:** force critical damage when the table calls a hit critical.
-- **Up:** reroll the attack.
-
-An ammunition weapon consumes one round per attack and will refuse to roll at zero ammunition.
-
-### Initiative
-
-1. Add reusable names and initiative modifiers under **Initiative > Party Roster**.
-2. Choose **Start New Combat**. The character and saved party are copied into the setup list.
-3. Select a participant and press OK to roll `d20 + modifier`, or use Left/Right to enter a total manually.
-4. Add temporary participants if needed, then select **Begin Combat**. The order sorts from highest to lowest.
-5. During combat, OK advances the turn and increments the round after the last participant. Hold OK to make the selected participant current. Hold Left/Right to reorder the selected participant.
-
-Active combat is saved and can be resumed after leaving the app.
-
-### Rests and Exhaustion
-
-- **Short Rest** requires at least 1 HP and refreshes only feature resources configured as **Short/Long**.
-- **Spend Hit Die** rolls the configured Hit Die, adds the Constitution modifier, heals at least 1 HP up to the maximum, decrements the pool, animates the die, and reports the roll.
-- **Long Rest** requires at least 1 HP, restores HP and spent Hit Dice, clears temporary HP and death-save marks, restores spell slots and free casts, refreshes configured rest-based features, resets Arcane Recovery, and reduces Exhaustion by 1.
-- Each 2024 Exhaustion level applies `-2` to D20 Tests and reduces Speed by 5 feet. Pocket d20 applies those effects to calculated D20 Test modifiers, attack rolls, spell attacks, and initiative.
-
-## Saving and recovery
-
-Pocket d20 stores each character in a separate, readable, versioned text file under `/ext/apps_data/pocket_d20/`:
-
-- `character_0.txt` is Main.
-- `character_1.txt` through `character_5.txt` are additional saved characters.
-- `profiles.txt` records which slots exist and which one is active.
-
-Every character file contains the complete sheet plus that character's party roster and initiative state. Saves use a synced temporary `.txt` file and rotate the previous valid file to a `.bak.txt` backup before replacement. If the main character file is missing or invalid, the app attempts its backup before creating a fresh character.
-
-Version 0.3 intentionally does not migrate the pre-1.0 binary save format. Older `character.save` data is ignored and v0.3 starts with the new per-character text format.
-
-## Build from source
-
-Install the RogueMaster build environment, then place this folder at `applications_user/pocket_d20` in the firmware tree and run:
-
-```sh
-./fbt fap_pocket_d20
-```
-
-The result is normally written to:
-
-```text
-build/f7-firmware-C/.extapps/pocket_d20.fap
-```
-
-See `RULES_AUDIT.md` for the official-statistics audit, `FEATURE_CHECKLIST.md` for the request-by-request implementation check, `ROADMAP.md` for the proposed path to 1.0, and `BUILD_VERIFICATION.md` for the exact tested revision and artifact checksum.
-
-## Scope and limitations
-
-- Version 0.3 supports six character profiles and up to four classes per character.
-- The app is a tracker and roller, not a complete rules engine. It does not automatically apply every class table, subclass benefit, prerequisite, spell rule, condition, inventory interaction, or multiclass spell-slot calculation.
-- Class perks/features are selected from names or entered manually, then class-linked. Pocket d20 does not bundle proprietary feature rules text; record mechanics you own in the feature notes and resource fields.
-- A multiclass character currently has one configurable pooled Hit Die type. Mixed Hit Die pools are planned for a later release and are called out in the roadmap.
-- Expansion catalogs contain option names for convenient selection, not the proprietary rules attached to those options. Enter mechanics you own in the notes and editable statistics.
-- Compilation and firmware API validation were performed; physical-device interaction was not available in this environment.
-
-Pocket d20 is an independent fan-made utility and is not affiliated with or endorsed by Wizards of the Coast.
+Physical-device interaction remains to be tested. This application is a tracker and roller, not a complete automated rules engine; unusual campaign rules and granted abilities can be represented with custom entries.

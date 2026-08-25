@@ -4,7 +4,7 @@ Copy this catalogs folder to:
 /ext/apps_data/pocket_d20/catalogs/
 
 Each file normally uses one option per line. Blank lines and lines beginning with # are ignored.
-Pocket d20 merges these entries with its built-in SRD starter names and removes duplicates.
+Pocket d20 merges these entries with its built-in SRD names and removes duplicates.
 Append homebrew or legally obtained add-on names to the appropriate file. The app stores only
 the selected name in the character save; rules text and licensed add-on content are not bundled.
 
@@ -19,4 +19,7 @@ Spell Name|level|Class1,Class2
 
 Annotated spells appear by default only when the spell's assigned source class can cast that
 spell level and its class is listed. Plain spell names remain supported but appear in the
-Spells: All view. Hold OK in the spell catalog to toggle Allowed/All.
+Spell lines may use Spell|Level|Class, Class metadata. Hold OK in the spell catalog to toggle Allowed/All.
+Subclass lines use Subclass|Parent Class. The default view shows only the selected class; hold OK for All.
+Item lines use Name|Category|Rarity|Source. Supported categories include Weapon, Armor, Gear, Tool,
+Mount/Vehicle, Potion, Ring, Rod, Scroll, Staff, Wand, and Wondrous.

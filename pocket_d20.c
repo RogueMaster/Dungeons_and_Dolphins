@@ -15,7 +15,7 @@
 #define POCKET_D20_MAX_GENERIC_ROLLS 20U
 #define POCKET_D20_DICE_ANIMATION_FRAMES 8U
 #define POCKET_D20_DICE_ANIMATION_EVENT 0xD120U
-#define POCKET_D20_MAX_CATALOG_ENTRIES 384U
+#define POCKET_D20_MAX_CATALOG_ENTRIES 576U
 
 typedef enum {
     PocketViewMain,
@@ -67,14 +67,18 @@ typedef enum {
 
 enum {
     PocketClassMaskArtificer = 1U << 0,
-    PocketClassMaskBard = 1U << 1,
-    PocketClassMaskCleric = 1U << 2,
-    PocketClassMaskDruid = 1U << 3,
-    PocketClassMaskPaladin = 1U << 4,
-    PocketClassMaskRanger = 1U << 5,
-    PocketClassMaskSorcerer = 1U << 6,
-    PocketClassMaskWarlock = 1U << 7,
-    PocketClassMaskWizard = 1U << 8,
+    PocketClassMaskBarbarian = 1U << 1,
+    PocketClassMaskBard = 1U << 2,
+    PocketClassMaskCleric = 1U << 3,
+    PocketClassMaskDruid = 1U << 4,
+    PocketClassMaskFighter = 1U << 5,
+    PocketClassMaskMonk = 1U << 6,
+    PocketClassMaskPaladin = 1U << 7,
+    PocketClassMaskRanger = 1U << 8,
+    PocketClassMaskRogue = 1U << 9,
+    PocketClassMaskSorcerer = 1U << 10,
+    PocketClassMaskWarlock = 1U << 11,
+    PocketClassMaskWizard = 1U << 12,
 };
 
 typedef struct {
@@ -82,6 +86,27 @@ typedef struct {
     uint8_t level;
     uint16_t class_mask;
 } PocketBuiltinSpell;
+
+typedef struct {
+    const char* name;
+    uint16_t class_mask;
+} PocketBuiltinSubclass;
+
+typedef enum {
+    PocketItemCategoryOther,
+    PocketItemCategoryWeapon,
+    PocketItemCategoryArmor,
+    PocketItemCategoryGear,
+    PocketItemCategoryTool,
+    PocketItemCategoryMountVehicle,
+    PocketItemCategoryPotion,
+    PocketItemCategoryRing,
+    PocketItemCategoryRod,
+    PocketItemCategoryScroll,
+    PocketItemCategoryStaff,
+    PocketItemCategoryWand,
+    PocketItemCategoryWondrous,
+} PocketItemCategory;
 
 typedef enum {
     PocketEditNone,
@@ -131,6 +156,8 @@ typedef struct {
     uint8_t catalog_levels[POCKET_D20_MAX_CATALOG_ENTRIES];
     uint16_t catalog_class_masks[POCKET_D20_MAX_CATALOG_ENTRIES];
     uint8_t catalog_has_metadata[POCKET_D20_MAX_CATALOG_ENTRIES];
+    uint8_t catalog_item_categories[POCKET_D20_MAX_CATALOG_ENTRIES];
+    uint8_t catalog_item_magic[POCKET_D20_MAX_CATALOG_ENTRIES];
     uint8_t catalog_show_all;
     uint8_t edit_slot_max;
     uint8_t edit_modifier_mode;
@@ -205,34 +232,19 @@ static const char* const pocket_catalog_classes[] = {
     "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk",
     "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"};
 
-static const char* const pocket_catalog_subclasses[] = {
-    "Path of the Berserker",
-    "College of Lore",
-    "Life Domain",
-    "Circle of the Land",
-    "Champion",
-    "Warrior of the Open Hand",
-    "Oath of Devotion",
-    "Hunter",
-    "Thief",
-    "Draconic Sorcery",
-    "Fiend Patron",
-    "Evoker",
-    "College of the Moon",
-    "Knowledge Domain",
-    "Banneret",
-    "Oath of the Noble Genies",
-    "Winter Walker",
-    "Scion of the Three",
-    "Spellfire Sorcery",
-    "Bladesinger",
-    "College of Spirits",
-    "The Undead",
-    "Alchemist",
-    "Armorer",
-    "Artillerist",
-    "Battle Smith",
-    "Cartographer",
+static const PocketBuiltinSubclass pocket_catalog_subclasses[] = {
+    {"Path of the Berserker", PocketClassMaskBarbarian},
+    {"College of Lore", PocketClassMaskBard},
+    {"Life Domain", PocketClassMaskCleric},
+    {"Circle of the Land", PocketClassMaskDruid},
+    {"Champion", PocketClassMaskFighter},
+    {"Warrior of the Open Hand", PocketClassMaskMonk},
+    {"Oath of Devotion", PocketClassMaskPaladin},
+    {"Hunter", PocketClassMaskRanger},
+    {"Thief", PocketClassMaskRogue},
+    {"Draconic Sorcery", PocketClassMaskSorcerer},
+    {"Fiend Patron", PocketClassMaskWarlock},
+    {"Evoker", PocketClassMaskWizard},
 };
 
 static const char* const pocket_catalog_backgrounds[] = {
@@ -658,15 +670,30 @@ static uint8_t pocket_cycle_die(uint8_t current, int8_t delta, bool damage_only)
 
 static uint16_t pocket_class_mask_from_name(const char* name) {
     if(strcmp(name, "Artificer") == 0) return PocketClassMaskArtificer;
+    if(strcmp(name, "Barbarian") == 0) return PocketClassMaskBarbarian;
     if(strcmp(name, "Bard") == 0) return PocketClassMaskBard;
     if(strcmp(name, "Cleric") == 0) return PocketClassMaskCleric;
     if(strcmp(name, "Druid") == 0) return PocketClassMaskDruid;
+    if(strcmp(name, "Fighter") == 0) return PocketClassMaskFighter;
+    if(strcmp(name, "Monk") == 0) return PocketClassMaskMonk;
     if(strcmp(name, "Paladin") == 0) return PocketClassMaskPaladin;
     if(strcmp(name, "Ranger") == 0) return PocketClassMaskRanger;
+    if(strcmp(name, "Rogue") == 0) return PocketClassMaskRogue;
     if(strcmp(name, "Sorcerer") == 0) return PocketClassMaskSorcerer;
     if(strcmp(name, "Warlock") == 0) return PocketClassMaskWarlock;
     if(strcmp(name, "Wizard") == 0) return PocketClassMaskWizard;
     return 0U;
+}
+
+static bool pocket_subclass_allowed(
+    const PocketD20App* app,
+    uint16_t class_mask,
+    bool has_metadata) {
+    if(app->catalog_show_all) return true;
+    if(!has_metadata || app->record_index >= app->data.character.class_count) return false;
+    uint16_t selected_class = pocket_class_mask_from_name(
+        app->data.character.classes[app->record_index].name);
+    return selected_class && (class_mask & selected_class);
 }
 
 static uint8_t pocket_class_max_spell_level(const PocketClassLevel* class_level) {
@@ -708,7 +735,7 @@ static const char* pocket_catalog_title(const PocketD20App* app) {
     case PocketCatalogClasses:
         return "Choose Class";
     case PocketCatalogSubclasses:
-        return "Choose Subclass";
+        return app->catalog_show_all ? "Subclasses: All" : "Choose Subclass";
     case PocketCatalogBackgrounds:
         return "Choose Background";
     case PocketCatalogSpells:
@@ -728,9 +755,12 @@ static bool pocket_catalog_add_metadata(
     uint8_t level,
     uint16_t class_mask,
     bool has_metadata) {
-    if(app->catalog_kind == PocketCatalogSpells &&
-       !pocket_spell_allowed(app, level, class_mask, has_metadata))
+    if(app->catalog_kind == PocketCatalogSpells) {
+        if(!pocket_spell_allowed(app, level, class_mask, has_metadata)) return false;
+    } else if(app->catalog_kind == PocketCatalogSubclasses &&
+              !pocket_subclass_allowed(app, class_mask, has_metadata)) {
         return false;
+    }
     if(!name[0] || app->catalog_count >= POCKET_D20_MAX_CATALOG_ENTRIES) return false;
     for(uint16_t i = 0U; i < app->catalog_count; ++i) {
         if(strcmp(app->catalog_entries[i], name) == 0) {
@@ -757,6 +787,68 @@ static bool pocket_catalog_add(PocketD20App* app, const char* name) {
     return pocket_catalog_add_metadata(app, name, 0U, 0U, false);
 }
 
+static uint8_t pocket_item_category_from_name(const char* category) {
+    if(strcmp(category, "Weapon") == 0) return PocketItemCategoryWeapon;
+    if(strcmp(category, "Armor") == 0) return PocketItemCategoryArmor;
+    if(strcmp(category, "Gear") == 0) return PocketItemCategoryGear;
+    if(strcmp(category, "Tool") == 0) return PocketItemCategoryTool;
+    if(strcmp(category, "Mount/Vehicle") == 0) return PocketItemCategoryMountVehicle;
+    if(strcmp(category, "Potion") == 0) return PocketItemCategoryPotion;
+    if(strcmp(category, "Ring") == 0) return PocketItemCategoryRing;
+    if(strcmp(category, "Rod") == 0) return PocketItemCategoryRod;
+    if(strcmp(category, "Scroll") == 0) return PocketItemCategoryScroll;
+    if(strcmp(category, "Staff") == 0) return PocketItemCategoryStaff;
+    if(strcmp(category, "Wand") == 0) return PocketItemCategoryWand;
+    if(strcmp(category, "Wondrous") == 0) return PocketItemCategoryWondrous;
+    return PocketItemCategoryOther;
+}
+
+static const char* pocket_item_category_mark(uint8_t category) {
+    switch(category) {
+    case PocketItemCategoryWeapon:
+        return "W";
+    case PocketItemCategoryArmor:
+        return "A";
+    case PocketItemCategoryGear:
+        return "G";
+    case PocketItemCategoryTool:
+        return "T";
+    case PocketItemCategoryMountVehicle:
+        return "M";
+    case PocketItemCategoryPotion:
+        return "P";
+    case PocketItemCategoryRing:
+        return "R";
+    case PocketItemCategoryRod:
+        return "D";
+    case PocketItemCategoryScroll:
+        return "S";
+    case PocketItemCategoryStaff:
+        return "F";
+    case PocketItemCategoryWand:
+        return "N";
+    case PocketItemCategoryWondrous:
+        return "O";
+    default:
+        return "?";
+    }
+}
+
+static void pocket_catalog_add_item(
+    PocketD20App* app,
+    const char* name,
+    uint8_t category,
+    bool magic) {
+    if(!pocket_catalog_add(app, name)) return;
+    for(uint16_t i = 0U; i < app->catalog_count; ++i) {
+        if(strcmp(app->catalog_entries[i], name) == 0) {
+            app->catalog_item_categories[i] = category;
+            app->catalog_item_magic[i] = magic ? 1U : 0U;
+            return;
+        }
+    }
+}
+
 static void pocket_catalog_add_builtins(PocketD20App* app, PocketCatalogKind kind) {
     const char* const* entries = NULL;
     size_t count = 0U;
@@ -766,9 +858,17 @@ static void pocket_catalog_add_builtins(PocketD20App* app, PocketCatalogKind kin
         count = sizeof(pocket_catalog_classes) / sizeof(pocket_catalog_classes[0]);
         break;
     case PocketCatalogSubclasses:
-        entries = pocket_catalog_subclasses;
-        count = sizeof(pocket_catalog_subclasses) / sizeof(pocket_catalog_subclasses[0]);
-        break;
+        for(size_t i = 0U;
+            i < sizeof(pocket_catalog_subclasses) / sizeof(pocket_catalog_subclasses[0]);
+            ++i) {
+            pocket_catalog_add_metadata(
+                app,
+                pocket_catalog_subclasses[i].name,
+                0U,
+                pocket_catalog_subclasses[i].class_mask,
+                true);
+        }
+        return;
     case PocketCatalogBackgrounds:
         entries = pocket_catalog_backgrounds;
         count = sizeof(pocket_catalog_backgrounds) / sizeof(pocket_catalog_backgrounds[0]);
@@ -805,6 +905,44 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
     while(end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) --end;
     *end = '\0';
     if(!start[0] || start[0] == '#') return;
+    if(app->catalog_kind == PocketCatalogItems) {
+        char* category_separator = strchr(start, '|');
+        if(!category_separator) {
+            pocket_catalog_add_item(app, start, PocketItemCategoryOther, false);
+            return;
+        }
+        *category_separator = '\0';
+        char* category = category_separator + 1U;
+        char* rarity_separator = strchr(category, '|');
+        if(rarity_separator) *rarity_separator = '\0';
+        char* category_end = category + strlen(category);
+        while(category_end > category && (category_end[-1] == ' ' || category_end[-1] == '\t'))
+            --category_end;
+        *category_end = '\0';
+        bool magic = false;
+        if(rarity_separator) {
+            char* rarity = rarity_separator + 1U;
+            char* source_separator = strchr(rarity, '|');
+            if(source_separator) *source_separator = '\0';
+            while(*rarity == ' ' || *rarity == '\t') ++rarity;
+            magic = strcmp(rarity, "Mundane") != 0;
+        }
+        pocket_catalog_add_item(app, start, pocket_item_category_from_name(category), magic);
+        return;
+    }
+    if(app->catalog_kind == PocketCatalogSubclasses) {
+        char* class_separator = strrchr(start, '|');
+        if(!class_separator) {
+            pocket_catalog_add_metadata(app, start, 0U, 0U, false);
+            return;
+        }
+        *class_separator = '\0';
+        char* class_name = class_separator + 1U;
+        while(*class_name == ' ' || *class_name == '\t') ++class_name;
+        uint16_t mask = pocket_class_mask_from_name(class_name);
+        pocket_catalog_add_metadata(app, start, 0U, mask, mask != 0U);
+        return;
+    }
     if(app->catalog_kind != PocketCatalogSpells) {
         pocket_catalog_add(app, start);
         return;
@@ -887,6 +1025,8 @@ static void pocket_open_catalog(
     app->catalog_show_all = 0U;
     app->catalog_count = 0U;
     memset(app->catalog_has_metadata, 0, sizeof(app->catalog_has_metadata));
+    memset(app->catalog_item_categories, 0, sizeof(app->catalog_item_categories));
+    memset(app->catalog_item_magic, 0, sizeof(app->catalog_item_magic));
     pocket_catalog_add_builtins(app, kind);
     pocket_catalog_load_external(app, kind);
     pocket_enter_screen(app, PocketScreenCatalog);
@@ -1404,6 +1544,15 @@ static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
                 sizeof(row),
                 "L%u %s",
                 app->catalog_levels[index],
+                app->catalog_entries[index]);
+        else if(app->catalog_kind == PocketCatalogItems &&
+                app->catalog_item_categories[index] != PocketItemCategoryOther)
+            snprintf(
+                row,
+                sizeof(row),
+                "%s%s %s",
+                pocket_item_category_mark(app->catalog_item_categories[index]),
+                app->catalog_item_magic[index] ? "*" : " ",
                 app->catalog_entries[index]);
         else
             pocket_copy(row, sizeof(row), app->catalog_entries[index]);
@@ -3316,6 +3465,8 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
         break;
     case PocketEditItemName:
         pocket_copy(character->items[index].name, sizeof(character->items[index].name), selected);
+        if(app->catalog_item_categories[app->selection] == PocketItemCategoryWeapon)
+            character->items[index].is_weapon = 1U;
         break;
     case PocketEditBackground:
         pocket_copy(character->background, sizeof(character->background), selected);
@@ -3339,7 +3490,8 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
     else if(app->catalog_count && pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, app->catalog_count, 1);
     else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-            app->catalog_kind == PocketCatalogSpells) {
+            (app->catalog_kind == PocketCatalogSpells ||
+             app->catalog_kind == PocketCatalogSubclasses)) {
         app->catalog_show_all = !app->catalog_show_all;
         app->catalog_count = 0U;
         app->selection = 0U;
@@ -3347,7 +3499,10 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
         memset(app->catalog_has_metadata, 0, sizeof(app->catalog_has_metadata));
         pocket_catalog_add_builtins(app, app->catalog_kind);
         pocket_catalog_load_external(app, app->catalog_kind);
-        pocket_set_status(app, app->catalog_show_all ? "Showing all" : "Class + level filter");
+        pocket_set_status(
+            app,
+            app->catalog_show_all ? "Showing all" :
+            app->catalog_kind == PocketCatalogSpells ? "Class + level filter" : "Class filter");
     } else if(event->type == InputTypeShort && event->key == InputKeyOk)
         pocket_apply_catalog_selection(app);
 }
