@@ -1,0 +1,11 @@
+App(
+    appid="pocket_d20",
+    name="Pocket d20",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="pocket_d20_app",
+    stack_size=8 * 1024,
+    fap_category="Games",
+    fap_author="RogueMaster",
+    fap_version="0.1",
+    fap_description="Offline 5E-compatible character, journal, dice, and initiative tracker.",
+)
