@@ -4,25 +4,46 @@
 
 #include <storage/storage.h>
 
-#define POCKET_D20_MAX_PROFILES 6U
+typedef struct {
+    uint32_t id;
+    uint8_t level;
+    char name[POCKET_D20_NAME_LEN];
+} PocketProfileEntry;
 
 typedef struct {
-    uint8_t active_profile;
-    uint8_t occupied_mask;
-    char names[POCKET_D20_MAX_PROFILES][POCKET_D20_NAME_LEN];
+    uint32_t active_profile;
+    uint16_t count;
+    uint16_t capacity;
+    PocketProfileEntry* entries;
 } PocketProfileState;
 
 void pocket_d20_profiles_set_defaults(PocketProfileState* profiles);
+void pocket_d20_profiles_free(PocketProfileState* profiles);
 bool pocket_d20_profiles_load(Storage* storage, PocketProfileState* profiles);
 bool pocket_d20_profiles_save(Storage* storage, const PocketProfileState* profiles);
+bool pocket_d20_profiles_refresh(Storage* storage, PocketProfileState* profiles);
+uint32_t pocket_d20_profiles_next_id(const PocketProfileState* profiles);
 
 bool pocket_d20_storage_load_profile(
     Storage* storage,
-    uint8_t profile,
+    uint32_t profile,
     PocketSaveData* data,
-    bool* recovered_backup);
+    bool* recovered_backup,
+    bool* migrated);
 bool pocket_d20_storage_save_profile(
     Storage* storage,
-    uint8_t profile,
+    uint32_t profile,
     const PocketSaveData* data);
-bool pocket_d20_storage_delete_profile(Storage* storage, uint8_t profile);
+bool pocket_d20_storage_delete_profile(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t destination);
+bool pocket_d20_storage_export_profile(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_archive_profile(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_verify_profile(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_restore_backup(
+    Storage* storage,
+    uint32_t profile,
+    PocketSaveData* data);
+bool pocket_d20_storage_import_first(
+    Storage* storage,
+    uint32_t destination,
+    PocketSaveData* data);

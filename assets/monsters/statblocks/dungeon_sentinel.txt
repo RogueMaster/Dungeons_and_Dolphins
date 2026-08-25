@@ -1,0 +1,10 @@
+SizeAlignment=Large, Unaligned
+Speed=25 ft.
+Abilities=20,8,18,8,12,6
+Skills=Perception +4
+Defenses=Resist Bludgeoning, Piercing, Slashing; Immune Poison
+Senses=Darkvision 120 ft.; Passive Perception 14
+Languages=Understands creator languages
+Traits=Immutable Form; Vigilant
+Actions=Multiattack; Stone Hammer +8, 14 bludgeoning
+Extra=Original Dungeons & Dolphins creature

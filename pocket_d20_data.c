@@ -27,6 +27,20 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
     pocket_d20_copy(character->species, sizeof(character->species), "Human");
     pocket_d20_copy(character->background, sizeof(character->background), "Adventurer");
     pocket_d20_copy(character->alignment, sizeof(character->alignment), "Neutral");
+    pocket_d20_copy(character->origin_feat, sizeof(character->origin_feat), "None");
+    character->size = PocketSizeMedium;
+    pocket_d20_copy(character->senses, sizeof(character->senses), "Normal vision");
+    pocket_d20_copy(character->movement_modes, sizeof(character->movement_modes), "Walk 30 ft");
+    pocket_d20_copy(
+        character->adventure_campaign,
+        sizeof(character->adventure_campaign),
+        "reef_wardens");
+    pocket_d20_copy(character->adventure_scene, sizeof(character->adventure_scene), "reef_gate");
+    pocket_d20_copy(
+        character->adventure_checkpoint,
+        sizeof(character->adventure_checkpoint),
+        "reef_gate");
+    character->reaction_available = 1U;
 
     character->class_count = 1U;
     pocket_d20_copy(character->classes[0].name, sizeof(character->classes[0].name), "Fighter");
@@ -35,6 +49,11 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
         sizeof(character->classes[0].subclass),
         "None");
     character->classes[0].level = 1U;
+    character->classes[0].hit_die = 10U;
+    character->classes[0].hit_dice_current = 1U;
+    character->classes[0].hit_dice_max = 1U;
+    character->classes[0].spellcasting_mode = PocketSpellcastingNone;
+    character->classes[0].spellcasting_ability = PocketAbilityIntelligence;
     character->milestone_leveling = 1U;
 
     for(uint8_t i = 0U; i < POCKET_D20_ABILITY_COUNT; ++i) {
@@ -70,6 +89,8 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
     sword->versatile_die = 10U;
     sword->damage_type = PocketDamageSlashing;
     sword->add_ability_damage = 1U;
+    sword->container_index = -1;
+    sword->armor_dex_cap = -1;
 
     character->journal_count = 1U;
     PocketJournalEntry* note = &character->journal[0];
@@ -79,6 +100,27 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
         sizeof(note->body),
         "Use Journal for adventure notes, item ideas, and milestones.");
     note->category = PocketJournalQuick;
+
+    character->attack_template_count = 3U;
+    PocketAttackTemplate* unarmed = &character->attack_templates[0];
+    pocket_d20_copy(unarmed->name, sizeof(unarmed->name), "Unarmed Strike");
+    pocket_d20_copy(unarmed->damage_type, sizeof(unarmed->damage_type), "Bludgeoning");
+    unarmed->type = PocketAttackTemplateUnarmed;
+    unarmed->ability = PocketAbilityStrength;
+    unarmed->damage_dice = 1U;
+    unarmed->damage_die = 1U;
+    PocketAttackTemplate* spell_attack = &character->attack_templates[1];
+    pocket_d20_copy(spell_attack->name, sizeof(spell_attack->name), "Spell Attack");
+    spell_attack->type = PocketAttackTemplateSpellAttack;
+    spell_attack->ability = PocketAbilityIntelligence;
+    spell_attack->damage_dice = 1U;
+    spell_attack->damage_die = 10U;
+    PocketAttackTemplate* saving_throw = &character->attack_templates[2];
+    pocket_d20_copy(saving_throw->name, sizeof(saving_throw->name), "Saving Throw Action");
+    saving_throw->type = PocketAttackTemplateSavingThrow;
+    saving_throw->save_ability = PocketAbilityDexterity;
+    saving_throw->damage_dice = 1U;
+    saving_throw->damage_die = 6U;
 
     data->initiative.round = 1U;
 }
@@ -92,6 +134,27 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
     character->background[sizeof(character->background) - 1U] = '\0';
     character->alignment[sizeof(character->alignment) - 1U] = '\0';
     character->other_proficiencies[sizeof(character->other_proficiencies) - 1U] = '\0';
+    character->origin_feat[sizeof(character->origin_feat) - 1U] = '\0';
+    character->tool_proficiencies[sizeof(character->tool_proficiencies) - 1U] = '\0';
+    character->armor_training[sizeof(character->armor_training) - 1U] = '\0';
+    character->weapon_training[sizeof(character->weapon_training) - 1U] = '\0';
+    character->senses[sizeof(character->senses) - 1U] = '\0';
+    character->adventure_campaign[sizeof(character->adventure_campaign) - 1U] = '\0';
+    character->adventure_scene[sizeof(character->adventure_scene) - 1U] = '\0';
+    character->adventure_checkpoint[sizeof(character->adventure_checkpoint) - 1U] = '\0';
+    if(!character->adventure_campaign[0])
+        pocket_d20_copy(
+            character->adventure_campaign,
+            sizeof(character->adventure_campaign),
+            "reef_wardens");
+    if(!character->adventure_scene[0])
+        pocket_d20_copy(character->adventure_scene, sizeof(character->adventure_scene), "reef_gate");
+    if(!character->adventure_checkpoint[0])
+        pocket_d20_copy(
+            character->adventure_checkpoint,
+            sizeof(character->adventure_checkpoint),
+            character->adventure_scene);
+    character->size = pocket_d20_clamp_u8(character->size, PocketSizeCount - 1U);
 
     character->class_count =
         pocket_d20_clamp_u8(character->class_count, POCKET_D20_MAX_CLASSES);
@@ -101,6 +164,19 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
         class_level->name[sizeof(class_level->name) - 1U] = '\0';
         class_level->subclass[sizeof(class_level->subclass) - 1U] = '\0';
         class_level->level = pocket_d20_clamp_u8(class_level->level, 20U);
+        if(class_level->hit_die != 6U && class_level->hit_die != 8U &&
+           class_level->hit_die != 10U && class_level->hit_die != 12U)
+            class_level->hit_die = 8U;
+        class_level->hit_dice_max = pocket_d20_clamp_u8(class_level->hit_dice_max, 20U);
+        class_level->hit_dice_current = pocket_d20_clamp_u8(
+            class_level->hit_dice_current, class_level->hit_dice_max);
+        class_level->spellcasting_mode = pocket_d20_clamp_u8(
+            class_level->spellcasting_mode, PocketSpellcastingModeCount - 1U);
+        class_level->spellcasting_ability = pocket_d20_clamp_u8(
+            class_level->spellcasting_ability, PocketAbilityCharisma);
+        class_level->cantrip_limit = pocket_d20_clamp_u8(class_level->cantrip_limit, 30U);
+        class_level->prepared_limit = pocket_d20_clamp_u8(class_level->prepared_limit, 50U);
+        class_level->pact_slot_level = pocket_d20_clamp_u8(class_level->pact_slot_level, 5U);
     }
     if(character->classes[0].level == 0U) character->classes[0].level = 1U;
 
@@ -159,6 +235,12 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
             pocket_d20_clamp_u8(character->spells[i].class_index, POCKET_D20_MAX_CLASSES - 1U);
         character->spells[i].prepared = character->spells[i].prepared ? 1U : 0U;
         character->spells[i].ritual = character->spells[i].ritual ? 1U : 0U;
+        character->spells[i].stable_id[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        character->spells[i].source[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        character->spells[i].school[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        character->spells[i].grant_name[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        character->spells[i].grant_source = pocket_d20_clamp_u8(
+            character->spells[i].grant_source, PocketGrantSourceCount - 1U);
         character->spell_known[i] = character->spell_known[i] ? 1U : 0U;
         character->spell_always_prepared[i] =
             character->spell_always_prepared[i] ? 1U : 0U;
@@ -178,6 +260,10 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
             pocket_d20_clamp_u8(character->features[i].class_level_gained, 20U);
         character->features[i].recharge =
             pocket_d20_clamp_u8(character->features[i].recharge, PocketRechargeCount - 1U);
+        character->features[i].resource_formula = pocket_d20_clamp_u8(
+            character->features[i].resource_formula, PocketResourceFormulaCount - 1U);
+        character->features[i].resource_ability = pocket_d20_clamp_u8(
+            character->features[i].resource_ability, PocketAbilityCharisma);
     }
     for(uint8_t i = 0U; i < POCKET_D20_MAX_ITEMS; ++i) {
         PocketItem* item = &character->items[i];
@@ -188,6 +274,12 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
         item->damage_type = pocket_d20_clamp_u8(item->damage_type, PocketDamageTypeCount - 1U);
         item->damage_dice = pocket_d20_clamp_u8(item->damage_dice, 20U);
         item->extra_dice = pocket_d20_clamp_u8(item->extra_dice, 20U);
+        item->container_index = (int8_t)pocket_d20_clamp_i16(
+            item->container_index, -1, POCKET_D20_MAX_ITEMS - 1U);
+        item->charges_current = pocket_d20_clamp_i16(item->charges_current, 0, 999);
+        item->charges_max = pocket_d20_clamp_i16(item->charges_max, 0, 999);
+        item->armor_dex_cap = (int8_t)pocket_d20_clamp_i16(item->armor_dex_cap, -1, 9);
+        item->ammunition_group[POCKET_D20_SHORT_LEN - 1U] = '\0';
     }
     for(uint8_t i = 0U; i < POCKET_D20_MAX_LANGUAGES; ++i) {
         character->languages[i][POCKET_D20_SHORT_LEN - 1U] = '\0';
@@ -202,6 +294,42 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
             pocket_d20_clamp_u8(entry->class_index, POCKET_D20_MAX_CLASSES - 1U);
     }
 
+    character->conditions[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->concentration[POCKET_D20_NAME_LEN - 1U] = '\0';
+    character->temporary_effects[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->resistances[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->immunities[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->vulnerabilities[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->movement_modes[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->reaction_available = character->reaction_available ? 1U : 0U;
+    character->grant_count = pocket_d20_clamp_u8(character->grant_count, POCKET_D20_MAX_GRANTS);
+    for(uint8_t i = 0U; i < character->grant_count; ++i) {
+        PocketGrant* grant = &character->grants[i];
+        grant->stable_id[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        grant->source[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        grant->option_name[POCKET_D20_NAME_LEN - 1U] = '\0';
+        grant->prerequisites[POCKET_D20_NAME_LEN - 1U] = '\0';
+        grant->grant_value[POCKET_D20_NAME_LEN - 1U] = '\0';
+        grant->source_type = pocket_d20_clamp_u8(grant->source_type, PocketGrantSourceCount - 1U);
+        grant->class_index = pocket_d20_clamp_u8(grant->class_index, POCKET_D20_MAX_CLASSES - 1U);
+        grant->level_gained = pocket_d20_clamp_u8(grant->level_gained, 20U);
+        grant->status = pocket_d20_clamp_u8(grant->status, PocketGrantSkipped);
+    }
+    character->attack_template_count = pocket_d20_clamp_u8(
+        character->attack_template_count, POCKET_D20_MAX_ATTACK_TEMPLATES);
+    for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
+        PocketAttackTemplate* attack = &character->attack_templates[i];
+        attack->name[POCKET_D20_NAME_LEN - 1U] = '\0';
+        attack->mastery[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        attack->damage_type[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        attack->rider_type[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        attack->type = pocket_d20_clamp_u8(attack->type, PocketAttackTemplateTypeCount - 1U);
+        attack->ability = pocket_d20_clamp_u8(attack->ability, PocketAbilityCharisma);
+        attack->save_ability = pocket_d20_clamp_u8(attack->save_ability, PocketAbilityCharisma);
+        attack->damage_dice = pocket_d20_clamp_u8(attack->damage_dice, 20U);
+        attack->rider_dice = pocket_d20_clamp_u8(attack->rider_dice, 20U);
+    }
+
     data->party_count = pocket_d20_clamp_u8(data->party_count, POCKET_D20_MAX_PARTY);
     for(uint8_t i = 0U; i < POCKET_D20_MAX_PARTY; ++i) {
         data->party[i].name[POCKET_D20_SHORT_LEN - 1U] = '\0';
@@ -213,5 +341,12 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
         data->initiative.current_turn = 0U;
     for(uint8_t i = 0U; i < POCKET_D20_MAX_INITIATIVE; ++i) {
         data->initiative.entries[i].name[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        data->initiative.entries[i].conditions[POCKET_D20_SHORT_LEN - 1U] = '\0';
+    }
+    data->encounter_history_count = pocket_d20_clamp_u8(
+        data->encounter_history_count, POCKET_D20_MAX_ENCOUNTER_HISTORY);
+    for(uint8_t i = 0U; i < data->encounter_history_count; ++i) {
+        data->encounter_history[i].kind = pocket_d20_clamp_u8(
+            data->encounter_history[i].kind, PocketHistoryKindCount - 1U);
     }
 }

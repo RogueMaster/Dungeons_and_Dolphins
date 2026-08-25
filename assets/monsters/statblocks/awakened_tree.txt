@@ -1,0 +1,10 @@
+SizeAlignment=Huge, Neutral
+Speed=20 ft.
+Abilities=19,6,15,10,10,7
+Skills=None listed
+Defenses=Vulnerable Fire; Resist Bludgeoning and Piercing
+Senses=Passive Perception 10
+Languages=Common plus one other language
+Traits=None listed
+Actions=Slam +6, 14 bludgeoning
+Extra=None

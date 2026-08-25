@@ -1,0 +1,10 @@
+SizeAlignment=Medium, Neutral
+Speed=30 ft.
+Abilities=13,12,12,9,10,10
+Skills=Athletics +3; Intimidation +2
+Defenses=None
+Senses=Passive Perception 10
+Languages=Common
+Traits=Pack Tactics
+Actions=Club +3, 4 bludgeoning; Sling +3, 3 bludgeoning
+Extra=Original Dungeons & Dolphins creature

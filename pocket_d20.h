@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define POCKET_D20_SAVE_VERSION 3U
+#define POCKET_D20_SAVE_VERSION 1U
 
 #define POCKET_D20_NAME_LEN 32U
 #define POCKET_D20_SHORT_LEN 24U
@@ -18,6 +18,9 @@
 #define POCKET_D20_MAX_JOURNAL 24U
 #define POCKET_D20_MAX_PARTY 16U
 #define POCKET_D20_MAX_INITIATIVE 24U
+#define POCKET_D20_MAX_GRANTS 24U
+#define POCKET_D20_MAX_ATTACK_TEMPLATES 8U
+#define POCKET_D20_MAX_ENCOUNTER_HISTORY 16U
 
 #define POCKET_D20_SKILL_COUNT 18U
 #define POCKET_D20_ABILITY_COUNT 6U
@@ -40,10 +43,63 @@ typedef enum {
 
 typedef enum {
     PocketRechargeManual,
+    PocketRechargeTurn,
+    PocketRechargeEncounter,
+    PocketRechargeDawn,
     PocketRechargeShortOrLong,
     PocketRechargeLong,
     PocketRechargeCount,
 } PocketRecharge;
+
+typedef enum {
+    PocketSizeTiny,
+    PocketSizeSmall,
+    PocketSizeMedium,
+    PocketSizeLarge,
+    PocketSizeCount,
+} PocketSize;
+
+typedef enum {
+    PocketSpellcastingNone,
+    PocketSpellcastingFull,
+    PocketSpellcastingHalf,
+    PocketSpellcastingThird,
+    PocketSpellcastingPact,
+    PocketSpellcastingSpellPoints,
+    PocketSpellcastingCustom,
+    PocketSpellcastingModeCount,
+} PocketSpellcastingMode;
+
+typedef enum {
+    PocketGrantSpecies,
+    PocketGrantBackground,
+    PocketGrantFeat,
+    PocketGrantClassFeature,
+    PocketGrantSubclassFeature,
+    PocketGrantItem,
+    PocketGrantSourceCount,
+} PocketGrantSource;
+
+typedef enum {
+    PocketGrantPending,
+    PocketGrantApplied,
+    PocketGrantSkipped,
+} PocketGrantStatus;
+
+typedef enum {
+    PocketResourceManual,
+    PocketResourceProficiency,
+    PocketResourceAbility,
+    PocketResourceFormulaCount,
+} PocketResourceFormula;
+
+typedef enum {
+    PocketAttackTemplateUnarmed,
+    PocketAttackTemplateSpellAttack,
+    PocketAttackTemplateSavingThrow,
+    PocketAttackTemplateCustom,
+    PocketAttackTemplateTypeCount,
+} PocketAttackTemplateType;
 
 typedef enum {
     PocketAttackAbilityAuto,
@@ -90,6 +146,20 @@ typedef struct {
     char name[POCKET_D20_NAME_LEN];
     char subclass[POCKET_D20_NAME_LEN];
     uint8_t level;
+    uint8_t hit_die;
+    uint8_t hit_dice_current;
+    uint8_t hit_dice_max;
+    uint8_t spellcasting_mode;
+    uint8_t spellcasting_ability;
+    uint8_t cantrip_limit;
+    uint8_t prepared_limit;
+    uint16_t spellbook_size;
+    uint8_t pact_slot_level;
+    uint8_t pact_slots_current;
+    uint8_t pact_slots_max;
+    uint16_t mystic_arcanum_mask;
+    uint16_t spell_points_current;
+    uint16_t spell_points_max;
 } PocketClassLevel;
 
 typedef struct {
@@ -99,6 +169,11 @@ typedef struct {
     uint8_t class_index;
     uint8_t prepared;
     uint8_t ritual;
+    char stable_id[POCKET_D20_SHORT_LEN];
+    char source[POCKET_D20_SHORT_LEN];
+    char school[POCKET_D20_SHORT_LEN];
+    uint8_t grant_source;
+    char grant_name[POCKET_D20_SHORT_LEN];
 } PocketSpell;
 
 typedef struct {
@@ -109,6 +184,8 @@ typedef struct {
     uint8_t class_index;
     uint8_t class_level_gained;
     uint8_t recharge;
+    uint8_t resource_formula;
+    uint8_t resource_ability;
 } PocketFeature;
 
 typedef struct {
@@ -133,7 +210,42 @@ typedef struct {
     uint16_t weapon_properties;
     int16_t ammo_current;
     int16_t ammo_max;
+    int8_t container_index;
+    int16_t charges_current;
+    int16_t charges_max;
+    uint8_t armor_base;
+    int8_t armor_dex_cap;
+    uint8_t shield_bonus;
+    char ammunition_group[POCKET_D20_SHORT_LEN];
 } PocketItem;
+
+typedef struct {
+    char stable_id[POCKET_D20_SHORT_LEN];
+    char source[POCKET_D20_SHORT_LEN];
+    char option_name[POCKET_D20_NAME_LEN];
+    char prerequisites[POCKET_D20_NAME_LEN];
+    char grant_value[POCKET_D20_NAME_LEN];
+    uint8_t source_type;
+    uint8_t class_index;
+    uint8_t level_gained;
+    uint8_t status;
+} PocketGrant;
+
+typedef struct {
+    char name[POCKET_D20_NAME_LEN];
+    char mastery[POCKET_D20_SHORT_LEN];
+    char damage_type[POCKET_D20_SHORT_LEN];
+    char rider_type[POCKET_D20_SHORT_LEN];
+    uint8_t type;
+    uint8_t ability;
+    uint8_t save_ability;
+    int8_t attack_misc;
+    uint8_t save_dc;
+    uint8_t damage_dice;
+    uint8_t damage_die;
+    uint8_t rider_dice;
+    uint8_t rider_die;
+} PocketAttackTemplate;
 
 typedef struct {
     char title[POCKET_D20_NAME_LEN];
@@ -154,7 +266,27 @@ typedef struct {
     int8_t initiative_modifier;
     int16_t initiative_total;
     uint8_t is_player_character;
+    int16_t hp_current;
+    int16_t hp_max;
+    int16_t armor_class;
+    char conditions[POCKET_D20_SHORT_LEN];
 } PocketInitiativeEntry;
+
+typedef struct {
+    uint16_t round;
+    uint8_t current_turn;
+    uint8_t kind;
+    uint8_t target;
+    int16_t value_before;
+    int16_t value_after;
+} PocketEncounterHistory;
+
+typedef enum {
+    PocketHistoryTurn,
+    PocketHistoryParticipantHp,
+    PocketHistoryFeatureResource,
+    PocketHistoryKindCount,
+} PocketHistoryKind;
 
 typedef struct {
     uint8_t active;
@@ -171,6 +303,12 @@ typedef struct {
     char background[POCKET_D20_NAME_LEN];
     char alignment[POCKET_D20_SHORT_LEN];
     char other_proficiencies[POCKET_D20_DETAIL_LEN];
+    char origin_feat[POCKET_D20_NAME_LEN];
+    char tool_proficiencies[POCKET_D20_DETAIL_LEN];
+    char armor_training[POCKET_D20_DETAIL_LEN];
+    char weapon_training[POCKET_D20_DETAIL_LEN];
+    uint8_t size;
+    char senses[POCKET_D20_DETAIL_LEN];
 
     uint8_t class_count;
     PocketClassLevel classes[POCKET_D20_MAX_CLASSES];
@@ -225,6 +363,28 @@ typedef struct {
     uint8_t spell_always_prepared[POCKET_D20_MAX_SPELLS];
     uint8_t spell_free_casts_current[POCKET_D20_MAX_SPELLS];
     uint8_t spell_free_casts_max[POCKET_D20_MAX_SPELLS];
+
+    char conditions[POCKET_D20_DETAIL_LEN];
+    char concentration[POCKET_D20_NAME_LEN];
+    uint8_t reaction_available;
+    char temporary_effects[POCKET_D20_DETAIL_LEN];
+    char resistances[POCKET_D20_DETAIL_LEN];
+    char immunities[POCKET_D20_DETAIL_LEN];
+    char vulnerabilities[POCKET_D20_DETAIL_LEN];
+    char movement_modes[POCKET_D20_DETAIL_LEN];
+
+    uint8_t grant_count;
+    PocketGrant grants[POCKET_D20_MAX_GRANTS];
+    uint8_t attack_template_count;
+    PocketAttackTemplate attack_templates[POCKET_D20_MAX_ATTACK_TEMPLATES];
+    uint8_t encumbrance_mode;
+    int16_t carrying_capacity_override;
+
+    char adventure_campaign[POCKET_D20_SHORT_LEN];
+    char adventure_scene[POCKET_D20_SHORT_LEN];
+    char adventure_checkpoint[POCKET_D20_SHORT_LEN];
+    uint32_t adventure_quest_flags;
+    uint32_t adventure_achievements;
 } PocketCharacter;
 
 typedef struct {
@@ -232,6 +392,8 @@ typedef struct {
     uint8_t party_count;
     PocketPartyMember party[POCKET_D20_MAX_PARTY];
     PocketInitiativeState initiative;
+    uint8_t encounter_history_count;
+    PocketEncounterHistory encounter_history[POCKET_D20_MAX_ENCOUNTER_HISTORY];
 } PocketSaveData;
 
 void pocket_d20_data_set_defaults(PocketSaveData* data);

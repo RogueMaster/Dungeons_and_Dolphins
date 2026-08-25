@@ -1,0 +1,10 @@
+SizeAlignment=Large, Unaligned
+Speed=25 ft.; Swim 25 ft.
+Abilities=17,10,16,5,13,6
+Skills=Perception +3; Stealth +2
+Defenses=Resist Poison
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=None
+Traits=False Appearance; Swamp Stride
+Actions=Vine +5, 10 bludgeoning and grapple DC 13
+Extra=Original Dungeons & Dolphins creature

@@ -1,133 +1,170 @@
-# Dungeons and Dolphins
+# Dungeons & Dolphins
 
-Dungeons and Dolphins is an offline, fifth-edition-compatible character, campaign, dice, and initiative tracker for Flipper Zero. Version 0.5 targets RogueMaster firmware and uses only the screen, directional controls, vibration, sound, and SD-card storage.
+Dungeons & Dolphins is an offline, 5E-compatible character, journal, dice, inventory, spell, initiative, adventure, monster, and encounter tracker for Flipper Zero. Version 2.0 targets RogueMaster and stores every character in a separate readable text file.
 
 ## Full feature list
 
-### Character profiles and saving
+### Profiles and persistence
 
-- Create, switch, and delete up to six independent character profiles.
-- Protect the Main profile from deletion.
-- Store each character in a separate, readable, versioned `.txt` file.
-- Keep stats, classes, spells, equipment, notes, party presets, and active combat isolated per character.
-- Autosave every meaningful edit, including stat, item, spell, currency, class, feature, journal, and initiative changes.
-- Write through a temporary file and retain a backup to reduce save corruption risk.
+- SD-card-limited character profiles with dynamic profile indexing.
+- Save names use `ch_{id}_{characterName}_{characterLevel}.txt`.
+- Each profile owns its complete character, party presets, initiative state, journal, inventory, spells, grants, and encounter history.
+- Immediate autosave after edits and resource changes.
+- Temporary-file replacement and backup recovery for interrupted writes.
+- One prior successful save generation retained per profile, with explicit checksum verification and restore controls.
+- Human-readable, versioned, checksummed save records.
+- Frozen schema 1 with serialized-file checksums and automatic migration from the v0.8 text layout.
+- Hold OK on a profile for switch, rename, duplicate, export, import, archive, delete, and checksum verification actions.
+- Exports are written under `exports/`; archived profiles move under `archive/` and leave the active profile list.
 
 ### Character sheet
 
-- Character name, player name, species, background, alignment, and other proficiencies.
-- Strength, Dexterity, Constitution, Intelligence, Wisdom, and Charisma scores and modifiers.
-- All six saving throws with proficiency and miscellaneous modifiers.
-- All 18 standard skills grouped by governing ability.
-- Skill proficiency, expertise, miscellaneous modifiers, and calculated totals.
-- Passive Perception, Passive Insight, and Passive Investigation.
-- Armor Class, current and maximum Hit Points, temporary Hit Points, Initiative, Speed, and Inspiration.
-- Proficiency Bonus calculated from combined character level.
-- Hit Point Dice, death saves, Exhaustion, conditions, experience, and milestone leveling.
-- Languages and currency in Copper, Silver, Electrum, Gold, and Platinum pieces.
+- Name, player, species, background, alignment, experience, milestone leveling, and inspiration.
+- Any combination of up to four classes, with total level and Proficiency Bonus calculated across classes.
+- Subclass assignment filtered by parent class, with an All view for custom choices.
+- All six ability scores and saving throws, including proficiency and miscellaneous modifiers.
+- All 18 standard skills grouped by governing ability, with proficiency, expertise, and miscellaneous modifiers.
+- HP, temporary HP, Armor Class, speed, initiative, exhaustion, death saves, and passive Perception, Insight, and Investigation.
+- Languages, Origin Feat, tool proficiencies, armor training, weapon training, size, senses, and general proficiencies.
 
-### Classes, subclasses, backgrounds, and features
+### Rules-aware builder and catalogs
 
-- Track up to four classes per character with independent class, subclass, and level values.
-- Calculate total level and Proficiency Bonus across all class records.
-- Default subclass picker filters every bundled subclass to the selected parent class.
-- Hold OK in the subclass picker to show all entries for custom campaigns and overrides.
-- Assign features and perks to a source class and the class level at which they were gained.
-- Track feature notes, current and maximum uses, and Manual, Short/Long Rest, or Long Rest recharge cadence.
-- Select backgrounds, classes, subclasses, feats, and abilities from bundled SD-card catalogs.
-- Hold OK on supported name fields to enter custom text.
+- Structured species, background, feat, class-feature, subclass-feature, and item grant records.
+- Review screen before pending grants are applied or skipped.
+- Stable catalog IDs, source label, option type, prerequisites, gained level, class associations, and grant value.
+- On-device diagnostics for missing catalogs, invalid metadata, and duplicate IDs.
+- Strict import validation for annotated metadata records.
+- Built-in FAP file assets plus user-editable app-data overlays.
+- Separate community metadata pack and generator script.
+- Catalog picker for species, backgrounds, classes, subclasses, feats/features, spells, and items.
+- Hold OK on supported name fields to retain custom text entry.
+- Stable zero-allocation translation hooks for top-level navigation and profile actions; catalog and campaign text remains externalized.
+
+### Multiclass and feature resources
+
+- Per-class level, subclass, Hit Point Die, and current/maximum Hit Dice pools.
+- Features retain source class and class level gained.
+- Feature resources can use manual, Proficiency Bonus, or ability-modifier maximums.
+- Recovery choices include manual, turn, encounter, dawn, Short Rest, and Long Rest cadences.
 
 ### Spellcasting
 
-- Track spellcasting ability, Spell Attack modifier, Spell Save DC modifier, and calculated totals.
-- Track Known, Prepared, Always Prepared, Ritual, and limited free-cast states independently.
-- Track current and maximum free casts for each spell and restore them on a Long Rest.
-- Track current and maximum spell slots for levels 1 through 9.
-- Default spell picker filters annotated spells by the assigned class and that class's available spell level.
-- Hold OK in the spell picker to switch between Allowed and All views.
-- Include complete standard spell-name, spell-level, and class-list metadata in the SD-card catalog.
-- Arcane Recovery helper restores selected spell slots within a level-based budget and tracks its use.
-- Long Rest restores spell slots; valid exceptions and granted spells can be entered through the All view or custom text.
+- Known, Prepared, Always Prepared, Ritual, and free-casts-per-rest states.
+- Grant source and grant name for spells received from species, background, feat, subclass, or item choices.
+- Per-class casting ability, casting mode, cantrip limit, prepared limit, spellbook size, Pact slots, Mystic Arcanum mask, and spell points.
+- Multiclass shared-slot calculation kept separate from each class’s known and prepared spells.
+- Separate Pact Magic and spell-point/custom tracking.
+- Spell attack, spell save DC, editable miscellaneous modifiers, and slot spending.
+- Long Rest slot recovery and a dedicated Arcane Recovery helper.
+- Filters for class, spell level/cantrips, ritual, school, source, and tracked preparation state.
 
-### Inventory and equipment
+### Combat and dice
 
-- Track item name, notes, quantity, weight, value, charges, and equipped state.
-- Mark items as weapons and store attack ability, proficiency, magic/attack bonus, damage dice, damage bonus, and damage type.
-- Track weapon properties including Finesse, Ranged, Thrown, Versatile, and Two-Handed behavior.
-- Track ammunition and limited-use resources.
-- Create an inventory item directly from a journal entry.
-- Select item names from the bundled catalog or hold OK for custom text.
-- Browse 519 bundled equipment and magic-item records with category, rarity, and source metadata.
-- Item rows show a compact category marker and a magic-item marker on the Flipper display.
-- Selecting a cataloged weapon automatically enables its weapon-tracking fields.
+- Generic animated roller for common dice, modifiers, Advantage, and Disadvantage.
+- Every multi-die result shows the individual rolls, dice sum, modifier, and final total.
+- Weapon attack and damage rolls use current character and item data.
+- Critical damage, finesse/ranged ability selection, magic bonuses, ammunition, versatile damage, and configurable extra damage riders.
+- Attack templates for unarmed strikes, spell attacks, saving-throw actions, and custom actions.
+- Template fields include attack/save ability, save DC, damage dice, rider dice, damage types, and Mastery name.
+- Conditions, concentration, reactions, temporary effects, resistances, immunities, vulnerabilities, senses, and movement modes.
+- Short Rest, class-specific Hit Dice spending, Long Rest, death saves, exhaustion, and renewable resources.
 
-### Dice and attacks
+### Initiative
 
-- Roll d4, d6, d8, d10, d12, d20, d100, and configurable multi-die combinations.
-- Normal, Advantage, and Disadvantage d20 modes.
-- Code-drawn multi-frame dice tumble animation with sound and vibration feedback.
-- Display every individual die whenever multiple dice are rolled, plus the dice sum and final modified total.
-- Roll ability checks and saving throws using the active character's calculated modifiers.
-- Roll attacks directly from equipped weapon data.
-- Calculate attack rolls from the selected ability, proficiency, weapon bonus, and other modifiers.
-- Roll normal, versatile, and critical damage.
-- Critical hits double applicable damage dice while adding flat modifiers once.
-- Support configurable extra damage dice for character abilities, magic, poison, and similar effects.
-- Retain roll history details while viewing the result.
+- Saved lightweight party roster with names and initiative modifiers.
+- Active character insertion, temporary participants, manual rolls, automatic rolls, sorting, tie reordering, round tracking, and current-turn selection.
+- Per-participant current/maximum HP, Armor Class, and conditions.
+- Encounter history with undo for accidental turn, HP, and feature-resource changes.
+- Resume combat after leaving the app or changing screens.
+
+### Inventory and currency
+
+- Item name, notes, quantity, weight, equipped/attuned state, container assignment, charges, and ammunition groups.
+- Weapon properties, attack ability, proficiency, damage dice/type, extra riders, and ammunition use.
+- Armor base, Dexterity cap, and shield bonus fields with calculated Armor Class.
+- Carried and equipped weight totals, Strength-based carrying capacity, and an override.
+- Standard carrying-capacity and optional encumbrance tracking.
+- Attunement warning above three items.
+- Copper, Silver, Electrum, Gold, and Platinum tracking with standard conversion/normalization.
 
 ### Journal and milestones
 
-- Quick notes, session notes, adventure notes, item notes, and milestones.
-- Editable title and body for each journal entry.
-- Pending and completed milestone states.
-- Milestone level-up action assigned to a selected class.
-- Persistent milestone and journal history per character.
+- Quick, adventure, item, and milestone notes.
+- Completed status, milestone level assignment, and class-specific advancement.
+- Create an inventory item directly from a journal entry.
 
-### Initiative tracker
+### Adventure mode
 
-- Saved party roster with names and initiative modifiers.
-- Automatically include the active character.
-- Manually enter or roll initiative values.
-- Add allies, summons, non-player characters, and enemies.
-- Sort highest to lowest and manually resolve ties.
-- Current-turn indicator, Next Turn, Previous Turn, and round counter.
-- Add late arrivals and remove participants during combat.
-- Start, resume, save, and end combat.
-- Keep separate party presets and active encounters for every character profile.
+- Data-driven scene and choice engine loaded from a campaign asset only while in use.
+- Skill checks use the active character's current skill modifier and show the natural roll, modifier, total, and outcome.
+- Success/failure branching, per-character quest flags, achievements, inventory rewards, and milestone rewards.
+- Compact sprite-and-text scene layouts with multiple selectable choices.
+- Per-character scene location and manual checkpoint save/restore.
+- Bundled Reef Wardens sample adventure plus an editable SD-card override.
+- Long OK saves a checkpoint, long Left restores it, and long Right restarts the sample adventure.
 
-### SD-card catalogs
+### Monsters and encounters
 
-Copy the included `sd_card/apps_data/pocket_d20/catalogs/` folder to the same path on the Flipper SD card. Catalogs are provided for:
-
-- Classes
-- Subclasses with parent-class metadata
-- Backgrounds
-- Spells with level and class-list metadata
-- Feats
-- Abilities and class features
-- Items
-
-Catalog entries can be extended with additional one-line names. Spell lines may use `Spell|Level|Class, Class`; subclass lines use `Subclass|Parent Class`; item lines use `Name|Category|Rarity|Source`.
+- Disk-backed monster index with compact challenge, XP, Armor Class, Hit Point, and type records.
+- On-device stat-block browser for abilities, movement, skills, defenses, senses, languages, traits, actions, and special actions.
+- Maximum-challenge and creature-type filters for the monster browser.
+- Case-insensitive monster-name search that combines with challenge and type filters without retaining a second index in RAM.
+- Low, Moderate, and High random encounter generation from party level and party size.
+- Environment themes for Aquatic, Dungeon, Planar, Urban, and Wilderness encounters, plus an Any setting.
+- Toggle between repeated creature types and mixed-only encounter composition.
+- Balanced, Horde, and Elite encounter templates alter challenge selection and target budget usage.
+- Environment selection is weighted: matching creatures are preferred while occasional off-theme creatures keep sparse packs usable.
+- Encounter XP is budgeted per character and generated groups do not exceed the selected budget.
+- Default safety limits avoid above-level solo threats and unwieldy groups; rerolling remains available.
+- Hold Right on a generated encounter to copy its creatures into Initiative with names, HP, Armor Class, and Dexterity-based initiative modifiers.
+- Bundled records and optional user monster packs use separate index and stat-block files.
+- On-device pack diagnostics count valid blocks, missing blocks, and duplicate IDs.
+- Versioned monster-pack headers and field-level checks for identity, movement, abilities, senses, languages, and actions.
+- A ready-to-copy community monster-pack template documents every supported field.
+- On-device custom monster creation for identity, challenge/XP, AC, HP, type, environment, speed, six abilities, senses, languages, traits, and actions.
+- Custom monsters receive stable filename-safe IDs and are appended to the user SD-card pack.
+- Custom stat blocks are written through a temporary file before the index is appended, preventing incomplete records after interrupted writes.
+- Pack Diagnostics reports current free heap and largest allocatable block for physical-device troubleshooting.
+- Twenty bundled creatures provide a wider challenge and environment spread; half are original, freely redistributable Dungeons & Dolphins creatures.
+- Monster pack schema 1 is stable and documented in `MONSTER_PACK_SCHEMA.md`.
+- Index scanning and one-stat-block-at-a-time loading keep monster data out of steady-state RAM.
 
 ## Controls
 
-- Up/Down: move through menus or lists.
+- Up/Down: select a row.
 - Left/Right: adjust the selected value.
-- Short OK: open, select, toggle, roll, or confirm.
-- Long OK on supported name fields: edit custom text.
-- Long OK in spell or subclass catalogs: toggle filtered and All views.
-- Back: return to the previous screen; from Home, save and exit.
+- Short OK: open, toggle, apply, or roll.
+- Long OK: custom text, alternate picker view, skip a grant, or a screen-specific action.
+- Back: return; leaving the Home screen exits after autosave.
 
-## Installation
+Screen headers and status messages describe special controls where they differ.
 
-1. Copy `dist/pocket_d20.fap` to the desired apps folder on the Flipper SD card.
-2. Copy the contents of the included `sd_card/` directory to the root of the SD card.
-3. Launch **Dungeons and Dolphins** from the Flipper application browser.
+## Asset locations
 
-The internal application ID and data directory remain `pocket_d20` so existing deployment paths and firmware integration stay stable during pre-1.0 development.
+Bundled catalogs are installed with the FAP under the application asset directory. User overlays and character saves live under:
 
-## Build verification
+`/ext/apps_data/dungeons_and_dolphins/`
 
-The included FAP was compiled against RogueMaster branch `420`, commit `d3ae1f86bd961852af6969e887a8dd3492a19321`. See `BUILD_VERIFICATION.md` for the exact validation record.
+Copy the provided `sd_card/apps_data/dungeons_and_dolphins/` tree to the SD card only when you want editable overrides. Files in app-data are merged after bundled catalogs. Optional monster records use `monsters/index.txt` and `monsters/statblocks/{id}.txt` beneath the same app-data directory.
 
-Physical-device interaction remains to be tested. This application is a tracker and roller, not a complete automated rules engine; unusual campaign rules and granted abilities can be represented with custom entries.
+## Build
+
+Place this source directory in RogueMaster’s `applications_user` tree and run:
+
+```sh
+./fbt fap_dungeons_and_dolphins
+```
+
+The release ZIP intentionally excludes `dist` and compiled FAP files. Build output is created by the firmware toolchain.
+
+Run host-side rules, catalog, parser, checksum, migration, filter, and packaging checks with:
+
+```sh
+./tests/run_host_tests.sh
+```
+
+## Hardware status
+
+The source is compiler-verified against RogueMaster. Physical-device navigation, SD-removal behavior, and long-session heap behavior still require device testing.
+
+See `COMPATIBILITY.md`, `ACCESSIBILITY.md`, `CATALOG_POLICY.md`, `SAVE_SCHEMA.md`, and `DEVICE_TEST_MATRIX.md` for the stable-release contracts and remaining hardware checks.

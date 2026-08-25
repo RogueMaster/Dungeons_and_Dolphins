@@ -1,0 +1,10 @@
+SizeAlignment=Large, Lawful Evil
+Speed=10 ft.; Swim 40 ft.
+Abilities=21,9,15,18,15,18
+Skills=History +12; Perception +10
+Defenses=None listed
+Senses=Darkvision 120 ft.; Passive Perception 20
+Languages=Deep Speech; telepathy 120 ft.
+Traits=Amphibious; Eldritch Restoration; Legendary Resistance; Mucus Cloud; Probing Telepathy
+Actions=Multiattack; Tentacle +9, 12 bludgeoning; Consume Memories DC 16; Dominate Mind DC 16 (2/day)
+Extra=3 Legendary Actions: Lash or Psychic Drain

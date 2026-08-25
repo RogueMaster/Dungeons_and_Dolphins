@@ -1,0 +1,10 @@
+SizeAlignment=Large, Unaligned
+Speed=10 ft.
+Abilities=17,14,10,1,3,1
+Skills=None listed
+Defenses=Immune Poison, Psychic and multiple conditions
+Senses=Blindsight 60 ft.; Passive Perception 6
+Languages=None
+Traits=None listed
+Actions=Smother +5, 10 bludgeoning; may grapple, blind, restrain and suffocate (escape DC 13)
+Extra=Shares damage while smothering a target

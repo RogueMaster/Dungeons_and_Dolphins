@@ -1,0 +1,10 @@
+SizeAlignment=Medium, Unaligned
+Speed=30 ft.; Climb 30 ft.
+Abilities=15,14,14,3,12,5
+Skills=Perception +3; Stealth +4
+Defenses=None
+Senses=Darkvision 90 ft.; Tremorsense 20 ft.; Passive Perception 13
+Languages=None
+Traits=Spider Climb
+Actions=Bite +4, 7 piercing; Web Snare DC 12
+Extra=Original Dungeons & Dolphins creature

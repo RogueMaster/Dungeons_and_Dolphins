@@ -1,0 +1,22 @@
+# MonsterPack=1
+# id|name|CR in eighths|XP|AC|HP|type|environment
+aboleth|Aboleth|80|5900|17|150|Aberration|Aquatic
+air_elemental|Air Elemental|40|1800|15|90|Elemental|Planar
+animated_armor|Animated Armor|8|200|18|33|Construct|Dungeon
+flying_sword|Animated Flying Sword|2|50|17|14|Construct|Dungeon
+rug_smothering|Animated Rug of Smothering|16|450|12|27|Construct|Dungeon
+ankheg|Ankheg|16|450|14|45|Monstrosity|Wilderness
+assassin|Assassin|64|3900|16|97|Humanoid|Urban
+awakened_shrub|Awakened Shrub|0|10|9|10|Plant|Wilderness
+awakened_tree|Awakened Tree|16|450|13|59|Plant|Wilderness
+axe_beak|Axe Beak|2|50|11|19|Monstrosity|Wilderness
+reef_crab|Reef Crab|1|25|13|7|Beast|Aquatic
+ember_mote|Ember Mote|2|50|14|9|Elemental|Planar
+dockside_thug|Dockside Thug|4|100|12|16|Humanoid|Urban
+cave_crawler|Cave Crawler|8|200|14|22|Monstrosity|Dungeon
+mire_stalker|Mire Stalker|16|450|13|38|Plant|Wilderness
+coral_guardian|Coral Guardian|24|700|16|52|Construct|Aquatic
+rift_hound|Rift Hound|32|1100|15|68|Monstrosity|Planar
+dungeon_sentinel|Dungeon Sentinel|40|1800|18|85|Construct|Dungeon
+storm_corsair|Storm Corsair|48|2300|16|96|Humanoid|Aquatic
+tide_leviathan|Tide Leviathan|64|3900|17|126|Monstrosity|Aquatic

@@ -1,0 +1,10 @@
+SizeAlignment=Medium, Neutral
+Speed=30 ft.; Swim 30 ft.
+Abilities=16,18,16,13,14,15
+Skills=Acrobatics +7; Perception +5
+Defenses=Resist Lightning, Thunder
+Senses=Passive Perception 15
+Languages=Common; Primordial
+Traits=Sea Legs; Storm Step
+Actions=Multiattack; Cutlass +7, 8 slashing; Storm Bolt +7, 13 lightning
+Extra=Original Dungeons & Dolphins creature

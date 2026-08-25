@@ -1,50 +1,33 @@
-# Pocket d20 roadmap to 1.0
+# Dungeons & Dolphins roadmap
 
-Version 0.3 establishes the editable tracker, independent text saves, catalogs, rolls, rests, and initiative. The following sequence targets the largest remaining character-sheet gaps without turning the Flipper into an unmaintainable rules database.
+This document contains planned work only. Implemented work belongs in `CHANGELOG.md`. A roadmap item moves to the changelog only after its code, tests, documentation, and RogueMaster build verification are complete.
 
-## 0.4 — rules-aware character builder
+## 2.1 — monster discovery and encounter roles
 
-- Add structured species, background, feat, class-feature, and subclass-feature grants with a review screen before applying changes.
-- Add Origin Feat, tool proficiency, armor/weapon training, size, and senses fields.
-- Add class-specific Hit Point Die pools for multiclass characters.
-- Add annotated catalog records with stable IDs, source book, option type, prerequisites, level gained, and class associations.
-- Add import validation and an on-device catalog diagnostics screen.
+- Add source and environment filters to the ordinary monster browser, combinable with name, challenge, and creature-type filters.
+- Add optional Leader, Controller, Skirmisher, Artillery, Brute, and Minion role metadata with role-aware encounter weighting.
+- Add per-record diagnostic navigation that identifies the exact monster ID, file, and invalid or missing field.
 
-## 0.5 — spellcasting model
+## 2.2 — custom monster lifecycle
 
-- Calculate multiclass spell slots separately from each class's spells known/prepared.
-- Add per-class spellcasting ability, prepared-count limits, spellbook size, Pact Magic slots, Mystic Arcanum, and spell-point/custom modes.
-- Model always-prepared and free-cast sources from species, background, feat, subclass, and item grants.
-- Add spell filters for cantrip count, class list, level, ritual, school, source, and prepared status.
-- Publish a separate community-maintainable metadata pack that users populate from legally owned sources.
+- Allow existing user-created monsters to be opened and edited on-device without changing their stable IDs.
+- Allow user-created monsters to be deleted on-device while protecting bundled records from modification.
+- Add atomic index rewrite, orphan-block recovery, and interrupted-edit rollback for user monster packs.
 
-## 0.6 — combat sheet
+## 2.3 — campaign pack manager
 
-- Add conditions, concentration, reactions, temporary effects, resistances, immunities, vulnerabilities, senses, and movement modes.
-- Add attack templates for unarmed strikes, spell attacks, saving-throw actions, Mastery properties, and configurable damage riders.
-- Add per-participant HP/AC/conditions to initiative while retaining the lightweight name-and-roll preset.
-- Add encounter history and undo for accidental turn/HP/resource changes.
+- Add on-device campaign selection with separate per-character campaign progress and checkpoints.
+- Add versioned campaign manifests with compatibility, missing-scene, duplicate-ID, and broken-link diagnostics.
+- Add a documented third-party campaign-pack format and an SD-card starter template.
 
-## 0.7 — inventory and resources
+## 2.4 — complete structured editors
 
-- Add containers, carried/equipped weight, carrying capacity, armor/shield AC formulas, attunement limit warnings, ammunition groups, and item charges.
-- Add resource formulas tied to Proficiency Bonus or ability modifiers and recovery conditions beyond Short/Long Rest.
-- Add standard coin conversion and optional encumbrance rules.
+- Add full on-device editing for every attack-template field, including save actions, Mastery, damage riders, and recharge behavior.
+- Add a structured-grant editor for prerequisites, class association, gained level, source, and grant payloads.
+- Add optional runtime language packs for navigation and field labels with measured heap limits and English fallback.
 
-## 0.8 — adventure mode
+## 2.5 — device resilience and validation
 
-- Connect choices, skill checks, quest flags, achievements, story location, inventory rewards, and milestones to a small data-driven fantasy adventure engine.
-- Add sprite/text scene layouts and save checkpoints per character.
-- Keep campaign content in separate SD packs so the tracker remains useful by itself.
-
-## 0.9 — reliability and migration
-
-- Freeze a documented version-1 save schema and add forward migrations, export/import, duplicate/rename character, archive, and corruption diagnostics.
-- Add host-side unit tests for rules, parsers, checksums, migration, spell filtering, multiclass calculations, and dice bounds.
-- Run physical-device UX tests for every screen, long-name truncation, SD removal, low-memory behavior, interrupted writes, and rapid autosave.
-
-## 1.0 — stable release
-
-- Publish reproducible RogueMaster build instructions and release checksums.
-- Establish catalog licensing/source policy, translation hooks, accessibility conventions, and a compatibility matrix.
-- Support migration for all subsequent schema changes and retain recoverable backups.
+- Add an on-device stress test for repeated catalog, campaign, monster, profile, and encounter allocation/release cycles.
+- Add graceful SD-card removal handling, read-only fallback, retry controls, and clear unsaved-state warnings.
+- Complete and publish the physical-device test matrix for controls, display truncation, long sessions, power interruption, and low-memory behavior.

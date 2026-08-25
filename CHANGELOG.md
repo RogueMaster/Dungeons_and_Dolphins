@@ -1,63 +1,143 @@
-# Dungeons and Dolphins changelog
+# Dungeons & Dolphins changelog
 
-## 0.5
+## Unreleased documentation update
 
-- Expanded the item catalog from 123 starter entries to 519 structured records.
-- Completed the standard weapons, armor, tools, adventuring gear, mounts, vehicles, and magic-item name sets.
-- Added 48 supplementary common magic items and additional setting-specific item names.
-- Added item category, rarity, and source metadata to the SD-card catalog format.
-- Added compact item-category and magic-item markers to the catalog screen.
-- Made cataloged weapons automatically enable weapon tracking when selected.
-- Increased catalog capacity from 512 to 576 entries.
+- Audited every completed roadmap claim against the implemented code, packaged assets, tests, and build records.
+- Consolidated completed release history in this changelog and removed it from the roadmap.
+- Replaced the roadmap with release-scoped future work containing exactly three testable features per release.
 
-## 0.4
+## 2.0
 
-- Renamed the user-facing application to Dungeons and Dolphins.
-- Completed the standard spell catalog with 339 names, spell levels, and class-list metadata.
-- Added parent-class metadata to all 58 bundled subclasses.
-- Made the subclass picker default to the active class.
-- Added hold OK in the subclass picker to show every subclass.
-- Expanded catalog capacity from 384 to 512 entries.
-- Added a comprehensive feature list and installation guide to the README.
+- Declared monster pack schema 1 stable and documented its compatibility contract.
+- Made custom stat-block writes interruption-resistant by publishing the block before its index record.
+- Added live free-heap and largest-block readings to Pack Diagnostics.
+- Expanded the bundled compendium to twenty creatures with ten original, freely redistributable entries.
+- Completed the five-release monster and encounter roadmap established after version 1.5.
+
+## 1.9
+
+- Added an on-device custom monster editor.
+- Added editable challenge/XP, defenses, identity, environment, movement, abilities, senses, languages, traits, and actions.
+- Added direct persistence into the versioned user monster pack with collision-resistant IDs.
+
+## 1.8
+
+- Added an explicit monster-pack format version.
+- Added field-level validation for required stat-block sections.
+- Added bundled/user version reporting and incompatible-version warnings to Pack Diagnostics.
+
+## 1.7
+
+- Added Balanced, Horde, and Elite encounter templates.
+- Added weighted environment selection so themed creatures are preferred without making small packs unusable.
+- Tuned target-budget usage and creature-count limits by template.
+
+## 1.6
+
+- Added case-insensitive monster-name search.
+- Combined name, maximum-challenge, and creature-type filters in the streaming browser.
+
+## 1.5
+
+- Added on-device monster-pack diagnostics.
+- Added checks for missing stat blocks and duplicate stable IDs.
+- Added a ready-to-copy community monster-pack template with a complete example record.
+
+## 1.4
+
+- Added environment metadata and themed encounter generation.
+- Added Aquatic, Dungeon, Planar, Urban, Wilderness, and unrestricted themes.
+- Added a composition toggle for repeated creature types versus mixed-only groups.
+
+## 1.3
+
+- Added generated-encounter transfer into Initiative.
+- Prefilled monster names, quantities, HP, Armor Class, and Dexterity-based initiative modifiers.
+- Capped transfers safely at the initiative tracker capacity.
+
+## 1.2
+
+- Added challenge-rating and creature-type filters to the monster browser.
+- Made filter changes immediately rebuild the disk-backed result count without retaining an in-memory catalog.
+
+## 1.1
+
+- Added a disk-backed monster compendium and on-device stat-block browser.
+- Added party-level, party-size, and difficulty controls for random encounters.
+- Added per-character XP budgets for Low, Moderate, and High encounters.
+- Added safety limits for above-level creatures, oversized groups, and over-budget results.
+- Added bundled monster assets and a documented SD-card extension format.
+- Kept the monster index streaming and stat blocks lazy-loaded to protect heap memory.
+- Updated the feature list, tests, roadmap, and build verification for the new release.
+
+## 1.0
+
+- Declared schema 1 stable for future forward migrations.
+- Retained one prior successful save generation for every active profile.
+- Added an explicit profile backup-restore action alongside checksum verification.
+- Added zero-allocation translation hooks and a community translation template.
+- Added compatibility, accessibility, catalog policy, stable schema, and reproducible-build documents.
+- Added a release verification script that runs host tests and the RogueMaster FAP target.
+- Finalized source-only release packaging with no compiled FAP or `dist` directory.
+
+## 0.9
+
+- Froze character save schema 1 and documented its compatibility contract.
+- Replaced compiler-layout checksums with checksums over canonical serialized file bytes.
+- Added automatic one-time migration from the 0.8 text layout.
+- Added profile actions for rename, duplicate, export, first-valid-export import, archive, delete, and checksum verification.
+- Kept duplicate, export, and archive operations chunked so they do not require a second character-sized allocation.
+- Added host-side tests for calculations, dice bounds, catalogs, metadata IDs, parsers, checksums, migration acceptance, spell filtering, manifest fields, and release-document wording.
+- Added a physical-device test matrix for hardware verification.
+
+## 0.8
+
+- Added a data-driven Adventure mode with compact sprite-and-text scenes.
+- Added selectable choices, character-based skill checks, and success/failure branches.
+- Added per-character story location, quest flags, achievements, and checkpoints.
+- Added adventure inventory rewards and milestone journal rewards with duplicate protection.
+- Added a bundled sample campaign and editable SD-card campaign override.
+- Kept campaign scene memory lazy and released it when Adventure mode closes.
+
+## 0.7
+
+- Changed the internal application ID and SD namespace to `dungeons_and_dolphins`.
+- Added FAP-packaged file assets for catalogs and metadata, with app-data overlays for user changes.
+- Reworked catalog memory into lazy heap allocations that grow only while a picker is open and are released on exit.
+- Replaced full-name diagnostic storage with compact hashes and removed the second full-character allocation during save.
+- Added graceful allocation failure handling and catalog-memory status reporting.
+- Added structured grants with a review/apply/skip screen.
+- Added species, Origin Feat, tool proficiency, armor training, weapon training, size, and senses fields.
+- Added annotated catalog metadata, strict import validation, and on-device catalog diagnostics.
+- Added class-specific Hit Point Dice and pools for multiclass characters.
+- Added per-class spellcasting modes, abilities, limits, spellbook size, Pact slots, Mystic Arcanum, and spell points.
+- Added multiclass shared-slot calculation and spell filters.
+- Added spell stable ID, source, school, ritual, grant type, and grant-name tracking.
+- Added conditions, concentration, reactions, temporary effects, defenses, movement modes, and attack templates.
+- Added initiative HP, Armor Class, conditions, encounter history, and undo for turn, HP, and feature-resource changes.
+- Added containers, weights, carrying capacity, Armor Class formulas, attunement warnings, ammunition groups, and charges.
+- Added resource formulas and recovery cadences beyond rests.
+- Added coin normalization and optional encumbrance tracking.
+- Counted container contents in total carried weight while retaining container organization.
+- Added a community-maintainable metadata pack and generator.
+- Updated the roadmap and full feature documentation.
+
+## 0.6
+
+- Added SD-card-limited profiles with dynamic profile indexing.
+- Added profile filenames in `ch_{id}_{characterName}_{characterLevel}.txt` format.
+- Expanded class, subclass, spell, item, background, and feature-name catalogs.
+- Added complete README and changelog documents.
+- Used the manifest version macro in the About screen.
 
 ## 0.3
 
-- Added up to six independent character profiles.
-- Changed storage to one readable `.txt` file per character.
-- Added profile creation, switching, deletion, and protected Main profile behavior.
-- Added immediate autosave to character mutation paths.
-- Added temporary-file writes and backup recovery.
-- Added SD-card catalogs for classes, subclasses, backgrounds, spells, features, feats, and items.
-- Added short-OK catalog selection and long-OK custom text editing.
-- Added class-and-level spell filtering with an All view.
-- Added background selection and assignment.
-- Added multiclass level tracking and class-linked features.
-- Added five-denomination currency tracking.
-- Grouped all standard skills by governing ability.
-- Corrected saving throws to use proficiency without expertise.
-- Added Short Rest Hit Point Dice handling and Long Rest Exhaustion reduction.
-- Added configurable feature recharge cadence.
-- Added Arcane Recovery support.
-- Added per-character party presets and resumable initiative encounters.
-- Added dice animation, individual multi-die results, dice sums, and final totals.
-- Added a 10-by-10 monochrome d20 application icon.
+- Added separate readable character save files, profile switching, custom catalogs, dice animation, autosave, and the 10×10 application icon.
 
 ## 0.2
 
-- Added all six saving throws with miscellaneous modifiers.
-- Added all 18 standard skills with proficiency, expertise, miscellaneous modifiers, and totals.
-- Added Passive Perception, Passive Insight, and Passive Investigation.
-- Added editable Initiative, Spell Attack, and Spell Save DC modifiers.
-- Added Known, Prepared, Always Prepared, Ritual, and free-cast spell states.
-- Added free-cast spending and Long Rest restoration.
-- Added spell slots and rest controls.
+- Added all saving throws and skills, miscellaneous modifiers, passive statistics, expanded spell states, and free-cast recovery.
 
 ## 0.1
 
-- Added the initial character sheet and derived ability math.
-- Added multiclass records, subclasses, and class-linked perks.
-- Added spells, inventory, equipment, languages, notes, and milestones.
-- Added weapon-aware attack and damage rolling.
-- Added a generic dice roller.
-- Added saved party roster and initiative combat tracking.
-- Added native SD-card save and load support.
+- Added the initial character tracker, multiclass records, inventory, spells, journal, weapon rolls, party roster, and initiative tracker.

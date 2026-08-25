@@ -1,0 +1,92 @@
+#pragma once
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <storage/storage.h>
+
+#define POCKET_MONSTER_ID_LEN 32U
+#define POCKET_MONSTER_NAME_LEN 40U
+#define POCKET_MONSTER_TEXT_LEN 192U
+#define POCKET_MONSTER_ENCOUNTER_MAX 12U
+#define POCKET_MONSTER_PACK_VERSION 1U
+
+enum {
+    PocketMonsterFieldSize = 1U << 0,
+    PocketMonsterFieldSpeed = 1U << 1,
+    PocketMonsterFieldAbilities = 1U << 2,
+    PocketMonsterFieldSenses = 1U << 3,
+    PocketMonsterFieldLanguages = 1U << 4,
+    PocketMonsterFieldActions = 1U << 5,
+    PocketMonsterRequiredFields = 0x3FU,
+};
+
+typedef enum {
+    PocketEncounterLow,
+    PocketEncounterModerate,
+    PocketEncounterHigh,
+    PocketEncounterDifficultyCount,
+} PocketEncounterDifficulty;
+
+typedef enum {
+    PocketEncounterBalanced,
+    PocketEncounterHorde,
+    PocketEncounterElite,
+    PocketEncounterTemplateCount,
+} PocketEncounterTemplate;
+
+typedef struct {
+    char id[POCKET_MONSTER_ID_LEN];
+    char name[POCKET_MONSTER_NAME_LEN];
+    uint8_t cr_eighths;
+    uint32_t xp;
+    uint8_t armor_class;
+    uint16_t hit_points;
+    char type[24];
+    char environment[24];
+} PocketMonsterSummary;
+
+typedef struct {
+    PocketMonsterSummary summary;
+    char size_alignment[48];
+    char speed[64];
+    int8_t abilities[6];
+    char skills[POCKET_MONSTER_TEXT_LEN];
+    char defenses[POCKET_MONSTER_TEXT_LEN];
+    char senses[POCKET_MONSTER_TEXT_LEN];
+    char languages[96];
+    char traits[POCKET_MONSTER_TEXT_LEN];
+    char actions[POCKET_MONSTER_TEXT_LEN];
+    char extra[POCKET_MONSTER_TEXT_LEN];
+    uint16_t present_fields;
+} PocketMonsterDetail;
+
+typedef struct {
+    PocketMonsterSummary monsters[POCKET_MONSTER_ENCOUNTER_MAX];
+    uint8_t quantities[POCKET_MONSTER_ENCOUNTER_MAX];
+    uint8_t count;
+    uint32_t budget;
+    uint32_t spent;
+} PocketMonsterEncounter;
+
+uint32_t pocket_monster_xp_budget(
+    uint8_t party_level,
+    uint8_t party_size,
+    PocketEncounterDifficulty difficulty);
+uint16_t pocket_monster_count(Storage* storage);
+bool pocket_monster_at(Storage* storage, uint16_t index, PocketMonsterSummary* output);
+bool pocket_monster_load(Storage* storage, const PocketMonsterSummary* summary, PocketMonsterDetail* output);
+bool pocket_monster_save_custom(Storage* storage, PocketMonsterDetail* detail);
+void pocket_monster_pack_versions(
+    Storage* storage,
+    uint8_t* bundled_version,
+    uint8_t* user_version,
+    bool* user_present);
+bool pocket_monster_generate(
+    Storage* storage,
+    uint8_t party_level,
+    uint8_t party_size,
+    PocketEncounterDifficulty difficulty,
+    const char* environment,
+    bool allow_repeats,
+    PocketEncounterTemplate template_kind,
+    PocketMonsterEncounter* output);

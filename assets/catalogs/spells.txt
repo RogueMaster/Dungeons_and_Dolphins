@@ -1,0 +1,468 @@
+# Dungeons & Dolphins complete SRD 5.2.1 spell catalog.
+# Format: Spell|Level|Class, Class
+Acid Arrow|2|Wizard
+Acid Splash|0|Sorcerer, Wizard
+Aid|2|Bard, Cleric, Druid, Paladin, Ranger
+Alarm|1|Ranger, Wizard
+Alter Self|2|Sorcerer, Wizard
+Animal Friendship|1|Bard, Druid, Ranger
+Animal Messenger|2|Bard, Druid, Ranger
+Animal Shapes|8|Druid
+Animate Dead|3|Cleric, Wizard
+Animate Objects|5|Bard, Sorcerer, Wizard
+Antilife Shell|5|Druid
+Antimagic Field|8|Cleric, Wizard
+Antipathy/Sympathy|8|Bard, Druid, Wizard
+Arcane Eye|4|Wizard
+Arcane Hand|5|Sorcerer, Wizard
+Arcane Lock|2|Wizard
+Arcane Sword|7|Bard, Wizard
+Arcanist's Magic Aura|2|Wizard
+Astral Projection|9|Cleric, Warlock, Wizard
+Augury|2|Cleric, Druid, Wizard
+Aura of Life|4|Cleric, Paladin
+Awaken|5|Bard, Druid
+Bane|1|Bard, Cleric, Warlock
+Banishment|4|Cleric, Paladin, Sorcerer, Warlock, Wizard
+Barkskin|2|Druid, Ranger
+Beacon of Hope|3|Cleric
+Befuddlement|8|Bard, Druid, Warlock, Wizard
+Bestow Curse|3|Bard, Cleric, Wizard
+Black Tentacles|4|Wizard
+Blade Barrier|6|Cleric
+Bless|1|Cleric, Paladin
+Blight|4|Druid, Sorcerer, Warlock, Wizard
+Blindness/Deafness|2|Bard, Cleric, Sorcerer, Wizard
+Blink|3|Sorcerer, Wizard
+Blur|2|Sorcerer, Wizard
+Burning Hands|1|Sorcerer, Wizard
+Call Lightning|3|Druid
+Calm Emotions|2|Bard, Cleric
+Chain Lightning|6|Sorcerer, Wizard
+Charm Monster|4|Bard, Druid, Sorcerer, Warlock, Wizard
+Charm Person|1|Bard, Druid, Sorcerer, Warlock, Wizard
+Chill Touch|0|Sorcerer, Warlock, Wizard
+Chromatic Orb|1|Sorcerer, Wizard
+Circle of Death|6|Sorcerer, Warlock, Wizard
+Clairvoyance|3|Bard, Cleric, Sorcerer, Wizard
+Clone|8|Wizard
+Cloudkill|5|Sorcerer, Wizard
+Color Spray|1|Bard, Sorcerer, Wizard
+Command|1|Bard, Cleric, Paladin
+Commune|5|Cleric
+Commune with Nature|5|Druid, Ranger
+Comprehend Languages|1|Bard, Sorcerer, Warlock, Wizard
+Compulsion|4|Bard
+Cone of Cold|5|Druid, Sorcerer, Wizard
+Confusion|4|Bard, Druid, Sorcerer, Wizard
+Conjure Animals|3|Druid, Ranger
+Conjure Celestial|7|Cleric
+Conjure Elemental|5|Druid, Wizard
+Conjure Fey|6|Druid
+Conjure Minor Elementals|4|Druid, Wizard
+Conjure Woodland Beings|4|Druid, Ranger
+Contact Other Plane|5|Warlock, Wizard
+Contagion|5|Cleric, Druid
+Contingency|6|Wizard
+Continual Flame|2|Cleric, Druid, Wizard
+Control Water|4|Cleric, Druid, Wizard
+Control Weather|8|Cleric, Druid, Wizard
+Counterspell|3|Sorcerer, Warlock, Wizard
+Create Food and Water|3|Cleric, Paladin
+Create or Destroy Water|1|Cleric, Druid
+Create Undead|6|Cleric, Warlock, Wizard
+Creation|5|Sorcerer, Wizard
+Cure Wounds|1|Bard, Cleric, Druid, Paladin, Ranger
+Dancing Lights|0|Bard, Sorcerer, Wizard
+Darkness|2|Sorcerer, Warlock, Wizard
+Darkvision|2|Druid, Ranger, Sorcerer, Wizard
+Daylight|3|Cleric, Druid, Paladin, Ranger, Sorcerer
+Death Ward|4|Cleric, Paladin
+Delayed Blast Fireball|7|Sorcerer, Wizard
+Demiplane|8|Sorcerer, Warlock, Wizard
+Detect Evil and Good|1|Cleric, Paladin
+Detect Magic|1|Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard
+Detect Poison and Disease|1|Cleric, Druid, Paladin, Ranger
+Detect Thoughts|2|Bard, Sorcerer, Wizard
+Dimension Door|4|Bard, Sorcerer, Warlock, Wizard
+Disguise Self|1|Bard, Sorcerer, Wizard
+Disintegrate|6|Sorcerer, Wizard
+Dispel Evil and Good|5|Cleric, Paladin
+Dispel Magic|3|Bard, Cleric, Druid, Paladin, Ranger, Sorcerer, Warlock, Wizard
+Dissonant Whispers|1|Bard
+Divination|4|Cleric, Druid, Wizard
+Divine Favor|1|Paladin
+Divine Smite|1|Paladin
+Divine Word|7|Cleric
+Dominate Beast|4|Druid, Ranger, Sorcerer
+Dominate Monster|8|Bard, Sorcerer, Warlock, Wizard
+Dominate Person|5|Bard, Sorcerer, Wizard
+Dragon's Breath|2|Sorcerer, Wizard
+Dream|5|Bard, Warlock, Wizard
+Druidcraft|0|Druid
+Earthquake|8|Cleric, Druid, Sorcerer
+Eldritch Blast|0|Warlock
+Elementalism|0|Druid, Sorcerer, Wizard
+Enhance Ability|2|Bard, Cleric, Druid, Ranger, Sorcerer, Wizard
+Enlarge/Reduce|2|Bard, Druid, Sorcerer, Wizard
+Ensnaring Strike|1|Ranger
+Entangle|1|Druid, Ranger
+Enthrall|2|Bard, Warlock
+Etherealness|7|Bard, Cleric, Sorcerer, Warlock, Wizard
+Expeditious Retreat|1|Sorcerer, Warlock, Wizard
+Eyebite|6|Bard, Sorcerer, Warlock, Wizard
+Fabricate|4|Wizard
+Faerie Fire|1|Bard, Druid
+Faithful Hound|4|Wizard
+False Life|1|Sorcerer, Wizard
+Fear|3|Bard, Sorcerer, Warlock, Wizard
+Feather Fall|1|Bard, Sorcerer, Wizard
+Find Familiar|1|Wizard
+Find Steed|2|Paladin
+Find the Path|6|Bard, Cleric, Druid
+Find Traps|2|Cleric, Druid, Ranger
+Finger of Death|7|Sorcerer, Warlock, Wizard
+Fireball|3|Sorcerer, Wizard
+Fire Bolt|0|Sorcerer, Wizard
+Fire Shield|4|Druid, Sorcerer, Wizard
+Fire Storm|7|Cleric, Druid, Sorcerer
+Flame Blade|2|Druid, Sorcerer
+Flame Strike|5|Cleric
+Flaming Sphere|2|Druid, Sorcerer, Wizard
+Flesh to Stone|6|Druid, Sorcerer, Wizard
+Floating Disk|1|Wizard
+Fly|3|Sorcerer, Warlock, Wizard
+Fog Cloud|1|Druid, Ranger, Sorcerer, Wizard
+Forbiddance|6|Cleric
+Forcecage|7|Bard, Warlock, Wizard
+Foresight|9|Bard, Druid, Warlock, Wizard
+Freedom of Movement|4|Bard, Cleric, Druid, Ranger
+Freezing Sphere|6|Sorcerer, Wizard
+Gaseous Form|3|Sorcerer, Warlock, Wizard
+Gate|9|Cleric, Sorcerer, Warlock, Wizard
+Geas|5|Bard, Cleric, Druid, Paladin, Wizard
+Gentle Repose|2|Cleric, Paladin, Wizard
+Giant Insect|4|Druid
+Glibness|8|Bard, Warlock
+Globe of Invulnerability|6|Sorcerer, Wizard
+Glyph of Warding|3|Bard, Cleric, Wizard
+Goodberry|1|Druid, Ranger
+Grease|1|Sorcerer, Wizard
+Greater Invisibility|4|Bard, Sorcerer, Wizard
+Greater Restoration|5|Bard, Cleric, Druid, Paladin, Ranger
+Guardian of Faith|4|Cleric
+Guards and Wards|6|Bard, Wizard
+Guidance|0|Cleric, Druid
+Guiding Bolt|1|Cleric
+Gust of Wind|2|Druid, Ranger, Sorcerer, Wizard
+Hallow|5|Cleric
+Hallucinatory Terrain|4|Bard, Druid, Warlock, Wizard
+Harm|6|Cleric
+Haste|3|Sorcerer, Wizard
+Heal|6|Cleric, Druid
+Healing Word|1|Bard, Cleric, Druid
+Heat Metal|2|Bard, Druid
+Hellish Rebuke|1|Warlock
+Heroes' Feast|6|Bard, Cleric, Druid
+Heroism|1|Bard, Paladin
+Hex|1|Warlock
+Hideous Laughter|1|Bard, Warlock, Wizard
+Hold Monster|5|Bard, Sorcerer, Warlock, Wizard
+Hold Person|2|Bard, Cleric, Druid, Sorcerer, Warlock, Wizard
+Holy Aura|8|Cleric
+Hunter's Mark|1|Ranger
+Hypnotic Pattern|3|Bard, Sorcerer, Warlock, Wizard
+Ice Knife|1|Druid, Sorcerer, Wizard
+Ice Storm|4|Druid, Sorcerer, Wizard
+Identify|1|Bard, Wizard
+Illusory Script|1|Bard, Warlock, Wizard
+Imprisonment|9|Warlock, Wizard
+Incendiary Cloud|8|Druid, Sorcerer, Wizard
+Inflict Wounds|1|Cleric
+Insect Plague|5|Cleric, Druid, Sorcerer
+Instant Summons|6|Wizard
+Irresistible Dance|6|Bard, Wizard
+Invisibility|2|Bard, Sorcerer, Warlock, Wizard
+Jump|1|Druid, Ranger, Sorcerer, Wizard
+Knock|2|Bard, Sorcerer, Wizard
+Legend Lore|5|Bard, Cleric, Wizard
+Lesser Restoration|2|Bard, Cleric, Druid, Paladin, Ranger
+Levitate|2|Sorcerer, Wizard
+Light|0|Bard, Cleric, Sorcerer, Wizard
+Lightning Bolt|3|Sorcerer, Wizard
+Locate Animals or Plants|2|Bard, Druid, Ranger
+Locate Creature|4|Bard, Cleric, Druid, Paladin, Ranger, Wizard
+Locate Object|2|Bard, Cleric, Druid, Paladin, Ranger, Wizard
+Longstrider|1|Bard, Druid, Ranger, Wizard
+Mage Armor|1|Sorcerer, Wizard
+Mage Hand|0|Bard, Sorcerer, Warlock, Wizard
+Magic Circle|3|Cleric, Paladin, Warlock, Wizard
+Magic Jar|6|Wizard
+Magic Missile|1|Sorcerer, Wizard
+Magic Mouth|2|Bard, Wizard
+Magic Weapon|2|Paladin, Ranger, Sorcerer, Wizard
+Magnificent Mansion|7|Bard, Wizard
+Major Image|3|Bard, Sorcerer, Warlock, Wizard
+Mass Cure Wounds|5|Bard, Cleric, Druid
+Mass Heal|9|Cleric
+Mass Healing Word|3|Bard, Cleric
+Mass Suggestion|6|Bard, Sorcerer, Wizard
+Maze|8|Wizard
+Meld into Stone|3|Cleric, Druid, Ranger
+Mending|0|Bard, Cleric, Druid, Sorcerer, Wizard
+Message|0|Bard, Druid, Sorcerer, Wizard
+Meteor Swarm|9|Sorcerer, Wizard
+Mind Blank|8|Bard, Wizard
+Mind Spike|2|Sorcerer, Warlock, Wizard
+Minor Illusion|0|Bard, Sorcerer, Warlock, Wizard
+Mirage Arcane|7|Bard, Druid, Wizard
+Mirror Image|2|Bard, Sorcerer, Warlock, Wizard
+Mislead|5|Bard, Warlock, Wizard
+Misty Step|2|Sorcerer, Warlock, Wizard
+Modify Memory|5|Bard, Wizard
+Moonbeam|2|Druid
+Move Earth|6|Druid, Sorcerer, Wizard
+Nondetection|3|Bard, Ranger, Wizard
+Passwall|5|Wizard
+Pass without Trace|2|Druid, Ranger
+Phantasmal Force|2|Bard, Sorcerer, Wizard
+Phantasmal Killer|4|Bard, Wizard
+Phantom Steed|3|Wizard
+Planar Ally|6|Cleric
+Planar Binding|5|Bard, Cleric, Druid, Warlock, Wizard
+Plane Shift|7|Cleric, Druid, Sorcerer, Warlock, Wizard
+Plant Growth|3|Bard, Druid, Ranger
+Poison Spray|0|Druid, Sorcerer, Warlock, Wizard
+Polymorph|4|Bard, Druid, Sorcerer, Wizard
+Power Word Heal|9|Bard, Cleric
+Power Word Kill|9|Bard, Sorcerer, Warlock, Wizard
+Power Word Stun|8|Bard, Sorcerer, Warlock, Wizard
+Prayer of Healing|2|Cleric, Paladin
+Prestidigitation|0|Bard, Sorcerer, Warlock, Wizard
+Prismatic Spray|7|Bard, Sorcerer, Wizard
+Prismatic Wall|9|Bard, Wizard
+Private Sanctum|4|Wizard
+Produce Flame|0|Druid
+Programmed Illusion|6|Bard, Wizard
+Project Image|7|Bard, Wizard
+Protection from Energy|3|Cleric, Druid, Ranger, Sorcerer, Wizard
+Protection from Evil and Good|1|Cleric, Druid, Paladin, Warlock, Wizard
+Protection from Poison|2|Cleric, Druid, Paladin, Ranger
+Purify Food and Drink|1|Cleric, Druid, Paladin
+Raise Dead|5|Bard, Cleric, Paladin
+Ray of Enfeeblement|2|Warlock, Wizard
+Ray of Frost|0|Sorcerer, Wizard
+Regenerate|7|Bard, Cleric, Druid
+Ray of Sickness|1|Sorcerer, Wizard
+Reincarnate|5|Druid
+Remove Curse|3|Cleric, Paladin, Warlock, Wizard
+Resilient Sphere|4|Wizard
+Resistance|0|Cleric, Druid
+Resurrection|7|Bard, Cleric
+Reverse Gravity|7|Druid, Sorcerer, Wizard
+Revivify|3|Cleric, Druid, Paladin, Ranger
+Rope Trick|2|Wizard
+Sacred Flame|0|Cleric
+Sanctuary|1|Cleric
+Scorching Ray|2|Sorcerer, Wizard
+Scrying|5|Bard, Cleric, Druid, Warlock, Wizard
+Searing Smite|1|Paladin
+Secret Chest|4|Wizard
+See Invisibility|2|Bard, Sorcerer, Wizard
+Seeming|5|Bard, Sorcerer, Wizard
+Sending|3|Bard, Cleric, Wizard
+Sequester|7|Wizard
+Shapechange|9|Druid, Wizard
+Shatter|2|Bard, Sorcerer, Wizard
+Shield|1|Sorcerer, Wizard
+Shield of Faith|1|Cleric, Paladin
+Shillelagh|0|Druid
+Shining Smite|2|Paladin
+Shocking Grasp|0|Sorcerer, Wizard
+Silence|2|Bard, Cleric, Ranger
+Silent Image|1|Bard, Sorcerer, Wizard
+Simulacrum|7|Wizard
+Sleep|1|Bard, Sorcerer, Wizard
+Sleet Storm|3|Druid, Sorcerer, Wizard
+Slow|3|Bard, Sorcerer, Wizard
+Sorcerous Burst|0|Sorcerer
+Spare the Dying|0|Cleric, Druid
+Speak with Animals|1|Bard, Druid, Ranger, Warlock
+Speak with Dead|3|Bard, Cleric, Wizard
+Speak with Plants|3|Bard, Druid, Ranger
+Spider Climb|2|Sorcerer, Warlock, Wizard
+Spike Growth|2|Druid, Ranger
+Spirit Guardians|3|Cleric
+Spiritual Weapon|2|Cleric
+Starry Wisp|0|Bard, Druid
+Stinking Cloud|3|Bard, Sorcerer, Wizard
+Stone Shape|4|Cleric, Druid, Wizard
+Stoneskin|4|Druid, Ranger, Sorcerer, Wizard
+Storm of Vengeance|9|Druid
+Suggestion|2|Bard, Sorcerer, Warlock, Wizard
+Summon Dragon|5|Wizard
+Sunbeam|6|Cleric, Druid, Sorcerer, Wizard
+Sunburst|8|Cleric, Druid, Sorcerer, Wizard
+Symbol|7|Bard, Cleric, Druid, Wizard
+Telekinesis|5|Sorcerer, Wizard
+Telepathic Bond|5|Bard, Wizard
+Teleport|7|Bard, Sorcerer, Wizard
+Teleportation Circle|5|Bard, Sorcerer, Warlock, Wizard
+Thaumaturgy|0|Cleric
+Thunderwave|1|Bard, Druid, Sorcerer, Wizard
+Time Stop|9|Sorcerer, Wizard
+Tiny Hut|3|Bard, Wizard
+Tongues|3|Bard, Cleric, Sorcerer, Warlock, Wizard
+Transport via Plants|6|Druid
+Tree Stride|5|Druid, Ranger
+True Polymorph|9|Bard, Warlock, Wizard
+True Resurrection|9|Cleric, Druid
+True Seeing|6|Bard, Cleric, Sorcerer, Warlock, Wizard
+True Strike|0|Bard, Sorcerer, Warlock, Wizard
+Tsunami|8|Druid
+Unseen Servant|1|Bard, Warlock, Wizard
+Vampiric Touch|3|Sorcerer, Warlock, Wizard
+Vicious Mockery|0|Bard
+Vitriolic Sphere|4|Sorcerer, Wizard
+Wall of Fire|4|Druid, Sorcerer, Wizard
+Wall of Force|5|Wizard
+Wall of Ice|6|Wizard
+Wall of Stone|5|Druid, Sorcerer, Wizard
+Wall of Thorns|6|Druid
+Warding Bond|2|Cleric, Paladin
+Water Breathing|3|Druid, Ranger, Sorcerer, Wizard
+Water Walk|3|Cleric, Druid, Ranger, Sorcerer
+Web|2|Sorcerer, Wizard
+Weird|9|Warlock, Wizard
+Wind Walk|6|Druid
+Wind Wall|3|Druid, Ranger
+Wish|9|Sorcerer, Wizard
+Word of Recall|6|Cleric
+Zone of Truth|2|Bard, Cleric, Paladin
+# Forgotten Realms: Heroes of Faerun - 19 spell names only
+Spellfire Flare
+Wardaway
+Death Armor
+Deryan's Helpful Homunculi
+Elminster's Elusion
+Cacophonic Shield
+Conjure Constructs
+Laeral's Silver Lance
+Sylune's Viper
+Backlash
+Doomtide
+Spellfire Storm
+Alustriel's Mooncloak
+Songol's Elemental Suffusion
+Dirge
+Elminster's Effulgent Spheres
+Simbul's Synostodweomer
+Holy Star of Mystra
+Blade of Disaster
+# Ravenloft: The Undead expanded spell-list names; the source adds no dedicated spell chapter
+Bane
+False Life
+Blindness/Deafness
+Phantasmal Force
+Phantom Steed
+Speak with Dead
+Death Ward
+Greater Invisibility
+Antilife Shell
+Cloudkill
+# Xanathar's Guide to Everything - all 95 chapter 3 spell names only
+Control Flames
+Create Bonfire
+Frostbite
+Gust
+Infestation
+Magic Stone
+Mold Earth
+Primal Savagery
+Shape Water
+Thunderclap
+Toll the Dead
+Word of Radiance
+Absorb Elements
+Beast Bond
+Catapult
+Cause Fear
+Ceremony
+Chaos Bolt
+Earth Tremor
+Ice Knife
+Snare
+Zephyr Strike
+Aganazzar's Scorcher
+Dragon's Breath
+Dust Devil
+Earthbind
+Healing Spirit
+Maximilian's Earthen Grasp
+Mind Spike
+Pyrotechnics
+Shadow Blade
+Skywrite
+Snilloc's Snowball Swarm
+Warding Wind
+Catnap
+Enemies Abound
+Erupting Earth
+Flame Arrows
+Life Transference
+Melf's Minute Meteors
+Summon Lesser Demons
+Thunder Step
+Tidal Wave
+Tiny Servant
+Wall of Sand
+Wall of Water
+Charm Monster
+Elemental Bane
+Find Greater Steed
+Guardian of Nature
+Shadow of Moil
+Sickening Radiance
+Storm Sphere
+Summon Greater Demon
+Vitriolic Sphere
+Watery Sphere
+Control Winds
+Danse Macabre
+Dawn
+Enervation
+Far Step
+Holy Weapon
+Immolation
+Infernal Calling
+Maelstrom
+Negative Energy Flood
+Skill Empowerment
+Steel Wind Strike
+Synaptic Static
+Transmute Rock
+Wall of Light
+Wrath of Nature
+Bones of the Earth
+Create Homunculus
+Druid Grove
+Investiture of Flame
+Investiture of Ice
+Investiture of Stone
+Investiture of Wind
+Mental Prison
+Primordial Ward
+Scatter
+Soul Cage
+Tenser's Transformation
+Crown of Stars
+Power Word Pain
+Temple of the Gods
+Whirlwind
+Abi-Dalzim's Horrid Wilting
+Illusory Dragon
+Maddening Darkness
+Mighty Fortress
+Invulnerability
+Mass Polymorph
+Psychic Scream

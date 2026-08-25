@@ -1,0 +1,10 @@
+SizeAlignment=Huge, Unaligned
+Speed=10 ft.; Swim 60 ft.
+Abilities=23,10,21,6,15,10
+Skills=Perception +5
+Defenses=Resist Cold
+Senses=Blindsight 60 ft.; Passive Perception 15
+Languages=None
+Traits=Amphibious; Siege Creature
+Actions=Multiattack; Bite +9, 20 piercing; Tail +9, 17 bludgeoning
+Extra=Tidal Surge DC 16 (Recharge 5-6); original Dungeons & Dolphins creature

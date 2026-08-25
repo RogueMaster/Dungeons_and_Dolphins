@@ -1,0 +1,10 @@
+SizeAlignment=Tiny, Neutral
+Speed=10 ft.; Fly 40 ft. (hover)
+Abilities=4,16,10,6,12,8
+Skills=Stealth +5
+Defenses=Resist Fire; Immune Burning
+Senses=Darkvision 60 ft.; Passive Perception 11
+Languages=Primordial
+Traits=Illuminating Body
+Actions=Spark +5, 4 fire
+Extra=Original Dungeons & Dolphins creature

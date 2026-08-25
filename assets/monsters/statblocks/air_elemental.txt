@@ -1,0 +1,10 @@
+SizeAlignment=Large, Neutral
+Speed=10 ft.; Fly 90 ft. (hover)
+Abilities=14,20,14,6,10,6
+Skills=None listed
+Defenses=Resist B/L/P/S and Lightning; Immune Poison, Thunder and multiple conditions
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Primordial (Auran)
+Traits=Air Form
+Actions=Multiattack; Thunderous Slam +8, 14 thunder; Whirlwind DC 13 (Recharge 4-6)
+Extra=None

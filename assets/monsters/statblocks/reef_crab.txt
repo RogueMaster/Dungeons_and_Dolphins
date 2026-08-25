@@ -1,0 +1,10 @@
+SizeAlignment=Small, Unaligned
+Speed=20 ft.; Swim 30 ft.
+Abilities=8,14,12,2,10,3
+Skills=Stealth +4
+Defenses=None
+Senses=Darkvision 30 ft.; Passive Perception 10
+Languages=None
+Traits=Amphibious
+Actions=Claw +4, 4 slashing
+Extra=Original Dungeons & Dolphins creature
