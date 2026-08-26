@@ -21,6 +21,7 @@
 #define POCKET_D20_DICE_ANIMATION_EVENT 0xD120U
 #define POCKET_D20_LONG_BACK_EVENT 0xD121U
 #define POCKET_D20_MAX_CATALOG_ENTRIES 50U
+#define POCKET_D20_SPELL_PAGE_ENTRIES 10U
 #define POCKET_D20_MARQUEE_MS 350U
 
 typedef enum {
@@ -263,6 +264,7 @@ typedef struct {
     uint16_t catalog_total;
     uint16_t catalog_scan_count;
     uint16_t catalog_page_start;
+    uint16_t catalog_page_size;
     uint16_t catalog_return_selection;
     void* catalog_storage;
     char(*catalog_entries)[POCKET_D20_NAME_LEN];
@@ -628,10 +630,17 @@ static void pocket_catalog_release(PocketD20App* app) {
     app->catalog_capacity = 0U;
 }
 
+static uint16_t pocket_catalog_page_limit(const PocketD20App* app) {
+    if(app->catalog_page_size) return app->catalog_page_size;
+    return app->catalog_kind == PocketCatalogSpells ? POCKET_D20_SPELL_PAGE_ENTRIES :
+                                                      POCKET_D20_MAX_CATALOG_ENTRIES;
+}
+
 static bool pocket_catalog_ensure_capacity(PocketD20App* app, uint16_t needed) {
     if(needed <= app->catalog_capacity) return true;
-    if(needed > POCKET_D20_MAX_CATALOG_ENTRIES || app->catalog_storage) return false;
-    const size_t capacity = POCKET_D20_MAX_CATALOG_ENTRIES;
+    const uint16_t page_limit = pocket_catalog_page_limit(app);
+    if(needed > page_limit || app->catalog_storage) return false;
+    const size_t capacity = page_limit;
     const size_t bytes =
         capacity * sizeof(*app->catalog_entries) +
         capacity * sizeof(*app->catalog_levels) +
@@ -1172,9 +1181,10 @@ static bool pocket_catalog_add_metadata(
         return false;
     }
     if(!name[0]) return false;
+    uint16_t page_limit = pocket_catalog_page_limit(app);
     uint16_t absolute_index = app->catalog_scan_count++;
     if(absolute_index < app->catalog_page_start ||
-       absolute_index >= app->catalog_page_start + POCKET_D20_MAX_CATALOG_ENTRIES)
+       absolute_index >= app->catalog_page_start + page_limit)
         return true;
     for(uint16_t i = 0U; i < app->catalog_count; ++i) {
         if(strcmp(app->catalog_entries[i], name) == 0) {
@@ -1186,7 +1196,7 @@ static bool pocket_catalog_add_metadata(
             return true;
         }
     }
-    if(app->catalog_count >= POCKET_D20_MAX_CATALOG_ENTRIES ||
+    if(app->catalog_count >= page_limit ||
        !pocket_catalog_ensure_capacity(app, app->catalog_count + 1U)) {
         pocket_set_status(app, "Catalog memory full");
         return false;
@@ -1209,7 +1219,7 @@ static bool pocket_catalog_add_metadata(
 
 static bool pocket_catalog_page_complete(const PocketD20App* app) {
     return app->catalog_scan_count >
-           app->catalog_page_start + POCKET_D20_MAX_CATALOG_ENTRIES;
+           app->catalog_page_start + pocket_catalog_page_limit(app);
 }
 
 static bool pocket_catalog_add(PocketD20App* app, const char* name) {
@@ -2042,6 +2052,50 @@ static void pocket_catalog_apply_spell_filters(PocketD20App* app) {
     app->catalog_count = output;
 }
 
+static bool pocket_catalog_spell_after(
+    const PocketD20App* app,
+    uint16_t left,
+    uint16_t right) {
+    uint8_t left_level = app->catalog_has_metadata[left] ? app->catalog_levels[left] : UINT8_MAX;
+    uint8_t right_level =
+        app->catalog_has_metadata[right] ? app->catalog_levels[right] : UINT8_MAX;
+    if(left_level != right_level) return left_level > right_level;
+    return strcmp(app->catalog_entries[left], app->catalog_entries[right]) > 0;
+}
+
+static void pocket_catalog_swap(PocketD20App* app, uint16_t left, uint16_t right) {
+    char name[POCKET_D20_NAME_LEN];
+    memcpy(name, app->catalog_entries[left], sizeof(name));
+    memcpy(app->catalog_entries[left], app->catalog_entries[right], sizeof(name));
+    memcpy(app->catalog_entries[right], name, sizeof(name));
+#define POCKET_SWAP_VALUE(values, type)      \
+    do {                                     \
+        type temporary = (values)[left];     \
+        (values)[left] = (values)[right];    \
+        (values)[right] = temporary;         \
+    } while(false)
+    POCKET_SWAP_VALUE(app->catalog_levels, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_class_masks, uint16_t);
+    POCKET_SWAP_VALUE(app->catalog_has_metadata, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_item_categories, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_item_magic, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_schools, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_sources, uint8_t);
+    POCKET_SWAP_VALUE(app->catalog_ritual, uint8_t);
+#undef POCKET_SWAP_VALUE
+}
+
+static void pocket_catalog_sort_spells(PocketD20App* app) {
+    if(app->catalog_kind != PocketCatalogSpells) return;
+    for(uint16_t index = 1U; index < app->catalog_count; ++index) {
+        uint16_t position = index;
+        while(position && pocket_catalog_spell_after(app, position - 1U, position)) {
+            pocket_catalog_swap(app, position - 1U, position);
+            --position;
+        }
+    }
+}
+
 static void pocket_catalog_load_page(PocketD20App* app) {
     PocketCatalogKind kind = app->catalog_kind;
     pocket_catalog_release(app);
@@ -2053,10 +2107,12 @@ static void pocket_catalog_load_page(PocketD20App* app) {
     if(pocket_catalog_page_complete(app)) app->catalog_has_more = 1U;
     app->catalog_total = app->catalog_scan_count;
     pocket_catalog_apply_spell_filters(app);
+    pocket_catalog_sort_spells(app);
     if(app->catalog_page_start >= app->catalog_total && app->catalog_page_start) {
+        uint16_t page_limit = pocket_catalog_page_limit(app);
         app->catalog_page_start =
             ((app->catalog_total ? app->catalog_total - 1U : 0U) /
-             POCKET_D20_MAX_CATALOG_ENTRIES) * POCKET_D20_MAX_CATALOG_ENTRIES;
+             page_limit) * page_limit;
         pocket_catalog_release(app);
         app->catalog_scan_count = 0U;
         app->catalog_has_more = 0U;
@@ -2066,6 +2122,7 @@ static void pocket_catalog_load_page(PocketD20App* app) {
         if(pocket_catalog_page_complete(app)) app->catalog_has_more = 1U;
         app->catalog_total = app->catalog_scan_count;
         pocket_catalog_apply_spell_filters(app);
+        pocket_catalog_sort_spells(app);
     }
 }
 
@@ -2078,6 +2135,8 @@ static void pocket_open_catalog(
     pocket_release_number_input(app);
     app->catalog_kind = kind;
     app->catalog_target = target;
+    app->catalog_page_size = kind == PocketCatalogSpells ? POCKET_D20_SPELL_PAGE_ENTRIES :
+                                                          POCKET_D20_MAX_CATALOG_ENTRIES;
     app->return_screen = app->screen;
     app->catalog_return_selection = app->selection;
     app->catalog_show_all = 0U;
@@ -2591,7 +2650,11 @@ static void pocket_begin_number(
 
 static void pocket_draw_home(Canvas* canvas, PocketD20App* app) {
     char title[48];
-    snprintf(title, sizeof(title), "D&Dolphins - %.31s", app->data.character.name);
+    snprintf(
+        title,
+        sizeof(title),
+        "D&D v" FAP_VERSION " - %.27s",
+        app->data.character.name);
     pocket_draw_header(canvas, title, app->status);
     pocket_draw_menu_rows(
         canvas,
@@ -3064,7 +3127,7 @@ static void pocket_draw_currency(Canvas* canvas, PocketD20App* app) {
 
 static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
     char page[24];
-    uint16_t page_number = app->catalog_page_start / POCKET_D20_MAX_CATALOG_ENTRIES + 1U;
+    uint16_t page_number = app->catalog_page_start / pocket_catalog_page_limit(app) + 1U;
     snprintf(
         page,
         sizeof(page),
@@ -6901,10 +6964,11 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
     else if(pocket_is_move_event(event) &&
             (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         uint16_t next_start = app->catalog_page_start;
+        uint16_t page_limit = pocket_catalog_page_limit(app);
         if(event->key == InputKeyRight && app->catalog_has_more)
-            next_start += POCKET_D20_MAX_CATALOG_ENTRIES;
-        else if(event->key == InputKeyLeft && app->catalog_page_start >= POCKET_D20_MAX_CATALOG_ENTRIES)
-            next_start -= POCKET_D20_MAX_CATALOG_ENTRIES;
+            next_start += page_limit;
+        else if(event->key == InputKeyLeft && app->catalog_page_start >= page_limit)
+            next_start -= page_limit;
         if(next_start != app->catalog_page_start) {
             app->catalog_page_start = next_start;
             app->selection = 0U;

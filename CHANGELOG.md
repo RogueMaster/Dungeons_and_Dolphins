@@ -1,5 +1,17 @@
 # Dungeons & Dolphins changelog
 
+## 3.0
+
+- Enabled generated-encounter drill-down: short OK on an encounter monster now opens its complete stat block, and short OK on any stat row opens that attribute in the full-screen reader.
+- Preserved the selected encounter monster, encounter scroll position, selected stat row, and stat-block scroll position while navigating into and out of full-screen details.
+- Released the Bestiary's lazy text editor before allocating browser windows, generated encounters, diagnostics, and monster details to lower peak heap use.
+- Isolated user-created monsters in atomic `custom_index.txt` and `custom_statblocks.txt` files so creating, editing, or deleting them never rewrites the packaged Bestiary tables.
+- Streamed packaged and custom monster layers as one browser and encounter pool without loading either complete table into RAM.
+- Added a visible, custom-only Delete Monster row with two-step confirmation; packaged monsters remain read-only.
+- Kept custom spell, species, class, subclass, background, feat, and item text profile-local so assigning custom character options never rewrites a packaged catalog.
+- Reduced the spell picker from 50 retained records to ten retained records per streamed page, cutting its bounded catalog allocation by about 80 percent.
+- Sorted the packaged spell catalog by spell level and then alphabetically, with a bounded in-app page sort for catalog additions.
+
 ## 2.7.2
 
 - Added a full-screen reader for every monster stat-block line item.

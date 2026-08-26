@@ -69,6 +69,8 @@ typedef struct {
     uint16_t detail_line_offset;
     uint16_t detail_return_scroll;
     uint8_t detail_field;
+    uint16_t encounter_return_selection;
+    uint16_t encounter_return_scroll;
 
     char search[POCKET_MONSTER_NAME_LEN];
     uint8_t max_cr_eighths;
@@ -194,7 +196,10 @@ static void bestiary_release_window(BestiaryApp* app) {
     app->window_count = 0U;
 }
 
+static void bestiary_release_text_input(BestiaryApp* app);
+
 static bool bestiary_load_window(BestiaryApp* app) {
+    bestiary_release_text_input(app);
     bestiary_release_window(app);
     app->window = calloc(BESTIARY_WINDOW, sizeof(PocketMonsterSummary));
     if(!app->window) {
@@ -241,6 +246,15 @@ static void bestiary_release_detail(BestiaryApp* app) {
 static void bestiary_release_encounter(BestiaryApp* app) {
     free(app->encounter);
     app->encounter = NULL;
+}
+
+static void bestiary_release_text_input(BestiaryApp* app) {
+    if(!app->text_input) return;
+    view_dispatcher_remove_view(app->dispatcher, BestiaryViewText);
+    text_input_free(app->text_input);
+    app->text_input = NULL;
+    app->text_input_active = 0U;
+    app->edit = BestiaryEditNone;
 }
 
 static void bestiary_cr(char* output, size_t size, uint8_t eighths) {
@@ -339,7 +353,7 @@ static void bestiary_draw_home(Canvas* canvas, BestiaryApp* app) {
         difficulty, encounter_environment, encounter_role, repeats, template_row,
         "Generate Encounter", "Pack Diagnostics", "Create Custom Monster",
         "Open Dungeons & Dolphins"};
-    bestiary_header(canvas, "Dolphin Bestiary", app->status);
+    bestiary_header(canvas, "Bestiary v" FAP_VERSION, app->status);
     bestiary_rows(canvas, app, rows, 18U);
 }
 
@@ -362,7 +376,7 @@ static void bestiary_draw_list(Canvas* canvas, BestiaryApp* app) {
 static void bestiary_draw_detail(Canvas* canvas, BestiaryApp* app) {
     if(!app->detail) return;
     PocketMonsterDetail* m = app->detail;
-    char cr[8], core[64], type[48], abilities[64], source[40], role[32];
+    char cr[8], core[64], type[48], abilities[64], source[40], role[32], delete_row[32];
     bestiary_cr(cr, sizeof(cr), m->summary.cr_eighths);
     snprintf(core, sizeof(core), "CR %s XP %lu AC%u HP%u", cr,
              (unsigned long)m->summary.xp, m->summary.armor_class, m->summary.hit_points);
@@ -372,10 +386,15 @@ static void bestiary_draw_detail(Canvas* canvas, BestiaryApp* app) {
     snprintf(type, sizeof(type), "Type: %s", m->summary.type);
     snprintf(source, sizeof(source), "Source: %s", m->summary.source);
     snprintf(role, sizeof(role), "Role: %s", m->summary.role);
+    snprintf(
+        delete_row,
+        sizeof(delete_row),
+        "%s",
+        app->delete_armed ? "OK again: delete custom" : "Delete Custom Monster");
     const char* rows[] = {core, type, source, role, m->size_alignment, m->speed,
         abilities, m->skills, m->defenses, m->senses, m->languages, m->traits, m->actions,
-        m->extra, "Edit Custom Monster"};
-    uint8_t row_count = !strcmp(m->summary.source, "Custom") ? 15U : 14U;
+        m->extra, "Edit Custom Monster", delete_row};
+    uint8_t row_count = !strcmp(m->summary.source, "Custom") ? 16U : 14U;
     bestiary_header(canvas, m->summary.name, app->status);
     bestiary_rows(canvas, app, rows, row_count);
 }
@@ -588,6 +607,7 @@ static bool bestiary_open_detail(
     BestiaryApp* app,
     const PocketMonsterSummary* summary,
     BestiaryScreen return_screen) {
+    bestiary_release_text_input(app);
     bestiary_release_detail(app);
     app->detail = malloc(sizeof(PocketMonsterDetail));
     if(!app->detail || !pocket_monster_load(app->storage, summary, app->detail)) {
@@ -599,6 +619,7 @@ static bool bestiary_open_detail(
     app->return_screen = return_screen;
     app->delete_armed = 0U;
     bestiary_enter(app, BestiaryScreenDetail);
+    bestiary_status(app, "OK opens full stat line");
     return true;
 }
 
@@ -705,6 +726,7 @@ static void bestiary_return_to_detail(BestiaryApp* app) {
 }
 
 static void bestiary_generate(BestiaryApp* app) {
+    bestiary_release_text_input(app);
     bestiary_release_encounter(app);
     app->encounter = calloc(1U, sizeof(PocketMonsterEncounter));
     if(!app->encounter) {
@@ -730,6 +752,7 @@ static void bestiary_generate(BestiaryApp* app) {
 }
 
 static void bestiary_diagnose(BestiaryApp* app) {
+    bestiary_release_text_input(app);
     app->diagnostic_valid = 0U;
     app->diagnostic_invalid = 0U;
     pocket_monster_recover_user_pack(
@@ -743,6 +766,7 @@ static void bestiary_diagnose(BestiaryApp* app) {
 }
 
 static void bestiary_new_custom(BestiaryApp* app) {
+    bestiary_release_text_input(app);
     bestiary_release_detail(app);
     app->detail = calloc(1U, sizeof(PocketMonsterDetail));
     if(!app->detail) {
@@ -784,6 +808,10 @@ static void bestiary_back(BestiaryApp* app) {
             bestiary_enter(app, BestiaryScreenList);
         } else {
             bestiary_enter(app, destination);
+            if(destination == BestiaryScreenEncounter) {
+                app->selection = app->encounter_return_selection;
+                app->scroll = app->encounter_return_scroll;
+            }
         }
         break;
     }
@@ -902,18 +930,33 @@ static void bestiary_handle_list(BestiaryApp* app, const InputEvent* event) {
 static void bestiary_handle_detail(BestiaryApp* app, const InputEvent* event) {
     if(!app->detail) return;
     bool custom = !strcmp(app->detail->summary.source, "Custom");
-    uint8_t row_count = custom ? 15U : 14U;
-    if(bestiary_move_event(event) && event->key == InputKeyUp)
+    uint8_t row_count = custom ? 16U : 14U;
+    if(bestiary_move_event(event) && event->key == InputKeyUp) {
+        app->delete_armed = 0U;
         bestiary_move(app, row_count, -1);
-    else if(bestiary_move_event(event) && event->key == InputKeyDown)
+    } else if(bestiary_move_event(event) && event->key == InputKeyDown) {
+        app->delete_armed = 0U;
         bestiary_move(app, row_count, 1);
-    else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+    } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection < 14U) {
             bestiary_open_detail_line(app);
-        } else if(custom) {
+        } else if(custom && app->selection == 14U) {
             app->edit_existing = 1U;
             app->selected = app->detail->summary;
             bestiary_enter(app, BestiaryScreenEdit);
+        } else if(custom && app->selection == 15U) {
+            if(!app->delete_armed) {
+                app->delete_armed = 1U;
+                bestiary_status(app, "OK again deletes custom");
+            } else {
+                bool deleted =
+                    pocket_monster_delete_custom(app->storage, &app->detail->summary);
+                bestiary_release_detail(app);
+                bestiary_refresh_count(app);
+                bestiary_enter(app, BestiaryScreenHome);
+                bestiary_status(
+                    app, deleted ? "Custom monster deleted" : "Delete failed");
+            }
         }
     } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
               custom) {
@@ -953,8 +996,12 @@ static void bestiary_handle_encounter(BestiaryApp* app, const InputEvent* event)
     if(bestiary_move_event(event) && event->key == InputKeyUp) bestiary_move(app, app->encounter->count, -1);
     else if(bestiary_move_event(event) && event->key == InputKeyDown) bestiary_move(app, app->encounter->count, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk &&
-            app->selection < app->encounter->count)
-        bestiary_open_detail(app, &app->encounter->monsters[app->selection], BestiaryScreenEncounter);
+            app->selection < app->encounter->count) {
+        PocketMonsterSummary summary = app->encounter->monsters[app->selection];
+        app->encounter_return_selection = app->selection;
+        app->encounter_return_scroll = app->scroll;
+        bestiary_open_detail(app, &summary, BestiaryScreenEncounter);
+    }
     else if(event->type == InputTypeLong && event->key == InputKeyOk) bestiary_generate(app);
 }
 

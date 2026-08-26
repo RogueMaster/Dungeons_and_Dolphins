@@ -1,6 +1,6 @@
 # Dungeons & Dolphins
 
-Dungeons & Dolphins 2.7.2 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
+Dungeons & Dolphins 3.0 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
 
 - **Dungeons & Dolphins** — character profiles, rules tracking, spells, equipment, notes, dice, combat, initiative, and campaigns.
 - **Dolphin Bestiary** — the monster stat-block browser, custom monsters, diagnostics, and party-level encounter generation.
@@ -47,8 +47,9 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 
 - Packaged catalogs cover classes, subclasses, species, backgrounds, feats/features, spells, and items.
 - Each catalog uses one streamed file. Additional names and annotated rows are appended to the matching normal catalog instead of loading a second overlay.
-- Item and spell pickers stream from SD and retain at most 50 matching records in RAM.
-- Left/Right changes the current 50-record catalog page; buffers are released immediately when the picker closes.
+- On-device custom spell, species, class, subclass, background, feat, and item text is stored only in that character profile; assigning it never modifies a packaged catalog.
+- The spell picker streams from SD and retains at most ten matching records in RAM; item and other catalog pickers retain at most 50.
+- Left/Right changes the current bounded catalog page; buffers are released immediately when the picker closes.
 - Catalog source files, long descriptions, and campaigns are not retained in steady-state RAM.
 - Annotated spell rows can include level, class associations, school, ritual state, and source category.
 - Navigation labels are compiled directly into the application; runtime translation tables are intentionally omitted to reduce startup work and heap use.
@@ -62,6 +63,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Spell attack modifier, Spell Save DC, editable miscellaneous modifiers, and slot spending.
 - Long Rest recovery and a dedicated Arcane Recovery helper.
 - Filters for class, level/cantrip, ritual, school, source category, and prepared status.
+- Spell choices are presented by level and then alphabetically; only the current ten-record page is retained in RAM.
 - Magic includes an explicit Back to Main Menu row in addition to the Back button.
 
 ### Inventory and currency
@@ -105,12 +107,15 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - All packaged stat blocks share one streamed section file, reducing first-launch asset deployment and avoiding hundreds of simultaneous file entries.
 - Stat blocks show challenge, XP, Armor Class, HP, type, source, role, size, movement, abilities, skills, defenses, senses, languages, traits, actions, and extra actions.
 - Short OK on a browser result opens its complete, scrollable stat block.
+- Short OK on a generated-encounter monster opens that monster's complete stat block; short OK on any stat row then opens the attribute in a full-screen wrapped reader.
 - Low, Moderate, and High encounter budgets use the selected party level and size; generation spends as much of the selected budget as possible without exceeding it and keeps Moderate above Low and High above Moderate.
 - Aquatic, Dungeon, Planar, Urban, Wilderness, or unrestricted encounter environments.
 - Balanced, Horde, and Elite templates, repeated-creature control, and optional Leader, Controller, Skirmisher, Artillery, Brute, or Minion weighting.
 - Custom monster creation and editing preserve stable IDs.
-- Two-step deletion applies only to custom records; packaged records are read-only.
-- Atomic shared-index/stat-block replacement, transaction recovery, backup, and rollback for custom edits.
+- A visible Delete Custom Monster row uses two-step confirmation; packaged records are read-only.
+- Custom records use atomic `custom_index.txt` and `custom_statblocks.txt` files, while packaged `index.txt` and `statblocks.txt` remain untouched.
+- Browser, filter, diagnostic, and encounter scans stream the packaged and custom layers together without retaining either complete table in RAM.
+- Transaction recovery, backup, rollback, and orphan cleanup apply only to the custom layer.
 - Pack diagnostics report valid/invalid records, pack versions, recovery results, and free heap using one buffered stat-block pass.
 - Encounter generation performs one streaming eligibility pass, retains at most sixteen randomized candidates, limits total creatures to two per party member, and releases that pool immediately after generation.
 - Each FAP has a final menu entry that exits cleanly and queues the other installed FAP.
@@ -152,10 +157,18 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Persistent text is copied into UI rows with explicit bounds, satisfying strict format-truncation checks while retaining complete detail fields for horizontal scrolling.
 - The Bestiary reader's line-range display is sized for the complete range of its 16-bit counters under strict compiler checks.
 
+### Catalog and Bestiary isolation in 3.0
+
+- Generated encounters use the same two-step monster/stat-row reader and restore the original encounter selection when closed.
+- Spell catalog pages retain ten records rather than 50 and are ordered by level and name, reducing the picker's bounded heap allocation by about 80 percent.
+- The Bestiary releases its lazy text editor before allocating monster browsers, details, diagnostics, or encounters.
+- Custom-monster writes are isolated from the packaged Bestiary, and custom deletion is exposed as a confirmed row on custom stat blocks.
+- Custom character option text remains profile-local and never rewrites packaged character catalogs.
+
 ## Controls
 
 - Up/Down: move through rows.
-- Left/Right: adjust a value or change a 50-record page.
+- Left/Right: adjust a value or change the current bounded catalog page.
 - Short OK: open, toggle, apply, save, or roll.
 - Long OK: direct numerical entry on numeric rows, custom text on text rows, alternate spell/subclass view, or another screen-specific action.
 - Short Back: return to the correct parent screen.
@@ -168,7 +181,7 @@ All runtime files are accessed through `APP_ASSETS_PATH`; the code does not use 
 - Character assets and profiles: `/ext/apps_assets/dungeons_and_dolphins/`
 - Bestiary assets and custom monsters: `/ext/apps_assets/dolphin_bestiary/`
 
-Catalog additions are appended to the matching normal file, such as `catalogs/spells.txt`, `catalogs/classes.txt`, or `catalogs/items.txt`. Monster summaries and stat blocks use `monsters/index.txt` and `monsters/statblocks.txt`; custom records are identified by their `Custom` source field rather than a separate overlay filename. Character saves remain in the requested `ch_{id}_{name}_{level}.txt` format beneath `profiles/`.
+Catalog additions made manually on the SD card are appended to the matching normal file, such as `catalogs/spells.txt`, `catalogs/classes.txt`, or `catalogs/items.txt`. On-device custom character text remains inside its character save. Packaged monster summaries and stat blocks use `monsters/index.txt` and `monsters/statblocks.txt`; on-device custom monsters use `monsters/custom_index.txt` and `monsters/custom_statblocks.txt`. Character saves remain in the requested `ch_{id}_{name}_{level}.txt` format beneath `profiles/`.
 
 The FAP assets contain the ready-to-use catalog and bestiary files; no duplicate SD-card tree is required in the source release.
 
