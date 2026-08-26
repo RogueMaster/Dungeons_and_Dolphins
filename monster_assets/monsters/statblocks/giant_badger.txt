@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=30 ft., Burrow 10 ft.
+Abilities=13,10,17,2,12,5
+Skills=Perception +3
+Defenses=Poison
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

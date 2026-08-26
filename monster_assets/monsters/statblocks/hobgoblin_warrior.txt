@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fey (Goblinoid), Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Common, Goblin
+Traits=Pack Tactics. The hobgoblin has Advantage on an at- tack roll against a creature if at least one of the hobgob- lin’s allies is within 5 feet of the creature and the ally doesn’t have the Inc
+Actions=Longsword. Melee Attack Roll: +3, reach 5 ft. Hit: 12 (2d10 + 1) Slashing damage. Longbow. Ranged Attack Roll: +3, range 150/600 ft. Hit: 5 (1d8 + 1) Piercing damage plus 7 (3d4) Poi- son dam
+Extra=None

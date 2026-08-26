@@ -1,0 +1,10 @@
+SizeAlignment=Large Monstrosity, Unaligned
+Speed=40 ft. Climb 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +5
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 15
+Languages=None
+Traits=None
+Actions=Multiattack. The owlbear makes two Rend attacks. Rend. Melee Attack Roll: +7, reach 5 ft. Hit: 14 (2d8 + 5) Slashing damage. Pegasus
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Beast
+Speed=20 ft., Swim 20 ft.
+Abilities=1,13,8,1,8,3
+Skills=Perception +1, Stealth +3
+Defenses=None
+Senses=Darkvision 30 ft.; Passive Perception 11
+Languages=None
+Traits=None
+Actions=None
+Extra=None

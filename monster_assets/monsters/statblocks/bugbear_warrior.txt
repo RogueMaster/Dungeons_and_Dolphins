@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fey (Goblinoid), Chaotic Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +6, Survival +2
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Common, Goblin
+Traits=Abduct. The bugbear needn’t spend extra movement to move a creature it is grappling.
+Actions=Grab. Melee Attack Roll: +4, reach 10 ft. Hit: 9 (2d6 + 2) Bludgeoning damage. If the target is a Medium or smaller creature, it has the Grappled condition (es- cape DC 12). Light Hammer. Mel
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Large Aberration, Neutral Evil
+Speed=10 ft. Climb 20 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6, Stealth +5
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 16
+Languages=None
+Traits=Spider Climb. The roper can climb difficult surfaces, including along ceilings, without needing to make an ability check.
+Actions=Multiattack. The roper makes two Tentacle attacks, uses Reel, and makes two Bite attacks. Bite. Melee Attack Roll: +7, reach 5 ft. Hit: 17 (3d8 + 4) Piercing damage. Tentacle. Melee Attack Ro
+Extra=None

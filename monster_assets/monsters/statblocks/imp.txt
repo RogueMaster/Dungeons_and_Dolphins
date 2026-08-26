@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Fiend (Devil), Lawful Evil
+Speed=20 ft. Fly 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +4, Insight +3, Stealth +5
+Defenses=Cold; Fire, Poison; Poisoned
+Senses=Darkvision 120 ft. (unimpeded by magical Darkness); Passive Perception 11
+Languages=Common, Infernal
+Traits=Magic Resistance. The imp has Advantage on saving throws against spells and other magical effects.
+Actions=Sting. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage plus 7 (2d6) Poison damage. Invisibility. The imp casts Invisibility on itself, requiring no spell components and us
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend, Lawful Evil
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +10, Insight +8, Perception +8
+Defenses=Piercing damage from weapons wielded by creatures under the effect of a Bless spell; Charmed, Frightened
+Senses=Truesight 60 ft.; Passive Perception 18
+Languages=Common, Infernal
+Traits=Greater Magic Resistance. The rakshasa automatically succeeds on saving throws against spells and other magical effects, and the attack rolls of spells automat- ically miss it. Without the ra
+Actions=Multiattack. The rakshasa makes three Cursed Touch attacks. Cursed Touch. Melee Attack Roll: +10, reach 5 ft. Hit: 12 (2d6 + 5) Slashing damage plus 19 (3d12) Necrotic damage. If the target i
+Extra=None

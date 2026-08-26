@@ -1,0 +1,10 @@
+SizeAlignment=Large Elemental, Neutral
+Speed=50 ft. Fly 50 ft. (hover)
+Abilities=10,10,10,10,10,10
+Skills=Perception +8, Stealth +10
+Defenses=Bludgeoning, Piercing, Slashing; Poison; Exhaustion, Grappled, Paralyzed, Petrified, Poisoned, Prone, Restrained, Unconscious
+Senses=Darkvision 60 ft.; Passive Perception 18
+Languages=Common, Primordial (Auran)
+Traits=Air Form. The stalker can enter an enemy’s space and stop there. It can move through a space as narrow as 1 inch without expending extra movement to do so. Invisibility. The stalker has the I
+Actions=Multiattack. The stalker makes three Wind Swipe at- tacks. It can replace one attack with a use of Vortex. Wind Swipe. Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Force damage. Vorte
+Extra=None

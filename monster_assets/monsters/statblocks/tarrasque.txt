@@ -1,0 +1,10 @@
+SizeAlignment=Gargantuan Monstrosity (Titan), Unaligned
+Speed=60 ft. Burrow 40 ft. Climb 60 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +9
+Defenses=Bludgeoning, Piercing, Slashing; Fire, Poison; Charmed, Deafened, Frightened, Paralyzed, Poisoned
+Senses=Blindsight 120 ft.; Passive Perception 19
+Languages=None
+Traits=Legendary Resistance (6/Day). If the tarrasque fails a saving throw, it can choose to succeed instead. Magic Resistance. The tarrasque has Advantage on sav- ing throws against spells and othe
+Actions=Multiattack. The tarrasque makes one Bite attack and three other attacks, using Claw or Tail in any combination. Bite. Melee Attack Roll: +19, reach 15 ft. Hit: 36 (4d12 + 10) Piercing damage
+Extra=Bonus Actions: Swallow. Strength Saving Throw: DC 27, one Large or smaller creature Grappled by the tarrasque (it can have up to six creatures swallowed at a time). Failure: The target is swa

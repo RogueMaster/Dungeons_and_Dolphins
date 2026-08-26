@@ -1,0 +1,10 @@
+SizeAlignment=Small Aberration, Unaligned
+Speed=10 ft. Fly 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +3
+Defenses=None
+Senses=Blindsight 60 ft.; Passive Perception 10
+Languages=None
+Traits=None
+Actions=Crush. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage, and the darkmantle attaches to the target. If the target is a Medium or smaller crea- ture and the darkmantle ha
+Extra=None

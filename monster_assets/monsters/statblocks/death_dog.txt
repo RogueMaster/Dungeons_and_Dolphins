@@ -1,0 +1,10 @@
+SizeAlignment=Medium Monstrosity, Neutral Evil
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +5, Stealth +4
+Defenses=Blinded, Charmed, Deafened, Frightened, Stunned, Unconscious
+Senses=Darkvision 120 ft.; Passive Perception 15
+Languages=None
+Traits=None
+Actions=Multiattack. The death dog makes two Bite attacks. Bite. Melee Attack Roll: +4, reach 5 ft. Hit: 4 (1d4 + 2) Piercing damage. If the target is a creature, it is subjected to the following eff
+Extra=None

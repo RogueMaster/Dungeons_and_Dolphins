@@ -1,0 +1,10 @@
+SizeAlignment=Small Elemental, Neutral Evil
+Speed=30 ft. Fly 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +3
+Defenses=Cold; Fire, Poison; Exhaustion, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Primordial (Ignan, Terran)
+Traits=Death Burst. The mephit explodes when it dies. Dex- terity Saving Throw: DC 11, each creature in a 5-foot Emanation originating from the mephit. Failure: 7 (2d6) Fire damage. Success: Half da
+Actions=Claw. Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Slashing damage plus 3 (1d6) Fire damage. Fire Breath (Recharge 6). Dexterity Saving Throw: DC 11, each creature in a 15-foot Cone. F
+Extra=None

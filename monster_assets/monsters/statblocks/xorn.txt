@@ -1,0 +1,10 @@
+SizeAlignment=Medium Elemental
+Speed=20 ft., Burrow 20 ft.
+Abilities=17,10,22,11,10,11
+Skills=Perception +6, Stealth +6
+Defenses=Poison; Paralyzed, Petrified, Poisoned
+Senses=Darkvision 60 ft., Tremorsense 60 ft.; Passive Perception 16
+Languages=Primordial (Terran)
+Traits=Earth Glide. The xorn can burrow through nonmagical, unworked earth and stone. While doing so, the xorn doesn't disturb the material it moves through. Treasure Sense. The xorn can pinpoint th
+Actions=Multiattack. The xorn makes one Bite attack and three Claw attacks. Bite. Melee Attack Roll: +6, reach 5 ft. Hit: 17 (4d6 + 3) Piercing damage. Claw. Melee Attack Roll: +6, reach 5 ft. Hit: 8
+Extra=Bonus Actions: Charge. The xorn moves up to its Speed or Burrow Speed straight toward an enemy it can sense. ## Zombies

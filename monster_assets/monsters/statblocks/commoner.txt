@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Passive Perception 10
+Languages=Common
+Traits=Training. The commoner has proficiency in one skill of the GM’s choice and has Advantage whenever it makes an ability check using that skill.
+Actions=Club. Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Bludgeoning damage. Copper Dragons
+Extra=None

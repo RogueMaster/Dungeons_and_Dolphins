@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=10 ft., Fly 50 ft.
+Abilities=10,14,10,1,10,3
+Skills=None
+Defenses=None
+Senses=Passive Perception 10
+Languages=None
+Traits=None
+Actions=None
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Large Ooze, Unaligned
+Speed=15 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Acid; Blinded, Charmed, Deafened, Exhaustion, Frightened, Prone
+Senses=Blindsight 60 ft.; Passive Perception 8
+Languages=None
+Traits=Ooze Cube. The cube fills its entire space and is trans- parent. Other creatures can enter that space, but a creature that does so is subjected to the cube’s Engulf and has Disadvantage on th
+Actions=Pseudopod. Melee Attack Roll: +4, reach 5 ft. Hit: 12 (3d6 + 2) Acid damage. Engulf. The cube moves up to its Speed without provoking Opportunity Attacks. The cube can move through the spaces
+Extra=None

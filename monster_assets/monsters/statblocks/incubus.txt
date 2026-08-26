@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend, Neutral Evil
+Speed=30 ft. Fly 60 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +9, Insight +5, Perception +5, Persuasion +9, Stealth +7
+Defenses=Cold, Fire, Poison, Psychic
+Senses=Darkvision 60 ft.; Passive Perception 15
+Languages=Abyssal, Common, Infernal; telepathy 60 ft.
+Traits=Succubus Form. When the incubus finishes a Long Rest, it can shape-shift into a Succubus, using that stat block instead of this one. Any equipment it is wearing or carrying isn’t transformed.
+Actions=Multiattack. The incubus makes two Restless Touch attacks. 301 System Reference Document 5.2.1 Restless Touch. Melee Attack Roll: +7, reach 5 ft. Hit: 15 (3d6 + 5) Psychic damage, and the tar
+Extra=Bonus Actions: Nightmare (Recharge 6). Wisdom Saving Throw: DC 15, one creature the incubus can see within 60 feet. Failure: If the target has 20 Hit Points or fewer, it has the Unconscious c

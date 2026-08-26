@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid (Wizard), Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Arcana +6, History +6, Perception +4
+Defenses=None
+Senses=Passive Perception 14
+Languages=Common plus three other languages
+Traits=None
+Actions=Multiattack. The mage makes three Arcane Burst attacks. Arcane Burst. Melee or Ranged Attack Roll: +6, reach 5 ft. or range 120 ft. Hit: 16 (3d8 + 3) Force damage. Spellcasting. The mage cast
+Extra=Bonus Actions: Misty Step (3/Day). The mage casts Misty Step, using the same spellcasting ability as Spellcasting. Reactions: Protective Magic (3/Day). The mage casts Counterspell or Shield i

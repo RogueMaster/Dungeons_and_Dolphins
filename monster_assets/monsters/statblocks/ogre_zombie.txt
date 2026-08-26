@@ -1,0 +1,10 @@
+SizeAlignment=Large Undead
+Speed=30 ft.
+Abilities=19,6,18,3,6,5
+Skills=None
+Defenses=Poison; Exhaustion, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 8
+Languages=Understands Common and Giant but can't speak
+Traits=Undead Fortitude. If damage reduces the zombie to 0 Hit Points, it makes a Constitution saving throw (DC 5 plus the damage taken) unless the damage is Radiant or from a Critical Hit. On a suc
+Actions=Slam. Melee Attack Roll: +6, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage.
+Extra=None

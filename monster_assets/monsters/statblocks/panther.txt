@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=50 ft., Climb 40 ft.
+Abilities=14,16,10,3,14,7
+Skills=Perception +4, Stealth +7
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 14
+Languages=None
+Traits=None
+Actions=None
+Extra=None

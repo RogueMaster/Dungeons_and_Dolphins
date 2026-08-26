@@ -1,0 +1,10 @@
+SizeAlignment=Large Aberration, Chaotic Evil
+Speed=30 ft. Swim 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +4
+Defenses=Poison; Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 14
+Languages=Understands Deep Speech but can’t speak
+Traits=Amphibious. The chuul can breathe air and water. Sense Magic. The chuul senses magic within 120 feet of itself. This trait otherwise works like the Detect Magic spell but isn’t itself magical
+Actions=Multiattack. The chuul makes two Pincer attacks and uses Paralyzing Tentacles. Pincer. Melee Attack Roll: +6, reach 10 ft. Hit: 9 (1d10 + 4) Bludgeoning damage. If the target is a Large or sm
+Extra=None

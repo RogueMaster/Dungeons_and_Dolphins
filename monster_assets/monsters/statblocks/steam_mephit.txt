@@ -1,0 +1,10 @@
+SizeAlignment=Small Elemental, Neutral Evil
+Speed=30 ft. Fly 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +2
+Defenses=Fire, Poison; Exhaustion, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Primordial (Aquan, Ignan)
+Traits=Blurred Form. Attack rolls against the mephit are made with Disadvantage unless the mephit has the Incapaci- tated condition. Death Burst. The mephit explodes when it dies. Dex- terity Saving
+Actions=Claw. Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Slashing damage plus 2 (1d4) Fire damage. Steam Breath (Recharge 6). Constitution Saving Throw: DC 10, each creature in a 15-foot Cone. F
+Extra=None

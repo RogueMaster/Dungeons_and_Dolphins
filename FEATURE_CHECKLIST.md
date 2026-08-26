@@ -1,6 +1,6 @@
 # Request checklist
 
-| Requested capability | Version 1.0 status |
+| Requested capability | Version 2.6 status |
 |---|---|
 | Flipper FAP d20 icon | `icon.png`, 10x10 1-bit, assigned by `fap_icon` and FBT-validated |
 | Buttons and screen only | Implemented |
@@ -24,7 +24,7 @@
 | Party initiative presets and turn tracking | Per character with round/current turn, participant HP/AC/conditions, history, and undo |
 | SD catalogs and custom long-OK text | Implemented for names; Background uses short catalog/long custom |
 | Background catalog in its own SD file | `catalogs/backgrounds.txt` included |
-| Core and expansion option names | Names-only catalogs include SRD/core, XGtE, Ravenloft, Forgotten Realms, and Eberron selections |
+| Core and add-on option names | Names-only catalogs include packaged and optional add-on selections |
 | Structured rules-aware grants | Species, background, feat, class feature, subclass feature, spell, and item grants have review/apply/skip state |
 | Core class-feature assignment | Names in `abilities.txt`; assigned feature stores class, level, notes, uses, formulas, and recharge |
 | Per-class spellcasting | Shared multiclass slots, casting modes/ability, limits, spellbook, Pact slots, Arcanum, and spell points |
@@ -36,5 +36,12 @@
 | Profile portability | Rename, chunked duplicate/export/archive, validated import, and checksum diagnostics |
 | Recoverable prior generation | One previous successful save retained per profile with explicit restore action |
 | Translation and accessibility | Stable zero-allocation UI keys, translation template, and documented display/control conventions |
+| Separate bestiary application | Dolphin Bestiary is a separate FAP declared in the same manifest with an exclusive source list and asset namespace |
+| Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, and per-record diagnostics |
+| Custom monster lifecycle | Stable-ID edit, custom-only delete, atomic index rewrite, recovery journal, orphan completion, and rollback |
+| Campaign pack manager | On-device selection, per-profile/per-campaign progress, manifest diagnostics, schema, and starter template |
+| Complete structured editors | Full attack-template and grant editors with autosave |
+| Device resilience | Allocation stress runner, SD read-only fallback, unsaved warning, retry control, and published hardware matrix |
+| Asset namespace | Runtime access uses only `APP_ASSETS_PATH`; custom reference filenames use the `custom_` prefix |
 
 The expansion catalogs intentionally contain option names and original metadata rather than proprietary descriptions or mechanics. Custom text and notes support owned books, homebrew, errata, and table rulings.

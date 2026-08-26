@@ -1,0 +1,2 @@
+# MonsterPack=1
+# id|name|CR eighths|XP|AC|HP|type|environment|source|role

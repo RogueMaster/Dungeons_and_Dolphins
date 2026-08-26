@@ -328,6 +328,7 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
         attack->save_ability = pocket_d20_clamp_u8(attack->save_ability, PocketAbilityCharisma);
         attack->damage_dice = pocket_d20_clamp_u8(attack->damage_dice, 20U);
         attack->rider_dice = pocket_d20_clamp_u8(attack->rider_dice, 20U);
+        attack->recharge = pocket_d20_clamp_u8(attack->recharge, PocketRechargeCount - 1U);
     }
 
     data->party_count = pocket_d20_clamp_u8(data->party_count, POCKET_D20_MAX_PARTY);

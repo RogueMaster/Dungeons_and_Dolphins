@@ -1,0 +1,10 @@
+SizeAlignment=Large Monstrosity, Unaligned
+Speed=40 ft. Burrow 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6
+Defenses=None
+Senses=Darkvision 60 ft., Tremorsense 120 ft.; Passive Perception 16
+Languages=None
+Traits=None
+Actions=Multiattack. The bulette makes two Bite attacks. Bite. Melee Attack Roll: +7, reach 5 ft. Hit: 17 (2d12 + 4) Piercing damage. Deadly Leap. The bulette spends 5 feet of movement to jump to a s
+Extra=Bonus Actions: Leap. The bulette jumps up to 30 feet by spending 10 feet of movement. Centaur

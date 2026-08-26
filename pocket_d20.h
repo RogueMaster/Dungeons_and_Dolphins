@@ -245,6 +245,7 @@ typedef struct {
     uint8_t damage_die;
     uint8_t rider_dice;
     uint8_t rider_die;
+    uint8_t recharge;
 } PocketAttackTemplate;
 
 typedef struct {

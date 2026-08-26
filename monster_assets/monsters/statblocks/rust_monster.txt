@@ -1,0 +1,10 @@
+SizeAlignment=Medium Monstrosity, Unaligned
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 11
+Languages=None
+Traits=Iron Scent. The rust monster can pinpoint the location of ferrous metal within 30 feet of itself.
+Actions=Multiattack. The rust monster makes one Bite attack and uses Antennae twice. Bite. Melee Attack Roll: +3, reach 5 ft. Hit: 5 (1d8 + 1) Piercing damage. Antennae. The rust monster targets one
+Extra=Reactions: Reflexive Antennae. Trigger: An attack roll hits the rust monster. Response: The rust monster uses Antennae. Sahuagin

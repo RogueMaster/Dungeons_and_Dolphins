@@ -1,0 +1,10 @@
+SizeAlignment=Large Elemental (Genie), Neutral
+Speed=30 ft. Fly 90 ft. (hover)
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Lightning, Thunder
+Senses=Darkvision 120 ft.; Passive Perception 13
+Languages=Primordial (Auran)
+Traits=Elemental Restoration. If the djinni dies outside the Elemental Plane of Air, its body dissolves into mist, and it gains a new body in 1d4 days, reviving with all its Hit Points somewhere on
+Actions=Multiattack. The djinni makes three attacks, using Storm Blade or Storm Bolt in any combination. Storm Blade. Melee Attack Roll: +9, reach 5 feet. Hit: 12 (2d6 + 5) Slashing damage plus 7 (2d
+Extra=None

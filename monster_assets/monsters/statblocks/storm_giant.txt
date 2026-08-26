@@ -1,0 +1,10 @@
+SizeAlignment=Huge Giant, Chaotic Good
+Speed=50 ft. Fly 25 ft. (hover) Swim 50 ft.
+Abilities=10,10,10,10,10,10
+Skills=Arcana +8, Athletics +14, History +8, Perception +10
+Defenses=Cold; Lightning, Thunder
+Senses=Darkvision 120 ft., Truesight 30 ft.; Passive Perception 20
+Languages=Common, Giant
+Traits=Amphibious. The giant can breathe air and water.
+Actions=Multiattack. The giant makes two attacks, using Storm Sword or Thunderbolt in any combination. Storm Sword. Melee Attack Roll: +14, reach 10 ft. Hit: 23 (4d6 + 9) Slashing damage plus 13 (3d8
+Extra=None

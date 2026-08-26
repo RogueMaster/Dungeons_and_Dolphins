@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend (Devil), Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Bludgeoning, Cold, Piercing, Slashing; Fire, Poison; Poisoned
+Senses=Darkvision 120 ft. (unimpeded by magical Darkness); Passive Perception 11
+Languages=Infernal; telepathy 120 ft.
+Traits=Diabolical Restoration. If the devil dies outside the Nine Hells, its body disappears in sulfurous smoke, and it gains a new body instantly, reviving with all its Hit Points somewhere in the
+Actions=Multiattack. The devil makes two Chain attacks and uses Conjure Infernal Chain. Chain. Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Slashing damage. If the target is a Large or small
+Extra=Reactions: Unnerving Gaze. Trigger: A creature the devil can see starts its turn within 30 feet of the devil and can see the devil. Response—Wisdom Saving Throw: DC 15, the triggering creatur

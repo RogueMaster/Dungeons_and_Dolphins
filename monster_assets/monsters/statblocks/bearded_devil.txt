@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend (Devil), Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold; Fire, Poison; Frightened, Poisoned
+Senses=Darkvision 120 ft. (unimpeded by magical Darkness); Passive Perception 10
+Languages=Infernal; telepathy 120 ft.
+Traits=Magic Resistance. The devil has Advantage on saving throws against spells and other magical effects.
+Actions=Multiattack. The devil makes one Beard attack and one Infernal Glaive attack. Beard. Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Piercing damage, and the target has the Poisoned condi
+Extra=None

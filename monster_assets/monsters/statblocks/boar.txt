@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=40 ft.
+Abilities=13,11,14,2,9,5
+Skills=None
+Defenses=None
+Senses=Passive Perception 9
+Languages=None
+Traits=None
+Actions=None
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Medium Plant, Unaligned
+Speed=5 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Blinded, Charmed, Deafened, Frightened
+Senses=Blindsight 30 ft.; Passive Perception 6
+Languages=None
+Traits=None
+Actions=Multiattack. The fungus makes two Rotting Touch attacks. Rotting Touch. Melee Attack Roll: +2, reach 10 ft. Hit: 4 (1d8) Necrotic damage. Gargoyle
+Extra=None

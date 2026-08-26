@@ -1,0 +1,10 @@
+SizeAlignment=Small Fiend (Demon), Chaotic Evil
+Speed=20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold, Fire, Lightning; Poison; Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 9
+Languages=Abyssal; telepathy 60 ft. (works only with creatures that understand Abyssal)
+Traits=None
+Actions=Rend. Melee Attack Roll: +3, reach 5 ft. Hit: 4 (1d6 + 1) Slashing damage. Fetid Cloud (1/Day). Constitution Saving Throw: DC 11, each creature in a 10-foot Emanation originating from the dre
+Extra=None

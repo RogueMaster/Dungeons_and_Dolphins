@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend (Devil), Lawful Evil
+Speed=30 ft. Fly 60 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6, Persuasion +8
+Defenses=Cold; Fire, Poison; Poisoned
+Senses=Truesight 120 ft.; Passive Perception 16
+Languages=Infernal; telepathy 120 ft.
+Traits=Diabolical Restoration. If the erinyes dies outside the Nine Hells, its body disappears in sulfurous smoke, and it gains a new body instantly, reviving with all its Hit Points somewhere in th
+Actions=Multiattack. The erinyes makes three Withering Sword attacks and can use Entangling Rope. Withering Sword. Melee Attack Roll: +8, reach 5 ft. Hit: 13 (2d8 + 4) Slashing damage plus 11 (2d10)
+Extra=Reactions: Parry. Trigger: The erinyes is hit by a melee attack roll while holding a weapon. Response: The erinyes adds 4 to its AC against that attack, possibly causing it to miss. Ettercap

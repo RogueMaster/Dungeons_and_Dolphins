@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Undead
+Speed=5 ft., Fly 50 ft. (hover)
+Abilities=10,28,10,13,14,11
+Skills=None
+Defenses=Acid, Bludgeoning, Cold, Fire, Necrotic, Piercing, Slashing; Lightning, Poison; Exhaustion, Grappled, Paralyzed, Petrified, Poisoned, Prone, Restrained, Unconscious
+Senses=Darkvision 120 ft.; Passive Perception 12
+Languages=Common plus one other language
+Traits=Ephemeral. The wisp can't wear or carry anything. Illumination. The wisp sheds Bright Light in a 20-foot radius and Dim Light for an additional 20 feet. Incorporeal Movement. The wisp can mov
+Actions=Shock. Melee Attack Roll: +4, reach 5 ft. Hit: 11 (2d8 + 2) Lightning damage.
+Extra=Bonus Actions: Consume Life. Constitution Saving Throw: DC 10, one living creature the wisp can see within 5 feet that has 0 Hit Points. Failure: The target dies, and the wisp regains 10 (3d6

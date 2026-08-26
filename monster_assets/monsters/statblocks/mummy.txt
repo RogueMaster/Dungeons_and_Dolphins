@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Undead, Lawful Evil
+Speed=20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Fire; Necrotic, Poison; Charmed, Exhaustion, Frightened, Paralyzed, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 11
+Languages=Common plus two other languages
+Traits=None
+Actions=Multiattack. The mummy makes two Rotting Fist at- tacks and uses Dreadful Glare. Rotting Fist. Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Bludgeoning damage plus 10 (3d6) Necrotic d
+Extra=None

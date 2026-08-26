@@ -1,0 +1,10 @@
+SizeAlignment=Huge Fiend (Demon), Chaotic Evil
+Speed=40 ft. Fly 80 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +9
+Defenses=Cold, Lightning; Fire, Poison; Charmed, Frightened, Poisoned
+Senses=Truesight 120 ft.; Passive Perception 19
+Languages=Abyssal; telepathy 120 ft.
+Traits=Death Throes. The balor explodes when it dies. Dex- terity Saving Throw: DC 20, each creature in a 30-foot Emanation originating from the balor. Failure: 31 (9d6) Fire damage plus 31 (9d6) Fo
+Actions=Multiattack. The balor makes one Flame Whip attack and one Lightning Blade attack. Flame Whip. Melee Attack Roll: +14, reach 30 ft. Hit: 18 (3d6 + 8) Force damage plus 17 (5d6) Fire damage. I
+Extra=Bonus Actions: Teleport. The balor teleports itself or a willing demon within 10 feet of itself up to 60 feet to an unoccupied space the balor can see. Bandits

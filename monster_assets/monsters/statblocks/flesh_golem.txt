@@ -1,0 +1,10 @@
+SizeAlignment=Medium Construct, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Lightning, Poison; Charmed, Exhaustion, Frightened, Paralyzed, Petrified, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Understands Common plus one other language but can’t speak
+Traits=Aversion to Fire. If the golem takes Fire damage, it has Disadvantage on attack rolls and ability checks until the end of its next turn. Berserk. Whenever the golem starts its turn Bloodied,
+Actions=Multiattack. The golem makes two Slam attacks. Slam. Melee Attack Roll: +7, reach 5 ft. Hit: 13 (2d8 + 4) Bludgeoning damage plus 4 (1d8) Lightning damage. Frost Giant
+Extra=None

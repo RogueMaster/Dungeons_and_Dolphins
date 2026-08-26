@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fey, Chaotic Neutral
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +2, Performance +6, Stealth +5
+Defenses=None
+Senses=Passive Perception 12
+Languages=Common, Elvish, Sylvan
+Traits=Magic Resistance. The satyr has Advantage on saving throws against spells and other magical effects.
+Actions=Hooves. Melee Attack Roll: +5, reach 5 ft. Hit: 5 (1d4 + 3) Bludgeoning damage. If the target is a Medium or smaller creature, the satyr pushes the target up to 10 feet straight away from its
+Extra=None

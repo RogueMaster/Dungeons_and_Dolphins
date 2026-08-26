@@ -1,0 +1,10 @@
+SizeAlignment=Medium Swarm
+Speed=20 ft., Climb or Fly 20 ft. (GM's choice)
+Abilities=3,13,14,1,7,1
+Skills=None
+Defenses=Bludgeoning, Piercing, Slashing; Charmed, Frightened, Grappled, Paralyzed, Petrified, Prone, Restrained, Stunned
+Senses=Blindsight 30 ft.; Passive Perception 8
+Languages=None
+Traits=None
+Actions=None
+Extra=None

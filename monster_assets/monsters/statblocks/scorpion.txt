@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Beast
+Speed=10 ft.
+Abilities=2,11,8,1,8,2
+Skills=None
+Defenses=None
+Senses=Blindsight 10 ft.; Passive Perception 9
+Languages=None
+Traits=None
+Actions=None
+Extra=None

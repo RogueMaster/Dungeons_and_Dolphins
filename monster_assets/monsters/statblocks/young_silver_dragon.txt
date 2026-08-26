@@ -1,0 +1,10 @@
+SizeAlignment=Large Dragon (Metallic), Lawful Good
+Speed=40 ft. Fly 80 ft.
+Abilities=10,10,10,10,10,10
+Skills=History +6, Perception +8, Stealth +4
+Defenses=Cold
+Senses=Blindsight 30 ft., Darkvision 120 ft.; Passive Perception 18
+Languages=Common, Draconic
+Traits=None
+Actions=Multiattack. The dragon makes three Rend attacks. It can replace one attack with a use of Paralyzing Breath. 324 System Reference Document 5.2.1 Rend. Melee Attack Roll: +10, reach 10 ft. Hit
+Extra=None

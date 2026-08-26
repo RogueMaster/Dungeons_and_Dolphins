@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=50 ft.
+Abilities=11,16,11,2,14,5
+Skills=Perception +4
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 14
+Languages=None
+Traits=None
+Actions=None
+Extra=None

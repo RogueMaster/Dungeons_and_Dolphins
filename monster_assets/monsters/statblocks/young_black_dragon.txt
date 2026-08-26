@@ -1,0 +1,10 @@
+SizeAlignment=Large Dragon (Chromatic), Chaotic Evil
+Speed=40 ft. Fly 80 ft. Swim 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6, Stealth +5
+Defenses=Acid
+Senses=Blindsight 30 ft., Darkvision 120 ft.; Passive Perception 16
+Languages=Common, Draconic
+Traits=Amphibious. The dragon can breathe air and water.
+Actions=Multiattack. The dragon makes three Rend attacks. Rend. Melee Attack Roll: +7, reach 10 ft. Hit: 9 (2d4 + 4) Slashing damage plus 3 (1d6) Acid damage. Acid Breath (Recharge 5–6). Dexterity Sa
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Huge Dragon (Chromatic), Chaotic Evil
+Speed=40 ft. Fly 80 ft. Swim 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +11, Stealth +7
+Defenses=Acid
+Senses=Blindsight 60 ft., Darkvision 120 ft.; Passive Perception 21
+Languages=Common, Draconic
+Traits=Amphibious. The dragon can breathe air and water. Legendary Resistance (3/Day, or 4/Day in Lair). If the dragon fails a saving throw, it can choose to suc- ceed instead.
+Actions=Multiattack. The dragon makes three Rend attacks. It can replace one attack with a use of Spellcasting to cast Acid Arrow (level 3 version). Rend. Melee Attack Roll: +11, reach 10 ft. Hit: 13
+Extra=Legendary Actions: Legendary Action Uses: 3 (4 in Lair). Immediately after another creature’s turn, the dragon can expend a use to take one of the following actions. The dragon regains all ex

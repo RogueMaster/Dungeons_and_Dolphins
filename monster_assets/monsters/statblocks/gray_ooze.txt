@@ -1,0 +1,10 @@
+SizeAlignment=Medium Ooze, Unaligned
+Speed=10 ft. Climb 10 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +2
+Defenses=Acid, Cold, Fire; Blinded, Charmed, Deafened, Exhaustion, Frightened, Grappled, Prone, Restrained
+Senses=Blindsight 60 ft.; Passive Perception 8
+Languages=None
+Traits=Amorphous. The ooze can move through a space as narrow as 1 inch without expending extra move- ment to do so. Corrosive Form. Nonmagical ammunition is destroyed immediately after hitting the
+Actions=Pseudopod. Melee Attack Roll: +3, reach 5 ft. Hit: 10 (2d8 + 1) Acid damage. Nonmagical armor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed if the penalty
+Extra=None

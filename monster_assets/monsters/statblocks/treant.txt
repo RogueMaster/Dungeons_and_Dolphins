@@ -1,0 +1,10 @@
+SizeAlignment=Huge Plant, Chaotic Good
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Fire; Bludgeoning, Piercing
+Senses=Passive Perception 13
+Languages=Common, Druidic, Elvish, Sylvan
+Traits=Siege Monster. The treant deals double damage to ob- jects and structures.
+Actions=Multiattack. The treant makes two Slam attacks. Slam. Melee Attack Roll: +10, reach 5 ft. Hit: 16 (3d6 + 6) Bludgeoning damage. Hail of Bark. Ranged Attack Roll: +10, range 180 ft. Hit: 28 (4
+Extra=None

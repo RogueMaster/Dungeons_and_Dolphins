@@ -1,0 +1,10 @@
+SizeAlignment=Small Dragon, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 8
+Languages=Common, Draconic
+Traits=Pack Tactics. The kobold has Advantage on an attack roll against a creature if at least one of the kobold’s al- lies is within 5 feet of the creature and the ally doesn’t have the Incapacitat
+Actions=Dagger. Melee or Ranged Attack Roll: +4, reach 5 ft. or range 20/60 ft. Hit: 4 (1d4 + 2) Piercing damage. Kraken
+Extra=None

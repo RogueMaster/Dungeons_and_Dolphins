@@ -1,0 +1,10 @@
+SizeAlignment=Huge Monstrosity, Unaligned
+Speed=40 ft. Burrow 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold, Fire
+Senses=Darkvision 60 ft., Tremorsense 60 ft.; Passive Perception 10
+Languages=None
+Traits=Heat Aura. At the end of each of the remorhaz’s turns, each creature in a 5-foot Emanation originating from the remorhaz takes 16 (3d10) Fire damage.
+Actions=Bite. Melee Attack Roll: +11, reach 10 ft. Hit: 18 (2d10 + 7) Piercing damage plus 14 (4d6) Fire damage. If the target is a Large or smaller creature, it has the Grappled condition (escape DC
+Extra=Bonus Actions: Swallow. Strength Saving Throw: DC 19, one Large or smaller creature Grappled by the remorhaz (it can have up to two creatures swallowed at a time). Failure: The target is swal

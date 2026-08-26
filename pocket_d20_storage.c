@@ -9,12 +9,12 @@
 #define POCKET_D20_TEXT_VERSION 1U
 #define POCKET_D20_LEGACY_TEXT_VERSION 8U
 #define POCKET_D20_LINE_LEN 768U
-#define POCKET_D20_DATA_DIR APP_DATA_PATH("")
-#define POCKET_D20_EXPORT_DIR APP_DATA_PATH("exports")
-#define POCKET_D20_ARCHIVE_DIR APP_DATA_PATH("archive")
+#define POCKET_D20_DATA_DIR APP_ASSETS_PATH("profiles")
+#define POCKET_D20_EXPORT_DIR APP_ASSETS_PATH("profiles/exports")
+#define POCKET_D20_ARCHIVE_DIR APP_ASSETS_PATH("profiles/archive")
 
-#define POCKET_D20_ACTIVE_PROFILE_PATH APP_DATA_PATH("active_profile.txt")
-#define POCKET_D20_ACTIVE_PROFILE_TEMP_PATH APP_DATA_PATH("active_profile.tmp")
+#define POCKET_D20_ACTIVE_PROFILE_PATH APP_ASSETS_PATH("profiles/custom_active_profile.txt")
+#define POCKET_D20_ACTIVE_PROFILE_TEMP_PATH APP_ASSETS_PATH("profiles/custom_active_profile.tmp")
 
 static uint32_t pocket_d20_checksum(const void* data, size_t size) {
     const uint8_t* bytes = data;
@@ -69,7 +69,7 @@ static void pocket_d20_profile_path(
     snprintf(
         output,
         size,
-        "%sch_%lu_%s_%u.txt",
+        "%s/ch_%lu_%s_%u.txt",
         POCKET_D20_DATA_DIR,
         (unsigned long)profile,
         safe_name,
@@ -547,7 +547,7 @@ static bool pocket_d20_write_character(File* file, const PocketSaveData* data) {
                file,
                "AttackTemplate%uData=%u,%u,%u,%d,%u,%u,%u,%u,%u\n",
                i,
-               attack->type,
+               attack->type | (attack->recharge << 3U),
                attack->ability,
                attack->save_ability,
                attack->attack_misc,
@@ -925,7 +925,8 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data, bool* mi
         if(!pocket_d20_read_string(file, key, attack->rider_type, sizeof(attack->rider_type))) return false;
         snprintf(key, sizeof(key), "AttackTemplate%uData", i);
         if(!pocket_d20_read_numbers(file, key, n, 9U)) return false;
-        attack->type = (uint8_t)n[0];
+        attack->type = (uint8_t)n[0] & 0x07U;
+        attack->recharge = ((uint8_t)n[0] >> 3U);
         attack->ability = (uint8_t)n[1];
         attack->save_ability = (uint8_t)n[2];
         attack->attack_misc = (int8_t)n[3];
@@ -1059,7 +1060,13 @@ static bool pocket_d20_load_text_path(
 }
 
 static void pocket_d20_work_path(char* output, size_t size, uint32_t profile, const char* kind) {
-    snprintf(output, size, "%s%s_%lu.tmp", POCKET_D20_DATA_DIR, kind, (unsigned long)profile);
+    snprintf(
+        output,
+        size,
+        "%s/custom_%s_%lu.tmp",
+        POCKET_D20_DATA_DIR,
+        kind,
+        (unsigned long)profile);
 }
 
 static bool pocket_d20_parse_profile_filename(
@@ -1108,9 +1115,10 @@ static bool pocket_d20_find_profile_path(
            entry.id == profile) {
             size_t prefix_length = strlen(POCKET_D20_DATA_DIR);
             size_t filename_length = strlen(filename);
-            if(prefix_length + filename_length + 1U > size) continue;
+            if(prefix_length + filename_length + 2U > size) continue;
             memcpy(output, POCKET_D20_DATA_DIR, prefix_length);
-            memcpy(output + prefix_length, filename, filename_length + 1U);
+            output[prefix_length] = '/';
+            memcpy(output + prefix_length + 1U, filename, filename_length + 1U);
             found = true;
             break;
         }
@@ -1263,7 +1271,7 @@ bool pocket_d20_storage_duplicate_profile(
     snprintf(
         destination_path,
         sizeof(destination_path),
-        "%sch_%lu_%s_%u.txt",
+        "%s/ch_%lu_%s_%u.txt",
         POCKET_D20_DATA_DIR,
         (unsigned long)destination,
         safe_name,

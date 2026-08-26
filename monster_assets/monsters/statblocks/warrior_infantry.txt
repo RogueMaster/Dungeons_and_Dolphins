@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid
+Speed=30 ft.
+Abilities=13,11,11,8,11,8
+Skills=None
+Defenses=None
+Senses=Passive Perception 10
+Languages=Common
+Traits=Pack Tactics. The warrior has Advantage on an attack roll against a creature if at least one of the warrior's allies is within 5 feet of the creature and the ally doesn't have the Incapacitat
+Actions=Spear. Melee or Ranged Attack Roll: +3, reach 5 ft. or range 20/60 ft. Hit: 4 (1d6 + 1) Piercing damage.
+Extra=None

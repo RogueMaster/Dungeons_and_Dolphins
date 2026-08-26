@@ -1,21 +1,22 @@
 # Build verification
 
-- App version: `2.0`
-- Application ID: `dungeons_and_dolphins`
-- Display name: `Dungeons & Dolphins`
+- Release version: `2.6`
+- Character application ID: `dungeons_and_dolphins`
+- Bestiary application ID: `dolphin_bestiary`
 - Target: Flipper Zero, RogueMaster firmware
 - Firmware branch: `420`
-- Firmware commit: `d3ae1f86bd961852af6969e887a8dd3492a19321`
-- Firmware commit date: `2026-08-22`
-- Build command: `./fbt fap_dungeons_and_dolphins`
-- Build result: passed
+- Firmware commit: `dd196a93089970d3bd20b18492d6c70c9a402f60`
+- Firmware commit date: `2026-08-25`
+- Build command: `./fbt fap_dungeons_and_dolphins fap_dolphin_bestiary`
+- Build result: passed for both FAPs
 - Firmware API reported by build: `88.4`
 - FBT checks completed: compile, link, app metadata, FAP generation, FASTFAP, and APPCHK
-- Toolchain FAP size: `282,380 bytes` including packaged catalogs, campaign, monster records, and translation-key assets
-- Toolchain FAP SHA-256: `be37f0793cbe8cc54f1bba523985695ec0ea8b03e5b112514daf4e5a0bd386e2`
-- ARM ELF text: `82,970 bytes`
+- Dungeons & Dolphins FAP size: `274,944 bytes`
+- Dungeons & Dolphins FAP SHA-256: `8c0440ef18fc764aa6b2ceec485d5f04e830f2976be4e069eaa8c73a65579ced`
+- Dolphin Bestiary FAP size: `238,884 bytes`
+- Dolphin Bestiary FAP SHA-256: `e4fa21893d740cbdfb0d1efc3f75baba850e9db7aac01558db55fc495f856345`
 - Release ZIP policy: source and assets only; no `dist` directory or compiled FAP
 
-The build was performed from a clean RogueMaster checkout with the app linked into `applications_user/pocket_d20`. No device hardware was connected, so this verifies compilation and firmware API compatibility, not physical-device UI behavior.
+The build used a clean RogueMaster checkout with this source linked at `applications_user/pocket_d20`. Both applications were discovered from the same `application.fam`; their explicit `sources` lists exclude the other application's entry point and feature modules.
 
-Version 2.0 compiles the dynamically indexed character manager, lazy catalog/adventure/monster allocations, packaged assets, stable schema-1 `ch_{x}_{characterName}_{characterLvl}.txt` saves, migration, retained backups, profile transfer/archive/restore actions, translation hooks, structured grants, spellcasting models, combat sheet, inventory resources, catalog diagnostics, adventure engine, searchable monster compendium, template-aware encounter generator, initiative transfer, versioned monster packs, on-device custom creation, live heap diagnostics, and manifest icon. FBT accepted `icon.png` as the required 10x10 1-bit application icon.
+Version 2.6 validates separate packaged-asset namespaces, the 50-record catalog and bestiary windows, 340 monster records, profile save paths and recovery, custom-file prefixes, the 10x10 1-bit icon, and firmware API compatibility. No device was connected, so this record does not claim physical-device UI or long-session results.

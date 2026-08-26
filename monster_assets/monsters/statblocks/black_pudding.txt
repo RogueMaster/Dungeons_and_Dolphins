@@ -1,0 +1,10 @@
+SizeAlignment=Large Ooze, Unaligned
+Speed=20 ft. Climb 20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Acid, Cold, Lightning, Slashing; Charmed, Deafened, Exhaustion, Frightened, Grappled, Prone, Restrained
+Senses=Blindsight 60 ft.; Passive Perception 8
+Languages=None
+Traits=Amorphous. The pudding can move through a space as narrow as 1 inch without expending extra move- ment to do so. Corrosive Form. A creature that hits the pudding with a melee attack roll take
+Actions=Dissolving Pseudopod. Melee Attack Roll: +5, reach 10 ft. Hit: 17 (4d6 + 3) Acid damage. Nonmagical ar- mor worn by the target takes a −1 penalty to the AC it offers. The armor is destroyed i
+Extra=Reactions: Split. Trigger: While the pudding is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is sub- jected to Lightning or Slashing damage. Response: The pudding splits int

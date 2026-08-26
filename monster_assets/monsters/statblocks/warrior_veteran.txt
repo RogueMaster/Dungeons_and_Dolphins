@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid
+Speed=30 ft.
+Abilities=16,13,14,10,11,10
+Skills=Athletics +5, Perception +2
+Defenses=None
+Senses=Passive Perception 12
+Languages=Common plus one other language
+Traits=None
+Actions=Multiattack. The warrior makes two Greatsword or Heavy Crossbow attacks. Greatsword. Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage. Heavy Crossbow. Ranged Attack Roll:
+Extra=Reactions: Parry. Trigger: The warrior is hit by a melee attack roll while holding a weapon. Response: The warrior adds 2 to its AC against that attack, possibly causing it to miss. ## Water

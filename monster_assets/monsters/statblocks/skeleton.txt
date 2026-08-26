@@ -1,0 +1,10 @@
+SizeAlignment=Medium Undead, Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Bludgeoning; Poison; Exhaustion, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 9
+Languages=Understands Common plus one other language but can’t speak
+Traits=None
+Actions=Shortsword. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Piercing damage. Shortbow. Ranged Attack Roll: +5, range 80/320 ft. Hit: 6 (1d6 + 3) Piercing damage.
+Extra=None

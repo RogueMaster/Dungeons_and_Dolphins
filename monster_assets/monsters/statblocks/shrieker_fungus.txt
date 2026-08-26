@@ -1,0 +1,10 @@
+SizeAlignment=Medium Plant, Unaligned
+Speed=5 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Blinded, Charmed, Deafened, Frightened
+Senses=Blindsight 30 ft.; Passive Perception 6
+Languages=None
+Traits=None
+Actions=None
+Extra=Reactions: Shriek. Trigger: A creature or a source of Bright Light moves within 30 feet of the shrieker. Response: The shrieker emits a shriek audible within 300 feet of itself for 1 minute o

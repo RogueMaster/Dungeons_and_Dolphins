@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Undead (Cleric), Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=History +5, Perception +9, Religion +5
+Defenses=Fire; Necrotic, Poison; Charmed, Exhaustion, Frightened, Paralyzed, Poisoned
+Senses=Truesight 60 ft.; Passive Perception 19
+Languages=Common plus three other languages
+Traits=Legendary Resistance (3/Day, or 4/Day in Lair). If the mummy fails a saving throw, it can choose to suc- ceed instead. Magic Resistance. The mummy has Advantage on sav- ing throws against spe
+Actions=Multiattack. The mummy makes one Rotting Fist or Channel Negative Energy attack, and it uses Dreadful Glare. Rotting Fist. Melee Attack Roll: +9, reach 5 ft. Hit: 15 (2d10 + 4) Bludgeoning da
+Extra=Reactions: Whirlwind of Sand. Trigger: The mummy is hit by an attack roll. Response: The mummy adds 2 to its AC against the attack, possibly causing the attack to miss, and the mummy teleport

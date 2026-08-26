@@ -1,0 +1,10 @@
+SizeAlignment=Medium Dragon (Chromatic), Chaotic Evil
+Speed=30 ft. Fly 60 ft. Swim 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +4, Stealth +4
+Defenses=Acid
+Senses=Blindsight 10 ft., Darkvision 60 ft.; Passive Perception 14
+Languages=Draconic
+Traits=Amphibious. The dragon can breathe air and water.
+Actions=Multiattack. The dragon makes two Rend attacks. Rend. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage plus 2 (1d4) Acid damage. Acid Breath (Recharge 5–6). Dexterity Savin
+Extra=None

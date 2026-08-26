@@ -1,0 +1,10 @@
+SizeAlignment=Large Fiend
+Speed=40 ft., Fly 60 ft.
+Abilities=17,15,18,8,13,8
+Skills=None
+Defenses=Cold, Fire, Lightning; Poison; Poisoned
+Senses=Darkvision 120 ft.; Passive Perception 11
+Languages=Abyssal; telepathy 120 ft.
+Traits=Demonic Restoration. If the vrock dies outside the Abyss, its body dissolves into ichor, and it gains a new body instantly, reviving with all its Hit Points somewhere in the Abyss. Magic Resi
+Actions=Multiattack. The vrock makes two Shred attacks. Shred. Melee Attack Roll: +6, reach 5 ft. Hit: 10 (2d6 + 3) Piercing damage plus 10 (3d6) Poison damage. Spores (Recharge 6). Constitution Savi
+Extra=None

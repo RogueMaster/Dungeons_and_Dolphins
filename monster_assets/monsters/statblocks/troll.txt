@@ -1,0 +1,10 @@
+SizeAlignment=Large Giant, Chaotic Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +5
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 15
+Languages=Giant
+Traits=Loathsome Limbs (4/Day). If the troll ends any turn Bloodied and took 15+ Slashing damage during that turn, one of the troll’s limbs is severed, falls into the troll’s space, and becomes a Tr
+Actions=Multiattack. The troll makes three Rend attacks. Rend. Melee Attack Roll: +7, reach 10 ft. Hit: 11 (2d6 + 4) Slashing damage.
+Extra=Bonus Actions: Charge. The troll moves up to half its Speed straight toward an enemy it can see.

@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Beast
+Speed=10 ft., Fly 50 ft.
+Abilities=2,14,10,5,13,6
+Skills=Perception +3
+Defenses=None
+Senses=Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

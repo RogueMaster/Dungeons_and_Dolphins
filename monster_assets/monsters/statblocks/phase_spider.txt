@@ -1,0 +1,10 @@
+SizeAlignment=Large Monstrosity, Unaligned
+Speed=30 ft. Climb 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +7
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=None
+Traits=Ethereal Sight. The spider can see 60 feet into the Ethe- real Plane while on the Material Plane and vice versa. Spider Climb. The spider can climb difficult surfaces, including along ceiling
+Actions=Multiattack. The spider makes two Bite attacks. Bite. Melee Attack Roll: +5, reach 5 ft. Hit: 8 (1d10 + 3) Piercing damage plus 9 (2d8) Poison damage. If this damage reduces the target to 0 H
+Extra=Bonus Actions: Ethereal Jaunt. The spider teleports from the Material Plane to the Ethereal Plane or vice versa. Pirates

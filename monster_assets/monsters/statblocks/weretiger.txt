@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Monstrosity
+Speed=30 ft., 40 ft. (tiger form only)
+Abilities=17,15,16,10,13,11
+Skills=Perception +5, Stealth +4
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 15
+Languages=Common (can't speak in tiger form)
+Traits=None
+Actions=Multiattack. The weretiger makes two attacks, using Scratch or Longbow in any combination. It can replace one attack with a Bite attack. Bite (Tiger or Hybrid Form Only). Melee Attack Roll: +
+Extra=Bonus Actions: Prowl (Tiger or Hybrid Form Only). The weretiger moves up to its Speed without provoking Opportunity Attacks. At the end of this movement, the weretiger can take the Hide actio

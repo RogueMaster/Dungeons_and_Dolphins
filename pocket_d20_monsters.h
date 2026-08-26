@@ -43,6 +43,8 @@ typedef struct {
     uint16_t hit_points;
     char type[24];
     char environment[24];
+    char source[24];
+    char role[16];
 } PocketMonsterSummary;
 
 typedef struct {
@@ -68,14 +70,30 @@ typedef struct {
     uint32_t spent;
 } PocketMonsterEncounter;
 
+typedef bool (*PocketMonsterFilter)(const PocketMonsterSummary* summary, void* context);
+
 uint32_t pocket_monster_xp_budget(
     uint8_t party_level,
     uint8_t party_size,
     PocketEncounterDifficulty difficulty);
 uint16_t pocket_monster_count(Storage* storage);
 bool pocket_monster_at(Storage* storage, uint16_t index, PocketMonsterSummary* output);
+uint16_t pocket_monster_query(
+    Storage* storage,
+    PocketMonsterFilter filter,
+    void* context,
+    uint16_t start,
+    PocketMonsterSummary* output,
+    uint16_t capacity,
+    uint16_t* total_matches);
 bool pocket_monster_load(Storage* storage, const PocketMonsterSummary* summary, PocketMonsterDetail* output);
 bool pocket_monster_save_custom(Storage* storage, PocketMonsterDetail* detail);
+bool pocket_monster_update_custom(Storage* storage, PocketMonsterDetail* detail);
+bool pocket_monster_delete_custom(Storage* storage, const PocketMonsterSummary* summary);
+bool pocket_monster_recover_user_pack(
+    Storage* storage,
+    uint16_t* recovered,
+    uint16_t* rolled_back);
 void pocket_monster_pack_versions(
     Storage* storage,
     uint8_t* bundled_version,
@@ -89,4 +107,5 @@ bool pocket_monster_generate(
     const char* environment,
     bool allow_repeats,
     PocketEncounterTemplate template_kind,
+    const char* preferred_role,
     PocketMonsterEncounter* output);

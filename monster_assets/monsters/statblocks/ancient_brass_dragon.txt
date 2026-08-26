@@ -1,0 +1,10 @@
+SizeAlignment=Gargantuan Dragon (Metallic), Chaotic Good
+Speed=40 ft. Burrow 40 ft. Fly 80 ft.
+Abilities=10,10,10,10,10,10
+Skills=History +9, Perception +14, Persuasion +12, Stealth +6
+Defenses=Fire
+Senses=Blindsight 60 ft., Darkvision 120 ft.; Passive Perception 24
+Languages=Common, Draconic
+Traits=Legendary Resistance (4/Day, or 5/Day in Lair). If the dragon fails a saving throw, it can choose to suc- ceed instead.
+Actions=Multiattack. The dragon makes three Rend attacks. It can replace one attack with a use of (A) Sleep Breath or (B) Spellcasting to cast Scorching Ray (level 3 version). Rend. Melee Attack Roll
+Extra=Legendary Actions: Legendary Action Uses: 3 (4 in Lair). Immediately after another creature’s turn, the dragon can expend a use to take one of the following actions. The dragon regains all ex

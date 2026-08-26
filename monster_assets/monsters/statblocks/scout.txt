@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Nature +4, Perception +5, Stealth +6, Survival +5
+Defenses=None
+Senses=Passive Perception 15
+Languages=Common plus one other language
+Traits=None
+Actions=Multiattack. The scout makes two attacks, using Shorts- word and Longbow in any combination. Shortsword. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage. Longbow. Ranged A
+Extra=None

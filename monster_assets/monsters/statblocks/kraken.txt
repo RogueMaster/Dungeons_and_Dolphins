@@ -1,0 +1,10 @@
+SizeAlignment=Gargantuan Monstrosity (Titan), Chaotic Evil
+Speed=30 ft. Swim 120 ft.
+Abilities=10,10,10,10,10,10
+Skills=History +13, Perception +11
+Defenses=Cold, Lightning; Frightened, Grappled, Paralyzed, Restrained
+Senses=Truesight 120 ft.; Passive Perception 21
+Languages=Understands Abyssal, Celestial, Infernal, and Primordial but can’t speak; telepathy 120 ft.
+Traits=Amphibious. The kraken can breathe air and water. Legendary Resistance (4/Day, or 5/Day in Lair). If the kraken fails a saving throw, it can choose to suc- ceed instead. Siege Monster. The kr
+Actions=Multiattack. The kraken makes two Tentacle attacks and uses Fling, Lightning Strike, or Swallow. Tentacle. Melee Attack Roll: +17, reach 30 ft. Hit: 24 (4d6 + 10) Bludgeoning damage. The targ
+Extra=Legendary Actions: Legendary Action Uses: 3 (4 in Lair). Immediately after another creature’s turn, the kraken can expend a use to take one of the following actions. The kraken regains all ex

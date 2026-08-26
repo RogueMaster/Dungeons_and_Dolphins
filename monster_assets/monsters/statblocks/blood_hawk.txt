@@ -1,0 +1,10 @@
+SizeAlignment=Small Beast
+Speed=10 ft., Fly 60 ft.
+Abilities=6,14,10,3,14,5
+Skills=Perception +6
+Defenses=None
+Senses=Passive Perception 16
+Languages=None
+Traits=None
+Actions=None
+Extra=None

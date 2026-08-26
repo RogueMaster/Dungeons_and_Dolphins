@@ -1,0 +1,10 @@
+SizeAlignment=Medium Undead, Neutral
+Speed=5 ft. Fly 40 ft. (hover)
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Acid, Bludgeoning, Cold, Fire, Lightning, Piercing, Slashing, Thunder; Necrotic, Poison; Charmed, Exhaustion, Frightened, Grappled, Paralyzed, Petrified, Poisoned, Prone, Restrained
+Senses=Darkvision 60 ft.; Passive Perception 11
+Languages=Common plus one other language
+Traits=Ethereal Sight. The ghost can see 60 feet into the Ethe- real Plane when it is on the Material Plane. Incorporeal Movement. The ghost can move through other creatures and objects as if they w
+Actions=Multiattack. The ghost makes two Withering Touch attacks. Withering Touch. Melee Attack Roll: +5, reach 5 ft. Hit: 19 (3d10 + 3) Necrotic damage. Etherealness. The ghost casts the Etherealnes
+Extra=None

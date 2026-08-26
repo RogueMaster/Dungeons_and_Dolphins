@@ -1,0 +1,10 @@
+SizeAlignment=Huge Monstrosity, Neutral Evil
+Speed=50 ft. Climb 50 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6, Stealth +7
+Defenses=Lightning
+Senses=Darkvision 90 ft.; Passive Perception 16
+Languages=Draconic
+Traits=None
+Actions=Multiattack. The behir makes one Bite attack and uses Constrict. Bite. Melee Attack Roll: +10, reach 10 ft. Hit: 19 (2d12 + 6) Piercing damage plus 11 (2d10) Lightning damage. Constrict. Stre
+Extra=Bonus Actions: Swallow. Dexterity Saving Throw: DC 18, one Large or smaller creature Grappled by the behir (the behir can have only one creature swallowed at a time). Failure: The behir swall

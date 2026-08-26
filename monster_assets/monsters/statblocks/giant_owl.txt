@@ -1,0 +1,10 @@
+SizeAlignment=Large Celestial
+Speed=5 ft., Fly 60 ft.
+Abilities=13,15,12,10,14,10
+Skills=Perception +6, Stealth +6
+Defenses=Necrotic, Radiant
+Senses=Darkvision 120 ft.; Passive Perception 16
+Languages=Celestial; understands Common, Elvish, and Sylvan but can't speak them
+Traits=None
+Actions=None
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Large Monstrosity, Chaotic Evil
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +7, Survival +7
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 17
+Languages=Abyssal
+Traits=None
+Actions=Abyssal Glaive. Melee Attack Roll: +6, reach 10 ft. Hit: 10 (1d12 + 4) Slashing damage plus 10 (3d6) Ne- crotic damage. Gore (Recharge 5–6). Melee Attack Roll: +6, reach 5 ft. Hit: 18 (4d6 +
+Extra=None

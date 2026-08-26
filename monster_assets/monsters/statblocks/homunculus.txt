@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Construct, Neutral
+Speed=20 ft. Fly 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Poison; Charmed, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Understands Common plus one other language but can’t speak
+Traits=Telepathic Bond. While the homunculus is on the same plane of existence as its master, the two of them can communicate telepathically with each other.
+Actions=Bite. Melee Attack Roll: +4, reach 5 ft. Hit: 1 Piercing damage, and the target is subjected to the following effect. Constitution Saving Throw: DC 12. Failure: The target has the Poisoned co
+Extra=None

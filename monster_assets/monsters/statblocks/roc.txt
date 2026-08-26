@@ -1,0 +1,10 @@
+SizeAlignment=Gargantuan Monstrosity, Unaligned
+Speed=20 ft. Fly 120 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +8
+Defenses=None
+Senses=Passive Perception 18
+Languages=None
+Traits=None
+Actions=Multiattack. The roc makes two Beak attacks. It can replace one attack with a Talons attack. Beak. Melee Attack Roll: +13, reach 10 ft. Hit: 28 (3d12 + 9) Piercing damage. Talons. Melee Attac
+Extra=Bonus Actions: Swoop (Recharge 5–6). If the roc has a creature Grap- pled, the roc flies up to half its Fly Speed without pro- voking Opportunity Attacks and drops that creature. Roper

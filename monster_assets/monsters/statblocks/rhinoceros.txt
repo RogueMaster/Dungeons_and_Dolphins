@@ -1,0 +1,10 @@
+SizeAlignment=Large Beast
+Speed=40 ft.
+Abilities=21,8,15,2,12,6
+Skills=None
+Defenses=None
+Senses=Passive Perception 11
+Languages=None
+Traits=None
+Actions=None
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Tiny Beast
+Speed=30 ft., Climb 30 ft.
+Abilities=3,16,8,2,12,3
+Skills=Acrobatics +5, Perception +3, Stealth +5
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

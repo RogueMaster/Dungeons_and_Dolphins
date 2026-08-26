@@ -1,0 +1,10 @@
+SizeAlignment=Medium Undead (Wizard), Neutral Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Arcana +19, History +12, Insight +9, Perception +9
+Defenses=Cold, Lightning; Necrotic, Poison; Charmed, Exhaustion, Frightened, Paralyzed, Poisoned
+Senses=Truesight 120 ft.; Passive Perception 19
+Languages=All
+Traits=Legendary Resistance (4/Day, or 5/Day in Lair). If the lich fails a saving throw, it can choose to suc- ceed instead. 304 System Reference Document 5.2.1 Spirit Jar. If destroyed, the lich re
+Actions=Multiattack. The lich makes three attacks, using El- dritch Burst or Paralyzing Touch in any combination. Eldritch Burst. Melee or Ranged Attack Roll: +12, reach 5 ft. or range 120 ft. Hit: 3
+Extra=Reactions: Protective Magic. The lich casts Counterspell or Shield in response to the spell’s trigger, using the same spell- casting ability as Spellcasting. Legendary Actions: Legendary Acti

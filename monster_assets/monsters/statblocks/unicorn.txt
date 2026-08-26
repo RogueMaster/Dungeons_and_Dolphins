@@ -1,0 +1,10 @@
+SizeAlignment=Large Celestial, Lawful Good
+Speed=50 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Poison; Charmed, Paralyzed, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=Celestial, Elvish, Sylvan; telepathy 120 ft.
+Traits=Legendary Resistance (3/Day). If the unicorn fails a sav- ing throw, it can choose to succeed instead. Magic Resistance. The unicorn has Advantage on sav- ing throws against spells and other
+Actions=Multiattack. The unicorn makes one Hooves attack and one Radiant Horn attack. Hooves. Melee Attack Roll: +7, reach 5 ft. Hit: 11 (2d6 + 4) Bludgeoning damage. Radiant Horn. Melee Attack Roll:
+Extra=Bonus Actions: Unicorn’s Blessing (3/Day). The unicorn touches an- other creature with its horn and casts Cure Wounds or Lesser Restoration on that creature, using the same spellcasting abili

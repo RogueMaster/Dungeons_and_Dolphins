@@ -1,0 +1,10 @@
+SizeAlignment=Large Monstrosity, Unaligned
+Speed=40 ft. Fly 60 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +5
+Defenses=None
+Senses=Passive Perception 15
+Languages=None
+Traits=Flyby. The hippogriff doesn’t provoke an Opportunity Attack when it flies out of an enemy’s reach.
+Actions=Multiattack. The hippogriff makes two Rend attacks. Rend. Melee Attack Roll: +5, reach 5 ft. Hit: 7 (1d8 + 3) Slashing damage. Hobgoblins
+Extra=None

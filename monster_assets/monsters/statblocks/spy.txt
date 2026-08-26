@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid, Neutral
+Speed=30 ft. Climb 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +5, Insight +4, Investigation +5, Perception +6, Sleight of Hand +4, Stealth +6
+Defenses=None
+Senses=Passive Perception 16
+Languages=Common plus one other language
+Traits=None
+Actions=Shortsword. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Piercing damage plus 7 (2d6) Poison damage. Hand Crossbow. Ranged Attack Roll: +4, range 30/120 ft. Hit: 5 (1d6 + 2) Piercing d
+Extra=Bonus Actions: Cunning Action. The spy takes the Dash, Disengage, or Hide action. Stirge

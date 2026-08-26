@@ -1,0 +1,10 @@
+SizeAlignment=Large Construct, Unaligned
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Poison, Psychic; Charmed, Exhaustion, Frightened, Paralyzed, Petrified, Poisoned
+Senses=Darkvision 120 ft.; Passive Perception 10
+Languages=Understands Common plus two other languages but can’t speak
+Traits=Immutable Form. The golem can’t shape-shift. Magic Resistance. The golem has Advantage on saving throws against spells and other magical effects.
+Actions=Multiattack. The golem makes two attacks, using Slam or Force Bolt in any combination. Slam. Melee Attack Roll: +10, reach 5 ft. Hit: 15 (2d8 + 6) Bludgeoning damage plus 9 (2d8) Force damage
+Extra=Bonus Actions: Slow (Recharge 5–6). The golem casts the Slow spell, requiring no spell components and using Constitution as the spellcasting ability (spell save DC 17). Storm Giant

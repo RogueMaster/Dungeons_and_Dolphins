@@ -1,0 +1,10 @@
+SizeAlignment=Small Fey (Goblinoid), Chaotic Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +6
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 9
+Languages=Common, Goblin
+Traits=None
+Actions=Multiattack. The goblin makes two attacks, using Scim- itar or Shortbow in any combination. Scimitar. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Slashing damage, plus 2 (1d4) Slashin
+Extra=Bonus Actions: Nimble Escape. The goblin takes the Disengage or Hide action. Reactions: Redirect Attack. Trigger: A creature the goblin can see makes an attack roll against it. Response: The

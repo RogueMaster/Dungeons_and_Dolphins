@@ -1,0 +1,10 @@
+SizeAlignment=Huge Monstrosity, Unaligned
+Speed=40 ft. Swim 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +6
+Defenses=Blinded, Charmed, Deafened, Frightened, Stunned, Unconscious
+Senses=Darkvision 60 ft.; Passive Perception 16
+Languages=None
+Traits=Hold Breath. The hydra can hold its breath for 1 hour. Multiple Heads. The hydra has five heads. Whenever the hydra takes 25 damage or more on a single turn, one of its heads dies. The hydra
+Actions=Multiattack. The hydra makes as many Bite attacks as it has heads. Bite. Melee Attack Roll: +8, reach 10 ft. Hit: 10 (1d10 + 5) Piercing damage. 300 System Reference Document 5.2.1 Ice Devil
+Extra=None

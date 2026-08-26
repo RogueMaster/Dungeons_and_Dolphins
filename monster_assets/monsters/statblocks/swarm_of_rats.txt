@@ -1,0 +1,10 @@
+SizeAlignment=Medium Swarm
+Speed=30 ft., Climb 30 ft.
+Abilities=9,11,9,2,10,3
+Skills=None
+Defenses=Bludgeoning, Piercing, Slashing; Charmed, Frightened, Grappled, Paralyzed, Petrified, Prone, Restrained, Stunned
+Senses=Darkvision 30 ft.; Passive Perception 10
+Languages=None
+Traits=None
+Actions=None
+Extra=None

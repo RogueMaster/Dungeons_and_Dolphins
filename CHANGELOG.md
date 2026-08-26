@@ -1,5 +1,53 @@
 # Dungeons & Dolphins changelog
 
+## 2.6
+
+- Split the monster reference and encounter generator into the independent Dolphin Bestiary FAP while keeping both applications in one `application.fam` with explicit, mutually exclusive source lists.
+- Expanded the packaged bestiary from 220 to 340 unique records and retained combinable browser filters, encounter roles, custom lifecycle controls, and diagnostics.
+- Limited character catalogs and bestiary result windows to 50 records, with on-demand allocation and release when each picker, stat block, or encounter closes.
+- Moved all runtime reads and writes to each application's `APP_ASSETS_PATH` namespace and prefixed user-maintained reference files with `custom_`.
+- Fixed transactional character creation and profile-index refresh so a new Main or New Hero remains visible, while failed writes restore the prior active profile and display an unsaved warning.
+- Added a dedicated Back to Main Menu row to Magic and retained normal Back navigation from spell lists and detail screens.
+- Shortened passive-stat labels to `Pass.` without abbreviating their governing ability labels.
+- Moved attack templates and all combat-state fields into Combat, then removed the redundant Combat Sheet, Character Builder, About, and embedded monster menu entries.
+- Kept `Roll Now` stable while dice modifiers are edited and reset it only after a completed roll.
+- Replaced the launcher art with a validated 10x10, 1-bit d20 icon showing 20.
+
+## 2.5
+
+- Added another 100 redistributable open-reference monster records, bringing the bundled total to 220.
+- Added an on-device ten-cycle stress runner for catalog, campaign, monster, profile-index, and encounter allocation/release paths.
+- Added SD write-failure detection, read-only fallback, persistent unsaved warnings, failure counts, and an explicit retry-and-save control.
+- Published a case-by-case physical-device matrix covering controls, truncation, long sessions, power interruption, SD removal, and low-memory behavior without claiming unperformed hardware results.
+
+## 2.4
+
+- Added create/edit/delete controls for every attack-template field, including save actions, Mastery, damage riders, and recharge cadence.
+- Added a structured-grant editor for stable ID, source, option type/name, prerequisites, class association, gained level, payload, and status.
+- Preserved grant payloads when applying them so reviewed metadata remains editable.
+- Added optional runtime language packs for navigation and field labels with a compile-time 2 KiB heap ceiling, live heap reporting, and English fallback.
+
+## 2.3
+
+- Added an on-device campaign selector for bundled and user packs.
+- Added atomic per-profile/per-campaign progress files containing scene, checkpoint, quest flags, and achievements.
+- Added versioned manifests and diagnostics for compatibility, missing files/entries, duplicate IDs, and broken links.
+- Added a documented third-party campaign format and ready-to-copy SD-card starter template.
+
+## 2.2
+
+- Added full on-device editing for existing custom monsters while preserving stable IDs.
+- Added armed two-step custom deletion and kept bundled records read-only.
+- Added atomic user-index rewrites, transaction-journal recovery, orphan completion, and interrupted-edit rollback.
+- Expanded the custom editor to include size/alignment, role, skills, defenses, and extra actions.
+
+## 2.1
+
+- Added 100 redistributable open-reference monster records, bringing the bundled total to 120.
+- Added combinable source and environment filters to the monster browser.
+- Added optional Leader, Controller, Skirmisher, Artillery, Brute, and Minion metadata with role-aware encounter weighting.
+- Added diagnostic navigation that reports the exact record ID, stat-block filename, and first missing or invalid field.
+
 ## Unreleased documentation update
 
 - Audited every completed roadmap claim against the implemented code, packaged assets, tests, and build records.

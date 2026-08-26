@@ -1,0 +1,10 @@
+SizeAlignment=Large Ooze, Unaligned
+Speed=20 ft. Climb 20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Acid; Lightning, Slashing; Charmed, Deafened, Exhaustion, Frightened, Grappled, Prone, Restrained
+Senses=Blindsight 60 ft.; Passive Perception 8
+Languages=None
+Traits=Amorphous. The jelly can move through a space as narrow as 1 inch without expending extra move- ment to do so. Spider Climb. The jelly can climb difficult surfaces, including along ceilings,
+Actions=Pseudopod. Melee Attack Roll: +4, reach 5 ft. Hit: 12 (3d6 + 2) Acid damage. 312 System Reference Document 5.2.1
+Extra=Reactions: Split. Trigger: While the jelly is Large or Medium and has 10+ Hit Points, it becomes Bloodied or is subjected to Lightning or Slashing damage. Response: The jelly splits into two

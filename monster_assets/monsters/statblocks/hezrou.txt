@@ -1,0 +1,10 @@
+SizeAlignment=Large Fiend (Demon), Chaotic Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold, Fire, Lightning; Poison; Poisoned
+Senses=Darkvision 120 ft.; Passive Perception 11
+Languages=Abyssal; telepathy 120 ft.
+Traits=Demonic Restoration. If the hezrou dies outside the Abyss, its body dissolves into ichor, and it gains a new body instantly, reviving with all its Hit Points some- where in the Abyss. Magic R
+Actions=Multiattack. The hezrou makes three Rend attacks. Rend. Melee Attack Roll: +7, reach 5 ft. Hit: 6 (1d4 + 4) Slashing damage plus 9 (2d8) Poison damage.
+Extra=Bonus Actions: Leap. The hezrou jumps up to 30 feet by spending 10 feet of movement. Hill Giant

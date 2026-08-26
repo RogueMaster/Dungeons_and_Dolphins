@@ -1,0 +1,10 @@
+SizeAlignment=Gargantuan Dragon, Neutral
+Speed=20 ft. Swim 50 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Fire
+Senses=Darkvision 120 ft.; Passive Perception 11
+Languages=Draconic, Primordial (Aquan)
+Traits=Amphibious. The dragon can breathe air and water.
+Actions=Multiattack. The dragon makes three Bite attacks. It can replace one attack with a Tail attack. Bite. Melee Attack Roll: +13, reach 15 ft. Hit: 23 (3d10 + 7) Piercing damage plus 7 (2d6) Fire
+Extra=None

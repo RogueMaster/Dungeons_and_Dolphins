@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fiend (Devil), Lawful Evil
+Speed=20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold; Fire, Poison; Charmed, Frightened, Poisoned
+Senses=Darkvision 120 ft. (unimpeded by magical Darkness); Passive Perception 10
+Languages=Understands Infernal but can’t speak
+Traits=Hellish Restoration. If the lemure dies in the Nine Hells, it revives with all its Hit Points in 1d10 days un- less it is killed by a creature under the effects of a Bless spell or its remain
+Actions=Vile Slime. Melee Attack Roll: +2, reach 5 ft. Hit: 2 (1d4) Poison damage. Lich
+Extra=None

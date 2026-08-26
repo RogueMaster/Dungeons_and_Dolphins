@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Undead
+Speed=40 ft., Climb 40 ft.
+Abilities=18,18,18,17,15,18
+Skills=Perception +7, Stealth +9
+Defenses=Necrotic
+Senses=Darkvision 120 ft.; Passive Perception 17
+Languages=Common plus two other languages
+Traits=Legendary Resistance (3/Day, or 4/Day in Lair). If the vampire fails a saving throw, it can choose to succeed instead. Misty Escape. If the vampire drops to 0 Hit Points outside its resting p
+Actions=Multiattack (Vampire Form Only). The vampire makes two Grave Strike attacks and uses Bite. Grave Strike (Vampire Form Only). Melee Attack Roll: +9, reach 5 ft. Hit: 8 (1d8 + 4) Bludgeoning da
+Extra=Bonus Actions: Charm (Recharge 5–6). The vampire casts Charm Person, requiring no spell components and using Charisma as the spellcasting ability (spell save DC 17), and the duration is 24 ho

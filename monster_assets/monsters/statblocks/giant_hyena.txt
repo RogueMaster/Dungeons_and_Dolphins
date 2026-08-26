@@ -1,0 +1,10 @@
+SizeAlignment=Large Beast
+Speed=50 ft.
+Abilities=16,14,14,2,12,7
+Skills=Perception +3
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Large Dragon (Metallic), Chaotic Good
+Speed=40 ft. Climb 40 ft. Fly 80 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +5, Perception +7, Stealth +4
+Defenses=Acid
+Senses=Blindsight 30 ft., Darkvision 120 ft.; Passive Perception 17
+Languages=Common, Draconic
+Traits=None
+Actions=Multiattack. The dragon makes three Rend attacks. It can replace one attack with a use of Slowing Breath. Rend. Melee Attack Roll: +7, reach 10 ft. Hit: 15 (2d10 + 4) Slashing damage. Acid Br
+Extra=None

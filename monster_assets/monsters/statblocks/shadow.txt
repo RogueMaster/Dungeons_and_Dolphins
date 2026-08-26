@@ -1,0 +1,10 @@
+SizeAlignment=Medium Undead, Chaotic Evil
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=Stealth +6
+Defenses=Radiant; Acid, Cold, Fire, Lightning, Thunder; Necrotic, Poison; Exhaustion, Frightened, Grappled, Paralyzed, Petrified, Poisoned, Prone, Restrained, Unconscious
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=None
+Traits=Amorphous. The shadow can move through a space as narrow as 1 inch without expending extra move- ment to do so. Sunlight Weakness. While in sunlight, the shadow has Disadvantage on D20 Tests.
+Actions=Draining Swipe. Melee Attack Roll: +4, reach 5 ft. Hit: 5 (1d6 + 2) Necrotic damage, and the target’s Strength score decreases by 1d4. The target dies if this reduces that score to 0. If a Hu
+Extra=Bonus Actions: Shadow Stealth. While in Dim Light or Darkness, the shadow takes the Hide action. Shambling Mound

@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid (Cleric), Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Medicine +7, Perception +5, Religion +5
+Defenses=None
+Senses=Passive Perception 15
+Languages=Common plus one other language
+Traits=None
+Actions=Multiattack. The priest makes two attacks, using Mace or Radiant Flame in any combination. Mace. Melee Attack Roll: +5, reach 5 ft. Hit: 6 (1d6 + 3) Bludgeoning damage plus 5 (2d4) Radiant da
+Extra=Bonus Actions: Divine Aid (3/Day). The priest casts Bless, Dispel Magic, Healing Word, or Lesser Restoration, using the same spellcasting ability as Spellcasting. Pseudodragon

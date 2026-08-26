@@ -1,0 +1,10 @@
+SizeAlignment=Large Fiend, Chaotic Evil
+Speed=40 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Poison; Charmed, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 12
+Languages=Abyssal, Common
+Traits=Fiendish Restoration. If it dies, the naga returns to life in 1d6 days and regains all its Hit Points. Only a Wish spell can prevent this trait from functioning.
+Actions=Multiattack. The naga makes three attacks, using Bite or Necrotic Ray in any combination. Bite. Melee Attack Roll: +7, reach 10 ft. Hit: 7 (1d6 + 4) Piercing damage plus 14 (4d6) Poison damag
+Extra=None

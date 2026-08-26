@@ -1,0 +1,10 @@
+SizeAlignment=Large Fiend (Demon), Chaotic Evil
+Speed=20 ft. Fly 30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Cold, Fire, Lightning; Poison; Frightened, Poisoned
+Senses=Truesight 120 ft.; Passive Perception 11
+Languages=Abyssal; telepathy 120 ft.
+Traits=Demonic Restoration. If the nalfeshnee dies outside the Abyss, its body dissolves into ichor, and it gains a new body instantly, reviving with all its Hit Points some- where in the Abyss. Mag
+Actions=Multiattack. The nalfeshnee makes three Rend attacks. Rend. Melee Attack Roll: +10, reach 10 ft. Hit: 16 (2d10 + 5) Slashing damage plus 11 (2d10) Force damage. Teleport. The nalfeshnee telep
+Extra=Bonus Actions: Horror Nimbus (Recharge 5–6). Wisdom Saving Throw: DC 15, each creature in a 15-foot Emanation originating from the nalfeshnee. Failure: 28 (8d6) Psy- chic damage, and the targ

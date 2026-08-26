@@ -1,0 +1,10 @@
+SizeAlignment=Medium Swarm
+Speed=10 ft., Fly 50 ft.
+Abilities=6,14,12,5,12,6
+Skills=Perception +5
+Defenses=Bludgeoning, Piercing, Slashing; Charmed, Frightened, Grappled, Paralyzed, Petrified, Prone, Restrained, Stunned
+Senses=Passive Perception 15
+Languages=None
+Traits=None
+Actions=None
+Extra=None

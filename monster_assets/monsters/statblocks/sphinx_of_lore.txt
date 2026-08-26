@@ -1,0 +1,10 @@
+SizeAlignment=Large Celestial, Lawful Neutral
+Speed=40 ft. Fly 60 ft.
+Abilities=10,10,10,10,10,10
+Skills=Arcana +12, History +12, Perception +8, Religion +12
+Defenses=Necrotic, Radiant; Psychic; Charmed, Frightened
+Senses=Truesight 120 ft.; Passive Perception 18
+Languages=Celestial, Common
+Traits=Inscrutable. No magic can observe the sphinx remotely or detect its thoughts without its permission. Wisdom (Insight) checks made to ascertain its intentions or sin- cerity are made with Disa
+Actions=Multiattack. The sphinx makes three Claw attacks. Claw. Melee Attack Roll: +8, reach 5 ft. Hit: 14 (3d6 + 4) Slashing damage. Mind-Rending Roar (Recharge 5–6). Wisdom Saving Throw: DC 16, eac
+Extra=Legendary Actions: Legendary Action Uses: 3 (4 in Lair). Immediately after another creature’s turn, the sphinx can expend a use to take one of the following actions. The sphinx regains all ex

@@ -1,0 +1,10 @@
+SizeAlignment=Small Monstrosity, Unaligned
+Speed=20 ft. Fly 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Petrified
+Senses=Darkvision 60 ft.; Passive Perception 11
+Languages=None
+Traits=None
+Actions=Petrifying Bite. Melee Attack Roll: +3, reach 5 ft. Hit: 3 (1d4 + 1) Piercing damage. If the target is a creature, it is subjected to the following effect. Constitution Saving Throw: DC 11. F
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Large Beast
+Speed=40 ft., Climb 30 ft.
+Abilities=17,12,15,2,13,7
+Skills=Perception +3
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

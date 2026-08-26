@@ -1,0 +1,10 @@
+SizeAlignment=Large Aberration, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Darkvision 120 ft.; Passive Perception 11
+Languages=Otyugh; telepathy 120 ft. (doesn’t allow the receiving creature to respond telepathically)
+Traits=None
+Actions=Multiattack. The otyugh makes one Bite attack and two Tentacle attacks. Bite. Melee Attack Roll: +6, reach 5 ft. Hit: 12 (2d8 + 3) Piercing damage, and the target has the Poisoned con- dition
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Medium Elemental, Neutral
+Speed=10 ft. Swim 40 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Passive Perception 12
+Languages=Common, Primordial (Aquan)
+Traits=Amphibious. The merfolk can breathe air and water. 308 System Reference Document 5.2.1
+Actions=Ocean Spear. Melee or Ranged Attack Roll: +2, reach 5 ft. or range 20/60 ft. Hit: 3 (1d6) Piercing damage plus 2 (1d4) Cold damage. If the target is a creature, its Speed decreases by 10 feet
+Extra=None

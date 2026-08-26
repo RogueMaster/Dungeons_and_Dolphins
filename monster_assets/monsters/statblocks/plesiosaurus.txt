@@ -1,0 +1,10 @@
+SizeAlignment=Large Beast
+Speed=20 ft., Swim 40 ft.
+Abilities=18,15,16,2,12,5
+Skills=Perception +3, Stealth +4
+Defenses=None
+Senses=Passive Perception 13
+Languages=None
+Traits=None
+Actions=None
+Extra=None

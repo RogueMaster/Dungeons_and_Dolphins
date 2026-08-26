@@ -1,0 +1,10 @@
+SizeAlignment=Medium Undead
+Speed=30 ft.
+Abilities=15,14,16,10,13,15
+Skills=Perception +3, Stealth +4
+Defenses=Necrotic; Poison; Exhaustion, Poisoned
+Senses=Darkvision 60 ft.; Passive Perception 13
+Languages=Common plus one other language
+Traits=Sunlight Sensitivity. While in sunlight, the wight has Disadvantage on ability checks and attack rolls.
+Actions=Multiattack. The wight makes two attacks, using Necrotic Sword or Necrotic Bow in any combination. It can replace one attack with a use of Life Drain. Necrotic Sword. Melee Attack Roll: +4, r
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Medium Beast
+Speed=30 ft., Swim 30 ft.
+Abilities=12,13,11,2,10,3
+Skills=Perception +2, Stealth +4
+Defenses=None
+Senses=Darkvision 30 ft.; Passive Perception 12
+Languages=None
+Traits=None
+Actions=None
+Extra=None

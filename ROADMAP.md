@@ -2,32 +2,32 @@
 
 This document contains planned work only. Implemented work belongs in `CHANGELOG.md`. A roadmap item moves to the changelog only after its code, tests, documentation, and RogueMaster build verification are complete.
 
-## 2.1 — monster discovery and encounter roles
+## 2.7 — encounter workspace
 
-- Add source and environment filters to the ordinary monster browser, combinable with name, challenge, and creature-type filters.
-- Add optional Leader, Controller, Skirmisher, Artillery, Brute, and Minion role metadata with role-aware encounter weighting.
-- Add per-record diagnostic navigation that identifies the exact monster ID, file, and invalid or missing field.
+- Add named, reusable encounter files with duplicate, rename, archive, and resume controls.
+- Add configurable role targets and composition warnings for leader support, artillery protection, and excessive minion density.
+- Add a non-destructive difficulty simulator for changing party size/level and creature quantities before committing an encounter.
 
-## 2.2 — custom monster lifecycle
+## 2.8 — compendium operations
 
-- Allow existing user-created monsters to be opened and edited on-device without changing their stable IDs.
-- Allow user-created monsters to be deleted on-device while protecting bundled records from modification.
-- Add atomic index rewrite, orphan-block recovery, and interrupted-edit rollback for user monster packs.
+- Add on-device install, enable/disable, and uninstall controls for user monster packs without touching bundled assets.
+- Add custom-monster export and pack merge with stable-ID conflict review.
+- Add monster favorites, recent records, and saved filter presets using disk-backed indexes.
 
-## 2.3 — campaign pack manager
+## 2.9 — campaign state engine
 
-- Add on-device campaign selection with separate per-character campaign progress and checkpoints.
-- Add versioned campaign manifests with compatibility, missing-scene, duplicate-ID, and broken-link diagnostics.
-- Add a documented third-party campaign-pack format and an SD-card starter template.
+- Add typed campaign variables and conditional choice visibility without embedding executable scripts.
+- Add campaign objectives that synchronize selected scene events with journal milestones and inventory rewards.
+- Add campaign import/export with manifest preview, compatibility checks, and conflict-safe progress mapping.
 
-## 2.4 — complete structured editors
+## 3.0 — accessibility and controls
 
-- Add full on-device editing for every attack-template field, including save actions, Mastery, damage riders, and recharge behavior.
-- Add a structured-grant editor for prerequisites, class association, gained level, source, and grant payloads.
-- Add optional runtime language packs for navigation and field labels with measured heap limits and English fallback.
+- Add compact, standard, and large-text row layouts with per-screen truncation previews.
+- Add configurable long-press shortcuts and left/right behavior with a reset-to-default control map.
+- Add language-pack completeness diagnostics, fallback counts, and an on-device preview before activation.
 
-## 2.5 — device resilience and validation
+## 3.1 — stable pack platform
 
-- Add an on-device stress test for repeated catalog, campaign, monster, profile, and encounter allocation/release cycles.
-- Add graceful SD-card removal handling, read-only fallback, retry controls, and clear unsaved-state warnings.
-- Complete and publish the physical-device test matrix for controls, display truncation, long sessions, power interruption, and low-memory behavior.
+- Define save schema 2 with forward migration, rollback snapshots, and host-side golden-file compatibility tests.
+- Add checksummed catalog, campaign, language, and monster pack manifests with transactional installation.
+- Require a release qualification gate combining host tests, RogueMaster validation, stress-test evidence, and a signed physical-device matrix.

@@ -1,13 +1,12 @@
 # Release checksums
 
-## RogueMaster compiler artifact
+## RogueMaster compiler artifacts
 
-- Version: `1.0`
+- Version: `2.6`
 - Firmware branch: `420`
-- Firmware commit: `d3ae1f86bd961852af6969e887a8dd3492a19321`
+- Firmware commit: `dd196a93089970d3bd20b18492d6c70c9a402f60`
 - Firmware API: `88.4`
-- FAP size: `255,664 bytes`
-- FAP SHA-256: `ab6185a006b1475f4ac72081e0a722d895300ff59da3540e5c398900a614d763`
-- ARM ELF text: `72,526 bytes`
+- Dungeons & Dolphins FAP: `274,944 bytes`, SHA-256 `8c0440ef18fc764aa6b2ceec485d5f04e830f2976be4e069eaa8c73a65579ced`
+- Dolphin Bestiary FAP: `238,884 bytes`, SHA-256 `e4fa21893d740cbdfb0d1efc3f75baba850e9db7aac01558db55fc495f856345`
 
-The compiled FAP is intentionally excluded from the source release. Build it with `tools/verify_release.sh /path/to/rogue-master-firmware`. The downloadable source ZIP checksum is reported beside the release artifact because embedding an archive's own checksum inside itself is self-referential.
+Compiled FAPs are intentionally excluded from the source release. Build both with `tools/verify_release.sh /path/to/rogue-master-firmware`. The downloadable source ZIP checksum is reported beside the release artifact because embedding an archive's own checksum inside itself is self-referential.

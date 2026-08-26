@@ -1,0 +1,10 @@
+SizeAlignment=Medium Monstrosity, Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Deception +5, Perception +4, Stealth +6
+Defenses=None
+Senses=Darkvision 150 ft.; Passive Perception 14
+Languages=Common plus one other language
+Traits=None
+Actions=Multiattack. The medusa makes two Claw attacks and one Snake Hair attack, or it makes three Poison Ray attacks. Claw. Melee Attack Roll: +6, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage. Sna
+Extra=Bonus Actions: Petrifying Gaze (Recharge 5–6). Constitution Saving Throw: DC 13, each creature in a 30-foot Cone. If the medusa sees its reflection in the Cone, the medusa must make this save

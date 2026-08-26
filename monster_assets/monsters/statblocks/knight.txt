@@ -1,0 +1,10 @@
+SizeAlignment=Medium or Small Humanoid, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Frightened
+Senses=Passive Perception 10
+Languages=Common plus one other language
+Traits=None
+Actions=Multiattack. The knight makes two attacks, using Greatsword or Heavy Crossbow in any combination. Greatsword. Melee Attack Roll: +5, reach 5 ft. Hit: 10 (2d6 + 3) Slashing damage plus 4 (1d8)
+Extra=Reactions: Parry. Trigger: The knight is hit by a melee attack roll while holding a weapon. Response: The knight adds 2 to its AC against that attack, possibly causing it to miss. Kobold

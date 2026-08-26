@@ -1,0 +1,10 @@
+SizeAlignment=Medium Aberration, Chaotic Neutral
+Speed=20 ft. Swim 20 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=Prone
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=None
+Traits=Aberrant Ground. The ground in a 10-foot Emanation originating from the mouther is Difficult Terrain. Gibbering. The mouther babbles incoherently while it doesn’t have the Incapacitated condi
+Actions=Bite. Melee Attack Roll: +2, reach 5 ft. Hit: 7 (2d6) Piercing damage. If the target is a Medium or smaller creature, it has the Prone condition. The target dies if it is reduced to 0 Hit Poi
+Extra=None

@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fey, Neutral
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=Perception +4, Stealth +5
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 14
+Languages=Elvish, Sylvan
+Traits=Magic Resistance. The dryad has Advantage on saving throws against spells and other magical effects. Speak with Beasts and Plants. The dryad can com- municate with Beasts and Plants as if the
+Actions=Multiattack. The dryad makes one Vine Lash or Thorn Burst attack, and it can use Spellcasting to cast Charm Monster. Vine Lash. Melee Attack Roll: +6, reach 10 ft. Hit: 8 (1d8 + 4) Slashing d
+Extra=Bonus Actions: Tree Stride. If within 5 feet of a Large or bigger tree, the dryad teleports to an unoccupied space within 5 feet of a second Large or bigger tree that is within 60 feet of the

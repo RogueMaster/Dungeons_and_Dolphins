@@ -1,0 +1,10 @@
+SizeAlignment=Medium Fey (Goblinoid), Lawful Evil
+Speed=30 ft.
+Abilities=10,10,10,10,10,10
+Skills=None
+Defenses=None
+Senses=Darkvision 60 ft.; Passive Perception 10
+Languages=Common, Goblin
+Traits=Aura of Authority. While in a 10-foot Emanation origi- nating from the hobgoblin, the hobgoblin and its allies have Advantage on attack rolls and saving throws, provided the hobgoblin doesn’t
+Actions=Multiattack. The hobgoblin makes two attacks, using Greatsword or Longbow in any combination. Greatsword. Melee Attack Roll: +4, reach 5 ft. Hit: 9 (2d6 + 2) Slashing damage plus 3 (1d6) Pois
+Extra=None
