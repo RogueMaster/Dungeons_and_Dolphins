@@ -14,11 +14,11 @@ Schema 2 is the current compatibility baseline. Character filenames remain `ch_{
 ## Compatibility
 
 - Readers dispatch by explicit schema number and reject unknown versions rather than guessing field meanings.
-- Schema 2 is the oldest supported version in 3.0.1. Future releases must retain its reader or provide a validated, non-destructive migration before publishing a newer schema.
+- Schema 2 is the oldest supported version in 3.0.2. Future releases must retain its reader or provide a validated, non-destructive migration before publishing a newer schema.
 - Schema 2 files are validated before their ordered records are parsed.
 - A failed primary load attempts the retained backup. If neither validates and a profile file exists, the app preserves every file and refuses to autosave a blank replacement.
 - A fresh character is created only when no profile files exist.
-- Legacy asset-path profiles are copied into persistent app data only when the destination file and profile ID are absent. Existing app-data files are authoritative and never overwritten by migration.
+- Legacy asset-path profiles are relocated into persistent app data only when the destination file and profile ID are absent. Existing app-data files are authoritative and never overwritten; the legacy source is removed only after the destination is safely present.
 
 ## Data groups
 

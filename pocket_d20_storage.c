@@ -1297,11 +1297,12 @@ static bool pocket_d20_copy_file(
     return true;
 }
 
-static bool pocket_d20_copy_file_without_replace(
+static bool pocket_d20_relocate_file_without_replace(
     Storage* storage,
     const char* source,
     const char* destination) {
-    if(storage_file_exists(storage, destination)) return true;
+    if(storage_file_exists(storage, destination))
+        return storage_common_remove(storage, source) == FSE_OK;
     char temporary[224];
     int temporary_length =
         snprintf(temporary, sizeof(temporary), "%s.migrate.tmp", destination);
@@ -1329,13 +1330,13 @@ static bool pocket_d20_copy_file_without_replace(
     }
     if(storage_file_exists(storage, destination)) {
         storage_common_remove(storage, temporary);
-        return true;
+        return storage_common_remove(storage, source) == FSE_OK;
     }
     if(storage_common_rename(storage, temporary, destination) != FSE_OK) {
         storage_common_remove(storage, temporary);
         return false;
     }
-    return true;
+    return storage_common_remove(storage, source) == FSE_OK;
 }
 
 static bool pocket_d20_migrate_directory(
@@ -1369,7 +1370,7 @@ static bool pocket_d20_migrate_directory(
             continue;
         }
         if(file_info_is_dir(&info)) {
-            if(depth < 2U &&
+            if(depth >= 2U ||
                !pocket_d20_migrate_directory(
                    storage, source, destination, depth + 1U, copied_files))
                 success = false;
@@ -1383,11 +1384,13 @@ static bool pocket_d20_migrate_directory(
                    storage,
                    legacy_entry.id,
                    existing,
-                   sizeof(existing)))
+                   sizeof(existing))) {
+                if(storage_common_remove(storage, source) != FSE_OK) success = false;
                 continue;
+            }
         }
         bool existed = storage_file_exists(storage, destination);
-        if(!pocket_d20_copy_file_without_replace(storage, source, destination)) {
+        if(!pocket_d20_relocate_file_without_replace(storage, source, destination)) {
             success = false;
         } else if(!existed && copied_files && *copied_files < UINT16_MAX) {
             ++*copied_files;
@@ -1395,6 +1398,7 @@ static bool pocket_d20_migrate_directory(
     }
     storage_dir_close(directory);
     storage_file_free(directory);
+    if(success && storage_common_remove(storage, legacy_directory) != FSE_OK) success = false;
     return success;
 }
 

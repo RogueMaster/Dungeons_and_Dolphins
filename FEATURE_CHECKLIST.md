@@ -1,6 +1,6 @@
 # Request checklist
 
-| Requested capability | Version 3.0.1 status |
+| Requested capability | Version 3.0.2 status |
 |---|---|
 | Flipper FAP d20 icon | `icon.png`, 10x10 1-bit, assigned by `fap_icon` and FBT-validated |
 | Buttons and screen only | Implemented |
@@ -43,7 +43,7 @@
 | Complete structured editors | Full attack-template and grant editors with autosave |
 | Device resilience | Allocation stress runner, SD read-only fallback, unsaved warning, retry control, and published hardware matrix |
 | Direct-launch memory safety | Empty profiles allocate only their used spell, feature, item, journal, and grant records; all five groups grow on demand with checked limits; spell pages retain ten records |
-| Asset namespace | Packaged catalogs/packs use `APP_ASSETS_PATH`; writable profiles, campaign progress, and custom monsters use persistent `APP_DATA_PATH` with non-overwriting legacy relocation |
+| Asset namespace | Packaged catalogs, campaigns, and monster tables use `APP_ASSETS_PATH`; writable profiles, custom campaigns/progress, and custom monsters use persistent `APP_DATA_PATH` with copy-verify-cleanup relocation |
 | Cross-FAP navigation | Each application ends with a menu entry that queues the other FAP and exits cleanly |
 
 The expansion catalogs intentionally contain option names and original metadata rather than proprietary descriptions or mechanics. Custom text and notes support owned books, homebrew, errata, and table rulings.

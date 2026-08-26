@@ -307,6 +307,7 @@ typedef struct {
     uint8_t storage_read_only;
     uint8_t storage_unsaved;
     uint16_t migrated_profile_files;
+    uint16_t migrated_campaign_files;
     uint16_t storage_failure_count;
     PocketEditTarget edit_target;
     char edit_buffer[POCKET_D20_DETAIL_LEN];
@@ -8330,9 +8331,11 @@ static PocketD20App* pocket_app_alloc(void) {
 
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
-    bool migration_ok = pocket_d20_storage_migrate_legacy_profiles(
-        app->storage, &app->migrated_profile_files) &&
-                        pocket_campaign_migrate_legacy_progress(app->storage);
+    bool profile_migration_ok = pocket_d20_storage_migrate_legacy_profiles(
+        app->storage, &app->migrated_profile_files);
+    bool campaign_migration_ok = pocket_campaign_migrate_legacy_custom(
+        app->storage, &app->migrated_campaign_files);
+    bool migration_ok = profile_migration_ok && campaign_migration_ok;
     bool profiles_loaded = pocket_d20_profiles_load(app->storage, &app->profiles);
     bool had_profiles = app->profiles.count > 0U;
     bool recovered_backup = false;
@@ -8373,15 +8376,16 @@ static PocketD20App* pocket_app_alloc(void) {
     if(!loaded && had_profiles)
         pocket_set_status(app, "Profile preserved - load failed");
     else if(!migration_ok)
-        pocket_set_status(app, "Profile migration failed");
+        pocket_set_status(app, "User-data migration failed");
     else if(!character_ready || !metadata_saved)
         pocket_set_status(app, "UNSAVED - retry SD");
-    else if(app->migrated_profile_files)
+    else if(app->migrated_profile_files || app->migrated_campaign_files)
         snprintf(
             app->status,
             sizeof(app->status),
-            "Migrated %u profile files",
-            app->migrated_profile_files);
+            "Migrated %u user files",
+            (unsigned int)app->migrated_profile_files +
+                (unsigned int)app->migrated_campaign_files);
     else if(recovered_backup)
         pocket_set_status(app, "Backup recovered");
     else if(loaded)

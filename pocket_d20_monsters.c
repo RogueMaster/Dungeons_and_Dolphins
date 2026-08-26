@@ -493,6 +493,10 @@ static bool monster_exists(Storage* storage, const char* path) {
     return storage_common_stat(storage, path, &info) == FSE_OK;
 }
 
+static bool monster_remove_if_present(Storage* storage, const char* path) {
+    return !monster_exists(storage, path) || storage_common_remove(storage, path) == FSE_OK;
+}
+
 static bool monster_copy_storage_file(
     Storage* storage,
     const char* source,
@@ -528,7 +532,8 @@ bool pocket_monster_migrate_legacy_custom(Storage* storage, uint16_t* copied_fil
     bool pending = monster_exists(storage, CUSTOM_MONSTER_MIGRATION);
     if(data_index && data_blocks) {
         if(pending) storage_common_remove(storage, CUSTOM_MONSTER_MIGRATION);
-        return true;
+        return monster_remove_if_present(storage, LEGACY_CUSTOM_MONSTER_INDEX) &&
+               monster_remove_if_present(storage, LEGACY_CUSTOM_MONSTER_BLOCKS);
     }
     if((data_index || data_blocks) && !pending) return false;
     if(!monster_exists(storage, LEGACY_CUSTOM_MONSTER_INDEX) &&
@@ -572,6 +577,9 @@ bool pocket_monster_migrate_legacy_custom(Storage* storage, uint16_t* copied_fil
         return false;
     }
     storage_common_remove(storage, CUSTOM_MONSTER_MIGRATION);
+    if(!monster_remove_if_present(storage, LEGACY_CUSTOM_MONSTER_INDEX) ||
+       !monster_remove_if_present(storage, LEGACY_CUSTOM_MONSTER_BLOCKS))
+        return false;
     if(copied_files) *copied_files = (uint16_t)((data_index ? 0U : 1U) +
                                                 (data_blocks ? 0U : 1U));
     return true;

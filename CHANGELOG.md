@@ -1,5 +1,14 @@
 # Dungeons & Dolphins changelog
 
+## 3.0.2
+
+- Restricted asset-to-data migration to mutable user content: profiles, custom campaigns, campaign progress, and custom monsters.
+- Kept packaged catalogs, bundled campaign manifests/scenes, and packaged monster tables in `APP_ASSETS_PATH` without copying them into app data.
+- Moved custom campaign manifests and scene directories to `APP_DATA_PATH` and continued streaming them after bundled campaigns.
+- Preserved the combined Bestiary view: all packaged monster records are streamed first and app-data custom monsters are appended as the second layer.
+- Deleted legacy profile, custom-campaign, campaign-progress, and custom-monster files from the assets namespace only after their app-data destinations were safely present.
+- Kept existing app-data records authoritative; migration never overwrites a matching destination or profile ID.
+
 ## 3.0.1
 
 - Moved mutable character profiles, exports, archives, per-character campaign progress, and custom monster packs from deployable app assets to persistent app data.
