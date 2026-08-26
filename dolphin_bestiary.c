@@ -26,6 +26,7 @@ typedef enum {
     BestiaryScreenHome,
     BestiaryScreenList,
     BestiaryScreenDetail,
+    BestiaryScreenDetailLine,
     BestiaryScreenEncounter,
     BestiaryScreenDiagnostics,
     BestiaryScreenEdit,
@@ -64,6 +65,10 @@ typedef struct {
     uint16_t scroll;
     char status[32];
     char edit_buffer[POCKET_MONSTER_TEXT_LEN];
+    char detail_title[32];
+    uint16_t detail_line_offset;
+    uint16_t detail_return_scroll;
+    uint8_t detail_field;
 
     char search[POCKET_MONSTER_NAME_LEN];
     uint8_t max_cr_eighths;
@@ -369,9 +374,79 @@ static void bestiary_draw_detail(Canvas* canvas, BestiaryApp* app) {
     snprintf(role, sizeof(role), "Role: %s", m->summary.role);
     const char* rows[] = {core, type, source, role, m->size_alignment, m->speed,
         abilities, m->skills, m->defenses, m->senses, m->languages, m->traits, m->actions,
-        m->extra};
+        m->extra, "Edit Custom Monster"};
+    uint8_t row_count = !strcmp(m->summary.source, "Custom") ? 15U : 14U;
     bestiary_header(canvas, m->summary.name, app->status);
-    bestiary_rows(canvas, app, rows, 14U);
+    bestiary_rows(canvas, app, rows, row_count);
+}
+
+static const char* bestiary_next_text_line(
+    const char* cursor,
+    char* output,
+    size_t output_size) {
+    if(!cursor || !output_size) return NULL;
+    while(*cursor == ' ' || *cursor == '\r' || *cursor == '\n') ++cursor;
+    if(!*cursor) {
+        output[0] = '\0';
+        return NULL;
+    }
+    const size_t maximum = 20U;
+    size_t length = 0U;
+    size_t last_space = SIZE_MAX;
+    while(cursor[length] && cursor[length] != '\r' && cursor[length] != '\n' &&
+          length < maximum) {
+        if(cursor[length] == ' ') last_space = length;
+        ++length;
+    }
+    if(length == maximum && cursor[length] && cursor[length] != ' ' &&
+       cursor[length] != '\r' && cursor[length] != '\n' && last_space != SIZE_MAX)
+        length = last_space;
+    if(length >= output_size) length = output_size - 1U;
+    memcpy(output, cursor, length);
+    while(length && output[length - 1U] == ' ') --length;
+    output[length] = '\0';
+    cursor += length;
+    while(*cursor == ' ' || *cursor == '\r' || *cursor == '\n') ++cursor;
+    return cursor;
+}
+
+static uint16_t bestiary_text_line_count(const char* text) {
+    uint16_t count = 0U;
+    char line[21];
+    const char* cursor = text;
+    while(cursor && *cursor) {
+        const char* next = bestiary_next_text_line(cursor, line, sizeof(line));
+        if(!next || next == cursor) break;
+        ++count;
+        cursor = next;
+    }
+    return count ? count : 1U;
+}
+
+static void bestiary_draw_detail_line(Canvas* canvas, BestiaryApp* app) {
+    uint16_t line_count = bestiary_text_line_count(app->edit_buffer);
+    uint16_t last_line = app->detail_line_offset + 5U;
+    if(last_line > line_count) last_line = line_count;
+    /* Three uint16_t values need up to 17 visible characters plus NUL. */
+    char position[24];
+    snprintf(
+        position,
+        sizeof(position),
+        "%u-%u/%u",
+        app->detail_line_offset + 1U,
+        last_line,
+        line_count);
+    bestiary_header(canvas, app->detail_title, position);
+    canvas_draw_frame(canvas, 0, 10, 128, 54);
+    canvas_set_font(canvas, FontSecondary);
+    const char* cursor = app->edit_buffer;
+    char line[21];
+    for(uint16_t skip = 0U; skip < app->detail_line_offset && cursor && *cursor; ++skip)
+        cursor = bestiary_next_text_line(cursor, line, sizeof(line));
+    for(uint8_t row = 0U; row < 5U && cursor && *cursor; ++row) {
+        cursor = bestiary_next_text_line(cursor, line, sizeof(line));
+        canvas_draw_str(canvas, 4, (uint8_t)(20U + row * 10U), line);
+    }
 }
 
 static void bestiary_draw_encounter(Canvas* canvas, BestiaryApp* app) {
@@ -442,6 +517,7 @@ static void bestiary_draw(Canvas* canvas, void* model) {
     case BestiaryScreenHome: bestiary_draw_home(canvas, app); break;
     case BestiaryScreenList: bestiary_draw_list(canvas, app); break;
     case BestiaryScreenDetail: bestiary_draw_detail(canvas, app); break;
+    case BestiaryScreenDetailLine: bestiary_draw_detail_line(canvas, app); break;
     case BestiaryScreenEncounter: bestiary_draw_encounter(canvas, app); break;
     case BestiaryScreenDiagnostics: bestiary_draw_diagnostics(canvas, app); break;
     case BestiaryScreenEdit: bestiary_draw_edit(canvas, app); break;
@@ -524,6 +600,108 @@ static bool bestiary_open_detail(
     app->delete_armed = 0U;
     bestiary_enter(app, BestiaryScreenDetail);
     return true;
+}
+
+static void bestiary_open_detail_line(BestiaryApp* app) {
+    if(!app->detail || app->selection >= 14U) return;
+    PocketMonsterDetail* m = app->detail;
+    uint8_t field = (uint8_t)app->selection;
+    const char* value = NULL;
+    char cr[8];
+
+    switch(field) {
+    case 0U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Core Stats");
+        bestiary_cr(cr, sizeof(cr), m->summary.cr_eighths);
+        snprintf(
+            app->edit_buffer,
+            sizeof(app->edit_buffer),
+            "Challenge %s; XP %lu; Armor Class %u; Hit Points %u",
+            cr,
+            (unsigned long)m->summary.xp,
+            m->summary.armor_class,
+            m->summary.hit_points);
+        break;
+    case 1U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Creature Type");
+        value = m->summary.type;
+        break;
+    case 2U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Source");
+        value = m->summary.source;
+        break;
+    case 3U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Encounter Role");
+        value = m->summary.role;
+        break;
+    case 4U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Size / Alignment");
+        value = m->size_alignment;
+        break;
+    case 5U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Movement");
+        value = m->speed;
+        break;
+    case 6U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Ability Scores");
+        snprintf(
+            app->edit_buffer,
+            sizeof(app->edit_buffer),
+            "STR %d, DEX %d, CON %d, INT %d, WIS %d, CHA %d",
+            m->abilities[0],
+            m->abilities[1],
+            m->abilities[2],
+            m->abilities[3],
+            m->abilities[4],
+            m->abilities[5]);
+        break;
+    case 7U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Skills");
+        value = m->skills;
+        break;
+    case 8U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Defenses");
+        value = m->defenses;
+        break;
+    case 9U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Senses");
+        value = m->senses;
+        break;
+    case 10U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Languages");
+        value = m->languages;
+        break;
+    case 11U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Traits");
+        value = m->traits;
+        break;
+    case 12U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Actions");
+        value = m->actions;
+        break;
+    case 13U:
+        bestiary_copy(app->detail_title, sizeof(app->detail_title), "Extra");
+        value = m->extra;
+        break;
+    default: return;
+    }
+
+    if(value)
+        bestiary_copy(
+            app->edit_buffer,
+            sizeof(app->edit_buffer),
+            value[0] ? value : "(none)");
+    app->detail_field = field;
+    app->detail_line_offset = 0U;
+    app->detail_return_scroll = app->scroll;
+    bestiary_enter(app, BestiaryScreenDetailLine);
+}
+
+static void bestiary_return_to_detail(BestiaryApp* app) {
+    uint8_t field = app->detail_field;
+    bestiary_enter(app, BestiaryScreenDetail);
+    app->selection = field;
+    app->scroll = app->detail_return_scroll;
 }
 
 static void bestiary_generate(BestiaryApp* app) {
@@ -609,6 +787,9 @@ static void bestiary_back(BestiaryApp* app) {
         }
         break;
     }
+    case BestiaryScreenDetailLine:
+        bestiary_return_to_detail(app);
+        break;
     case BestiaryScreenEncounter:
         bestiary_release_encounter(app);
         bestiary_enter(app, BestiaryScreenHome);
@@ -720,15 +901,22 @@ static void bestiary_handle_list(BestiaryApp* app, const InputEvent* event) {
 
 static void bestiary_handle_detail(BestiaryApp* app, const InputEvent* event) {
     if(!app->detail) return;
-    if(bestiary_move_event(event) && event->key == InputKeyUp) bestiary_move(app, 14U, -1);
-    else if(bestiary_move_event(event) && event->key == InputKeyDown) bestiary_move(app, 14U, 1);
-    else if(event->type == InputTypeShort && event->key == InputKeyOk &&
-            !strcmp(app->detail->summary.source, "Custom")) {
-        app->edit_existing = 1U;
-        app->selected = app->detail->summary;
-        bestiary_enter(app, BestiaryScreenEdit);
+    bool custom = !strcmp(app->detail->summary.source, "Custom");
+    uint8_t row_count = custom ? 15U : 14U;
+    if(bestiary_move_event(event) && event->key == InputKeyUp)
+        bestiary_move(app, row_count, -1);
+    else if(bestiary_move_event(event) && event->key == InputKeyDown)
+        bestiary_move(app, row_count, 1);
+    else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        if(app->selection < 14U) {
+            bestiary_open_detail_line(app);
+        } else if(custom) {
+            app->edit_existing = 1U;
+            app->selected = app->detail->summary;
+            bestiary_enter(app, BestiaryScreenEdit);
+        }
     } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              !strcmp(app->detail->summary.source, "Custom")) {
+              custom) {
         if(!app->delete_armed) {
             app->delete_armed = 1U;
             bestiary_status(app, "Hold OK again delete");
@@ -739,6 +927,24 @@ static void bestiary_handle_detail(BestiaryApp* app, const InputEvent* event) {
             bestiary_enter(app, BestiaryScreenHome);
             bestiary_status(app, deleted ? "Custom monster deleted" : "Delete failed");
         }
+    }
+}
+
+static void bestiary_handle_detail_line(BestiaryApp* app, const InputEvent* event) {
+    uint16_t line_count = bestiary_text_line_count(app->edit_buffer);
+    uint16_t maximum = line_count > 5U ? line_count - 5U : 0U;
+    if(bestiary_move_event(event) && event->key == InputKeyUp) {
+        if(app->detail_line_offset) --app->detail_line_offset;
+    } else if(bestiary_move_event(event) && event->key == InputKeyDown) {
+        if(app->detail_line_offset < maximum) ++app->detail_line_offset;
+    } else if(bestiary_move_event(event) && event->key == InputKeyLeft) {
+        app->detail_line_offset =
+            app->detail_line_offset > 5U ? app->detail_line_offset - 5U : 0U;
+    } else if(bestiary_move_event(event) && event->key == InputKeyRight) {
+        uint16_t next = app->detail_line_offset + 5U;
+        app->detail_line_offset = next < maximum ? next : maximum;
+    } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        bestiary_return_to_detail(app);
     }
 }
 
@@ -839,6 +1045,7 @@ static bool bestiary_input(InputEvent* event, void* context) {
     case BestiaryScreenHome: bestiary_handle_home(app, event); break;
     case BestiaryScreenList: bestiary_handle_list(app, event); break;
     case BestiaryScreenDetail: bestiary_handle_detail(app, event); break;
+    case BestiaryScreenDetailLine: bestiary_handle_detail_line(app, event); break;
     case BestiaryScreenEncounter: bestiary_handle_encounter(app, event); break;
     case BestiaryScreenDiagnostics:
         if(event->type == InputTypeShort && event->key == InputKeyOk) bestiary_diagnose(app);

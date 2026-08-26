@@ -584,6 +584,34 @@ static void pocket_copy(char* destination, size_t size, const char* source) {
     destination[size - 1U] = '\0';
 }
 
+/*
+ * Append display text without asking snprintf to prove that a persistent field
+ * fits in a smaller UI row. RogueMaster treats -Wformat-truncation as an error,
+ * so rows are bounded explicitly here. Detail rows are sized for a complete
+ * persistent text field, and the row renderer horizontally scrolls that text.
+ */
+static void pocket_format_labeled_text(
+    char* destination,
+    size_t size,
+    const char* label,
+    const char* value) {
+    if(size == 0U) return;
+    size_t position = 0U;
+    if(label) {
+        while(label[position] && position + 1U < size) {
+            destination[position] = label[position];
+            ++position;
+        }
+    }
+    if(value) {
+        size_t source = 0U;
+        while(value[source] && position + 1U < size) {
+            destination[position++] = value[source++];
+        }
+    }
+    destination[position] = '\0';
+}
+
 static void pocket_catalog_release(PocketD20App* app) {
     free(app->catalog_storage);
     app->catalog_storage = NULL;
@@ -712,12 +740,39 @@ static bool pocket_custom_event_callback(void* context, uint32_t event) {
 }
 
 static uint32_t pocket_data_fingerprint(const PocketSaveData* data) {
-    const uint8_t* bytes = (const uint8_t*)data;
     uint32_t hash = 2166136261UL;
-    for(size_t i = 0U; i < sizeof(*data); ++i) {
-        hash ^= bytes[i];
-        hash *= 16777619UL;
+    const uint8_t* bytes = (const uint8_t*)data;
+#define POCKET_HASH_BYTES(pointer, length)                 \
+    do {                                                   \
+        const uint8_t* hash_bytes = (const uint8_t*)(pointer); \
+        for(size_t hash_i = 0U; hash_i < (length); ++hash_i) { \
+            hash ^= hash_bytes[hash_i];                    \
+            hash *= 16777619UL;                            \
+        }                                                  \
+    } while(false)
+    POCKET_HASH_BYTES(bytes, sizeof(*data));
+    const PocketCharacter* character = &data->character;
+    if(character->spell_count) {
+        POCKET_HASH_BYTES(
+            character->spells, (size_t)character->spell_count * sizeof(PocketSpell));
+        POCKET_HASH_BYTES(character->spell_known, character->spell_count);
+        POCKET_HASH_BYTES(character->spell_always_prepared, character->spell_count);
+        POCKET_HASH_BYTES(character->spell_free_casts_current, character->spell_count);
+        POCKET_HASH_BYTES(character->spell_free_casts_max, character->spell_count);
     }
+    if(character->feature_count)
+        POCKET_HASH_BYTES(
+            character->features, (size_t)character->feature_count * sizeof(PocketFeature));
+    if(character->item_count)
+        POCKET_HASH_BYTES(
+            character->items, (size_t)character->item_count * sizeof(PocketItem));
+    if(character->journal_count)
+        POCKET_HASH_BYTES(
+            character->journal, (size_t)character->journal_count * sizeof(PocketJournalEntry));
+    if(character->grant_count)
+        POCKET_HASH_BYTES(
+            character->grants, (size_t)character->grant_count * sizeof(PocketGrant));
+#undef POCKET_HASH_BYTES
     return hash;
 }
 
@@ -856,6 +911,7 @@ static void pocket_create_profile(PocketD20App* app) {
     uint32_t previous_profile = app->profiles.active_profile;
     app->arcane_recovery_active = 0U;
     app->campaign_active_valid = 0U;
+    pocket_d20_data_clear(&app->data);
     pocket_d20_data_set_defaults(&app->data);
     snprintf(
         app->data.character.name,
@@ -1741,6 +1797,7 @@ static void pocket_adventure_reward_item(PocketCharacter* character, const char*
         }
     }
     if(character->item_count >= POCKET_D20_MAX_ITEMS) return;
+    if(!pocket_d20_data_reserve_items(character, character->item_count + 1U)) return;
     PocketItem* item = &character->items[character->item_count++];
     memset(item, 0, sizeof(*item));
     pocket_copy(item->name, sizeof(item->name), name);
@@ -1757,6 +1814,7 @@ static void pocket_adventure_reward_milestone(PocketCharacter* character, const 
            strcmp(character->journal[i].title, title) == 0)
             return;
     if(character->journal_count >= POCKET_D20_MAX_JOURNAL) return;
+    if(!pocket_d20_data_reserve_journal(character, character->journal_count + 1U)) return;
     PocketJournalEntry* entry = &character->journal[character->journal_count++];
     memset(entry, 0, sizeof(*entry));
     pocket_copy(entry->title, sizeof(entry->title), title);
@@ -1869,6 +1927,8 @@ static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const
                pocket_grant_source_from_text(fields[2]) != source_type ||
                strcmp(fields[3], option) != 0 || !fields[7][0])
                 continue;
+            if(!pocket_d20_data_reserve_grants(character, character->grant_count + 1U))
+                continue;
             PocketGrant* grant = &character->grants[character->grant_count++];
             memset(grant, 0, sizeof(*grant));
             pocket_copy(grant->stable_id, sizeof(grant->stable_id), fields[0]);
@@ -1914,14 +1974,16 @@ static void pocket_apply_grant(PocketD20App* app, PocketGrant* grant) {
         for(uint8_t i = 0U; i < PocketSizeCount; ++i)
             if(strcmp(value, pocket_size_names[i]) == 0) character->size = i;
     } else if(strcmp(payload, "feature") == 0 &&
-              character->feature_count < POCKET_D20_MAX_FEATURES) {
+              character->feature_count < POCKET_D20_MAX_FEATURES &&
+              pocket_d20_data_reserve_features(character, character->feature_count + 1U)) {
         PocketFeature* feature = &character->features[character->feature_count++];
         memset(feature, 0, sizeof(*feature));
         pocket_copy(feature->name, sizeof(feature->name), value);
         feature->class_index = grant->class_index;
         feature->class_level_gained = grant->level_gained;
     } else if(strcmp(payload, "spell") == 0 &&
-              character->spell_count < POCKET_D20_MAX_SPELLS) {
+              character->spell_count < POCKET_D20_MAX_SPELLS &&
+              pocket_d20_data_reserve_spells(character, character->spell_count + 1U)) {
         uint8_t index = character->spell_count++;
         PocketSpell* spell = &character->spells[index];
         memset(spell, 0, sizeof(*spell));
@@ -2151,7 +2213,7 @@ static void pocket_format_list_entry(
     switch(app->list_kind) {
     case PocketListClasses: {
         const PocketClassLevel* class_level = &character->classes[index];
-        snprintf(output, size, "%s L%u", class_level->name, class_level->level);
+        snprintf(output, size, "%.31s L%u", class_level->name, class_level->level);
         break;
     }
     case PocketListSpells: {
@@ -2159,7 +2221,7 @@ static void pocket_format_list_entry(
         snprintf(
             output,
             size,
-            "%c%c L%u %s",
+            "%c%c L%u %.31s",
             pocket_spell_status(character, index),
             character->spell_free_casts_current[index] ? 'F' : ' ',
             spell->level,
@@ -2168,23 +2230,29 @@ static void pocket_format_list_entry(
     }
     case PocketListFeatures: {
         const PocketFeature* feature = &character->features[index];
-        snprintf(output, size, "%s", feature->name);
+        pocket_format_labeled_text(output, size, NULL, feature->name);
         break;
     }
     case PocketListItems: {
         const PocketItem* item = &character->items[index];
-        snprintf(output, size, "%c %dx %s", item->equipped ? '*' : ' ', item->quantity, item->name);
+        snprintf(
+            output,
+            size,
+            "%c %dx %.31s",
+            item->equipped ? '*' : ' ',
+            item->quantity,
+            item->name);
         break;
     }
     case PocketListLanguages:
-        snprintf(output, size, "%s", character->languages[index]);
+        pocket_format_labeled_text(output, size, NULL, character->languages[index]);
         break;
     case PocketListJournal: {
         const PocketJournalEntry* entry = &character->journal[index];
         snprintf(
             output,
             size,
-            "%c %s: %s",
+            "%c %.15s: %.31s",
             entry->completed ? 'X' : ' ',
             pocket_d20_journal_category_names[entry->category],
             entry->title);
@@ -2195,7 +2263,7 @@ static void pocket_format_list_entry(
         snprintf(
             output,
             size,
-            "%s %+d HP%d/%d AC%d",
+            "%.23s %+d HP%d/%d AC%d",
             member->name,
             member->initiative_modifier,
             member->hp_current,
@@ -2523,7 +2591,7 @@ static void pocket_begin_number(
 
 static void pocket_draw_home(Canvas* canvas, PocketD20App* app) {
     char title[48];
-    snprintf(title, sizeof(title), "D&Dolphins - %s", app->data.character.name);
+    snprintf(title, sizeof(title), "D&Dolphins - %.31s", app->data.character.name);
     pocket_draw_header(canvas, title, app->status);
     pocket_draw_menu_rows(
         canvas,
@@ -2546,7 +2614,7 @@ static void pocket_draw_profiles(Canvas* canvas, PocketD20App* app) {
             snprintf(
                 row,
                 sizeof(row),
-                "%c #%lu L%u %s",
+                "%c #%lu L%u %.24s",
                 entry->id == app->profiles.active_profile ? '*' : ' ',
                 (unsigned long)entry->id,
                 entry->level,
@@ -2573,11 +2641,11 @@ static void pocket_draw_character(Canvas* canvas, PocketD20App* app) {
     const char* row_ptrs[12];
     for(uint8_t i = 0U; i < 12U; ++i) row_ptrs[i] = rows[i];
 
-    snprintf(rows[0], sizeof(rows[0]), "Name: %s", character->name);
-    snprintf(rows[1], sizeof(rows[1]), "Player: %s", character->player);
-    snprintf(rows[2], sizeof(rows[2]), "Species: %s", character->species);
-    snprintf(rows[3], sizeof(rows[3]), "Background: %s", character->background);
-    snprintf(rows[4], sizeof(rows[4]), "Alignment: %s", character->alignment);
+    snprintf(rows[0], sizeof(rows[0]), "Name: %.31s", character->name);
+    snprintf(rows[1], sizeof(rows[1]), "Player: %.31s", character->player);
+    snprintf(rows[2], sizeof(rows[2]), "Species: %.31s", character->species);
+    snprintf(rows[3], sizeof(rows[3]), "Background: %.31s", character->background);
+    snprintf(rows[4], sizeof(rows[4]), "Alignment: %.23s", character->alignment);
     snprintf(rows[5], sizeof(rows[5]), "Classes (%u)", character->class_count);
     snprintf(
         rows[6],
@@ -2725,9 +2793,9 @@ static __attribute__((unused)) void pocket_draw_builder(Canvas* canvas, PocketD2
     char rows[11][48];
     const char* row_ptrs[11];
     for(uint8_t i = 0U; i < 11U; ++i) row_ptrs[i] = rows[i];
-    snprintf(rows[0], sizeof(rows[0]), "Species: %s", c->species);
-    snprintf(rows[1], sizeof(rows[1]), "Background: %s", c->background);
-    snprintf(rows[2], sizeof(rows[2]), "Origin feat: %s", c->origin_feat);
+    snprintf(rows[0], sizeof(rows[0]), "Species: %.31s", c->species);
+    snprintf(rows[1], sizeof(rows[1]), "Background: %.31s", c->background);
+    snprintf(rows[2], sizeof(rows[2]), "Origin feat: %.31s", c->origin_feat);
     snprintf(rows[3], sizeof(rows[3]), "Tools: %.36s", c->tool_proficiencies);
     snprintf(rows[4], sizeof(rows[4]), "Armor: %.36s", c->armor_training);
     snprintf(rows[5], sizeof(rows[5]), "Weapons: %.34s", c->weapon_training);
@@ -2756,7 +2824,13 @@ static void pocket_draw_grant_review(Canvas* canvas, PocketD20App* app) {
             const PocketGrant* grant = &c->grants[row_index - 1U];
             char mark = grant->status == PocketGrantApplied ? 'A' :
                         grant->status == PocketGrantSkipped ? 'S' : '?';
-            snprintf(row, sizeof(row), "%c %s: %s", mark, grant->option_name, grant->grant_value);
+            snprintf(
+                row,
+                sizeof(row),
+                "%c %.28s: %.28s",
+                mark,
+                grant->option_name,
+                grant->grant_value);
         } else {
             pocket_copy(row, sizeof(row), "+ Add Custom Grant");
         }
@@ -2845,7 +2919,11 @@ static __attribute__((unused)) void pocket_draw_combat_sheet(Canvas* canvas, Poc
     const char* ptrs[11];
     for(uint8_t i = 0U; i < 11U; ++i) ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Conditions: %.32s", c->conditions);
-    snprintf(rows[1], sizeof(rows[1]), "Concentration: %s", c->concentration[0] ? c->concentration : "None");
+    snprintf(
+        rows[1],
+        sizeof(rows[1]),
+        "Concentration: %.31s",
+        c->concentration[0] ? c->concentration : "None");
     snprintf(rows[2], sizeof(rows[2]), "Reaction: %s", c->reaction_available ? "Ready" : "Used");
     snprintf(rows[3], sizeof(rows[3]), "Temp effects: %.30s", c->temporary_effects);
     snprintf(rows[4], sizeof(rows[4]), "Resist: %.35s", c->resistances);
@@ -2869,7 +2947,14 @@ static void pocket_draw_attack_templates(Canvas* canvas, PocketD20App* app) {
             snprintf(row, sizeof(row), "+ New Attack Template");
         } else if(index < c->attack_template_count) {
             const PocketAttackTemplate* attack = &c->attack_templates[index];
-            snprintf(row, sizeof(row), "%s %ud%u+%d", attack->name, attack->damage_dice, attack->damage_die, attack->attack_misc);
+            snprintf(
+                row,
+                sizeof(row),
+                "%.30s %ud%u+%d",
+                attack->name,
+                attack->damage_dice,
+                attack->damage_die,
+                attack->attack_misc);
         } else break;
         pocket_draw_row(canvas, visible, index == app->selection, row);
     }
@@ -3004,7 +3089,7 @@ static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
             snprintf(
                 row,
                 sizeof(row),
-                "L%u %s",
+                "L%u %.31s",
                 app->catalog_levels[index],
                 app->catalog_entries[index]);
         else if(app->catalog_kind == PocketCatalogItems &&
@@ -3012,7 +3097,7 @@ static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
             snprintf(
                 row,
                 sizeof(row),
-                "%s%s %s",
+                "%s%s %.31s",
                 pocket_item_category_mark(app->catalog_item_categories[index]),
                 app->catalog_item_magic[index] ? "*" : " ",
                 app->catalog_entries[index]);
@@ -3052,14 +3137,25 @@ static void pocket_format_record_detail(
     switch(app->list_kind) {
     case PocketListClasses: {
         const PocketClassLevel* class_level = &character->classes[index];
-        if(field == 0U) snprintf(output, size, "Name: %s", class_level->name);
-        else if(field == 1U) snprintf(output, size, "Subclass: %s", class_level->subclass);
+        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", class_level->name);
+        else if(field == 1U)
+            pocket_format_labeled_text(output, size, "Subclass: ", class_level->subclass);
         else if(field == 2U) snprintf(output, size, "Class level: %u", class_level->level);
         else if(field == 3U) snprintf(output, size, "Hit Point Die: d%u", class_level->hit_die);
         else if(field == 4U) snprintf(output, size, "Class Hit Dice: %u/%u", class_level->hit_dice_current, class_level->hit_dice_max);
         else if(field == 5U) snprintf(output, size, "Class Hit Dice max: %u", class_level->hit_dice_max);
-        else if(field == 6U) snprintf(output, size, "Casting mode: %s", pocket_spellcasting_mode_names[class_level->spellcasting_mode]);
-        else if(field == 7U) snprintf(output, size, "Casting ability: %s", pocket_d20_ability_names[class_level->spellcasting_ability]);
+        else if(field == 6U)
+            pocket_format_labeled_text(
+                output,
+                size,
+                "Casting mode: ",
+                pocket_spellcasting_mode_names[class_level->spellcasting_mode]);
+        else if(field == 7U)
+            pocket_format_labeled_text(
+                output,
+                size,
+                "Casting ability: ",
+                pocket_d20_ability_names[class_level->spellcasting_ability]);
         else if(field == 8U) snprintf(output, size, "Cantrip limit: %u", class_level->cantrip_limit);
         else if(field == 9U) snprintf(output, size, "Prepared %u/%u", pocket_d20_class_prepared_count(character, index), class_level->prepared_limit);
         else if(field == 10U) snprintf(output, size, "Spellbook size: %u", class_level->spellbook_size);
@@ -3074,13 +3170,13 @@ static void pocket_format_record_detail(
     }
     case PocketListSpells: {
         const PocketSpell* spell = &character->spells[index];
-        if(field == 0U) snprintf(output, size, "Name: %s", spell->name);
-        else if(field == 1U) snprintf(output, size, "Notes: %s", spell->detail);
+        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", spell->name);
+        else if(field == 1U) pocket_format_labeled_text(output, size, "Notes: ", spell->detail);
         else if(field == 2U)
-            snprintf(
+            pocket_format_labeled_text(
                 output,
                 size,
-                "Source class: %s",
+                "Source class: ",
                 spell->class_index < character->class_count ?
                     character->classes[spell->class_index].name :
                     "Primary");
@@ -3110,16 +3206,19 @@ static void pocket_format_record_detail(
                 "Free casts max: %u",
                 character->spell_free_casts_max[index]);
         else if(field == 10U)
-            snprintf(
+            pocket_copy(
                 output,
                 size,
-                "%s",
                 character->spell_free_casts_current[index] ? "Use one free cast" :
                                                                "No free casts left");
-        else if(field == 11U) snprintf(output, size, "Stable ID: %s", spell->stable_id);
-        else if(field == 12U) snprintf(output, size, "Source: %s", spell->source);
-        else if(field == 13U) snprintf(output, size, "School: %s", spell->school);
-        else if(field == 14U) snprintf(output, size, "Grant source: %s", spell->grant_name);
+        else if(field == 11U)
+            pocket_format_labeled_text(output, size, "Stable ID: ", spell->stable_id);
+        else if(field == 12U)
+            pocket_format_labeled_text(output, size, "Source: ", spell->source);
+        else if(field == 13U)
+            pocket_format_labeled_text(output, size, "School: ", spell->school);
+        else if(field == 14U)
+            pocket_format_labeled_text(output, size, "Grant source: ", spell->grant_name);
         else if(field == 15U) snprintf(output, size, "Grant type: %u", spell->grant_source);
         else
             snprintf(output, size, "Delete spell");
@@ -3130,9 +3229,11 @@ static void pocket_format_record_detail(
         const char* class_name = feature->class_index < character->class_count ?
                                      character->classes[feature->class_index].name :
                                      "General";
-        if(field == 0U) snprintf(output, size, "Name: %s", feature->name);
-        else if(field == 1U) snprintf(output, size, "Notes: %s", feature->detail);
-        else if(field == 2U) snprintf(output, size, "Source class: %s", class_name);
+        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", feature->name);
+        else if(field == 1U)
+            pocket_format_labeled_text(output, size, "Notes: ", feature->detail);
+        else if(field == 2U)
+            pocket_format_labeled_text(output, size, "Source class: ", class_name);
         else if(field == 3U)
             snprintf(output, size, "Gained at class L%u", feature->class_level_gained);
         else if(field == 4U)
@@ -3151,10 +3252,10 @@ static void pocket_format_record_detail(
         const PocketItem* item = &character->items[index];
         switch(field) {
         case 0:
-            snprintf(output, size, "Name: %s", item->name);
+            pocket_format_labeled_text(output, size, "Name: ", item->name);
             break;
         case 1:
-            snprintf(output, size, "Notes: %s", item->detail);
+            pocket_format_labeled_text(output, size, "Notes: ", item->detail);
             break;
         case 2:
             snprintf(output, size, "Quantity: %d", item->quantity);
@@ -3259,7 +3360,7 @@ static void pocket_format_record_detail(
             snprintf(output, size, "Shield AC bonus: %u", item->shield_bonus);
             break;
         case 34:
-            snprintf(output, size, "Ammo group: %s", item->ammunition_group);
+            pocket_format_labeled_text(output, size, "Ammo group: ", item->ammunition_group);
             break;
         default:
             snprintf(output, size, "Delete item");
@@ -3268,7 +3369,8 @@ static void pocket_format_record_detail(
         break;
     }
     case PocketListLanguages:
-        if(field == 0U) snprintf(output, size, "Language: %s", character->languages[index]);
+        if(field == 0U)
+            pocket_format_labeled_text(output, size, "Language: ", character->languages[index]);
         else snprintf(output, size, "Delete language");
         break;
     case PocketListJournal: {
@@ -3277,20 +3379,30 @@ static void pocket_format_record_detail(
                                      character->classes[entry->class_index].name :
                                      "Primary";
         if(field == 0U)
-            snprintf(output, size, "Category: %s", pocket_d20_journal_category_names[entry->category]);
-        else if(field == 1U) snprintf(output, size, "Title: %s", entry->title);
-        else if(field == 2U) snprintf(output, size, "Body: %s", entry->body);
+            pocket_format_labeled_text(
+                output,
+                size,
+                "Category: ",
+                pocket_d20_journal_category_names[entry->category]);
+        else if(field == 1U)
+            pocket_format_labeled_text(output, size, "Title: ", entry->title);
+        else if(field == 2U)
+            pocket_format_labeled_text(output, size, "Body: ", entry->body);
         else if(field == 3U) snprintf(output, size, "Complete: %s", entry->completed ? "Yes" : "No");
-        else if(field == 4U) snprintf(output, size, "Level class: %s", class_name);
+        else if(field == 4U)
+            pocket_format_labeled_text(output, size, "Level class: ", class_name);
         else if(field == 5U)
-            snprintf(output, size, "%s", entry->level_granted ? "Level already applied" : "Apply milestone level");
+            pocket_copy(
+                output,
+                size,
+                entry->level_granted ? "Level already applied" : "Apply milestone level");
         else if(field == 6U) snprintf(output, size, "Create inventory item");
         else snprintf(output, size, "Delete journal entry");
         break;
     }
     case PocketListParty: {
         const PocketPartyMember* member = &app->data.party[index];
-        if(field == 0U) snprintf(output, size, "Name: %s", member->name);
+        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", member->name);
         else if(field == 1U) snprintf(output, size, "Initiative mod: %+d", member->initiative_modifier);
         else if(field == 2U) snprintf(output, size, "Armor Class: %d", member->armor_class);
         else if(field == 3U) snprintf(output, size, "Current HP: %d", member->hp_current);
@@ -3307,7 +3419,7 @@ static void pocket_draw_record_detail(Canvas* canvas, PocketD20App* app) {
     for(uint8_t visible = 0U; visible < 5U; ++visible) {
         uint16_t field = app->scroll + visible;
         if(field >= count) break;
-        char row[80];
+        char row[POCKET_D20_DETAIL_LEN + 32U];
         pocket_format_record_detail(app, (uint8_t)field, row, sizeof(row));
         pocket_draw_row(canvas, visible, field == app->selection, row);
     }
@@ -3327,14 +3439,18 @@ static void pocket_draw_combat(Canvas* canvas, PocketD20App* app) {
     snprintf(
         rows[6],
         sizeof(rows[6]),
-        "Spend %s d%u: %u/%u",
+        "Spend %.22s d%u: %u/%u",
         character->classes[app->hit_die_class_index].name,
         character->classes[app->hit_die_class_index].hit_die,
         character->classes[app->hit_die_class_index].hit_dice_current,
         character->classes[app->hit_die_class_index].hit_dice_max);
     snprintf(rows[7], sizeof(rows[7]), "Long Rest");
     snprintf(rows[8], sizeof(rows[8]), "Conditions: %.32s", character->conditions);
-    snprintf(rows[9], sizeof(rows[9]), "Concentration: %s", character->concentration[0] ? character->concentration : "None");
+    snprintf(
+        rows[9],
+        sizeof(rows[9]),
+        "Concentration: %.31s",
+        character->concentration[0] ? character->concentration : "None");
     snprintf(rows[10], sizeof(rows[10]), "Reaction: %s", character->reaction_available ? "Ready" : "Used");
     snprintf(rows[11], sizeof(rows[11]), "Temp effects: %.30s", character->temporary_effects);
     snprintf(rows[12], sizeof(rows[12]), "Resist: %.35s", character->resistances);
@@ -3623,7 +3739,14 @@ static void pocket_draw_initiative_setup(Canvas* canvas, PocketD20App* app) {
         char row[48];
         if(index < initiative->count) {
             PocketInitiativeEntry* entry = &initiative->entries[index];
-            snprintf(row, sizeof(row), "%s: %d HP%d AC%d", entry->name, entry->initiative_total, entry->hp_current, entry->armor_class);
+            snprintf(
+                row,
+                sizeof(row),
+                "%.16s: %d HP%d AC%d",
+                entry->name,
+                entry->initiative_total,
+                entry->hp_current,
+                entry->armor_class);
         } else if(index == initiative->count) {
             snprintf(row, sizeof(row), "+ Temporary participant");
         } else {
@@ -3646,7 +3769,7 @@ static void pocket_draw_initiative_combat(Canvas* canvas, PocketD20App* app) {
         snprintf(
             row,
             sizeof(row),
-            "%c %s I%d HP%d AC%d %s",
+            "%c %.10s I%d HP%d AC%d %.5s",
             index == initiative->current_turn ? '>' : ' ',
             entry->name,
             entry->initiative_total,
@@ -3664,13 +3787,13 @@ static void pocket_draw_initiative_edit(Canvas* canvas, PocketD20App* app) {
     char rows[8][48];
     const char* row_ptrs[8];
     for(uint8_t i = 0U; i < 8U; ++i) row_ptrs[i] = rows[i];
-    snprintf(rows[0], sizeof(rows[0]), "Name: %s", entry->name);
+    snprintf(rows[0], sizeof(rows[0]), "Name: %.23s", entry->name);
     snprintf(rows[1], sizeof(rows[1]), "Initiative roll: %d", entry->initiative_total);
     snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", entry->initiative_modifier);
     snprintf(rows[3], sizeof(rows[3]), "Armor Class: %d", entry->armor_class);
     snprintf(rows[4], sizeof(rows[4]), "Current HP: %d", entry->hp_current);
     snprintf(rows[5], sizeof(rows[5]), "Maximum HP: %d", entry->hp_max);
-    snprintf(rows[6], sizeof(rows[6]), "Conditions: %s", entry->conditions);
+    snprintf(rows[6], sizeof(rows[6]), "Conditions: %.23s", entry->conditions);
     snprintf(
         rows[7],
         sizeof(rows[7]),
@@ -4090,7 +4213,7 @@ static void pocket_draw_adventure(Canvas* canvas, PocketD20App* app) {
             snprintf(
                 choice,
                 sizeof(choice),
-                "%s [%s %u]",
+                "%.24s [%.12s %u]",
                 scene->choices[index].label,
                 pocket_d20_skill_names[(uint8_t)scene->choices[index].skill],
                 scene->choices[index].dc);
@@ -4240,7 +4363,9 @@ static bool pocket_add_record(PocketD20App* app) {
         character->classes[app->record_index].spellcasting_ability = PocketAbilityIntelligence;
         break;
     case PocketListSpells:
-        if(character->spell_count >= POCKET_D20_MAX_SPELLS) return false;
+        if(character->spell_count >= POCKET_D20_MAX_SPELLS ||
+           !pocket_d20_data_reserve_spells(character, character->spell_count + 1U))
+            return false;
         app->record_index = character->spell_count++;
         memset(&character->spells[app->record_index], 0, sizeof(PocketSpell));
         character->spell_known[app->record_index] = 1U;
@@ -4253,7 +4378,9 @@ static bool pocket_add_record(PocketD20App* app) {
             "New Spell");
         break;
     case PocketListFeatures:
-        if(character->feature_count >= POCKET_D20_MAX_FEATURES) return false;
+        if(character->feature_count >= POCKET_D20_MAX_FEATURES ||
+           !pocket_d20_data_reserve_features(character, character->feature_count + 1U))
+            return false;
         app->record_index = character->feature_count++;
         memset(&character->features[app->record_index], 0, sizeof(PocketFeature));
         pocket_copy(
@@ -4265,7 +4392,9 @@ static bool pocket_add_record(PocketD20App* app) {
             character->classes[0].level;
         break;
     case PocketListItems: {
-        if(character->item_count >= POCKET_D20_MAX_ITEMS) return false;
+        if(character->item_count >= POCKET_D20_MAX_ITEMS ||
+           !pocket_d20_data_reserve_items(character, character->item_count + 1U))
+            return false;
         app->record_index = character->item_count++;
         PocketItem* item = &character->items[app->record_index];
         memset(item, 0, sizeof(*item));
@@ -4289,7 +4418,9 @@ static bool pocket_add_record(PocketD20App* app) {
             "New Language");
         break;
     case PocketListJournal:
-        if(character->journal_count >= POCKET_D20_MAX_JOURNAL) return false;
+        if(character->journal_count >= POCKET_D20_MAX_JOURNAL ||
+           !pocket_d20_data_reserve_journal(character, character->journal_count + 1U))
+            return false;
         app->record_index = character->journal_count++;
         memset(&character->journal[app->record_index], 0, sizeof(PocketJournalEntry));
         pocket_copy(
@@ -5375,7 +5506,8 @@ static void pocket_handle_grant_review(PocketD20App* app, const InputEvent* even
                 pocket_apply_grant(app, grant);
             else if(grant->status == PocketGrantSkipped)
                 grant->status = PocketGrantPending;
-        } else if(c->grant_count < POCKET_D20_MAX_GRANTS) {
+        } else if(c->grant_count < POCKET_D20_MAX_GRANTS &&
+                  pocket_d20_data_reserve_grants(c, c->grant_count + 1U)) {
             app->record_index = c->grant_count++;
             PocketGrant* grant = &c->grants[app->record_index];
             memset(grant, 0, sizeof(*grant));
@@ -6330,6 +6462,10 @@ static void pocket_create_item_from_journal(PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
     if(character->item_count >= POCKET_D20_MAX_ITEMS) {
         pocket_set_status(app, "Inventory is full");
+        return;
+    }
+    if(!pocket_d20_data_reserve_items(character, character->item_count + 1U)) {
+        pocket_set_status(app, "Inventory memory low");
         return;
     }
     PocketJournalEntry* entry = &character->journal[app->record_index];
@@ -8194,6 +8330,7 @@ static void pocket_app_free(PocketD20App* app) {
     if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
     view_dispatcher_free(app->dispatcher);
     pocket_d20_profiles_free(&app->profiles);
+    pocket_d20_data_clear(&app->data);
     furi_record_close(RECORD_STORAGE);
     furi_record_close(RECORD_GUI);
     free(app);

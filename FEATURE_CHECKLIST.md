@@ -1,6 +1,6 @@
 # Request checklist
 
-| Requested capability | Version 2.7.1 status |
+| Requested capability | Version 2.7.2 status |
 |---|---|
 | Flipper FAP d20 icon | `icon.png`, 10x10 1-bit, assigned by `fap_icon` and FBT-validated |
 | Buttons and screen only | Implemented |
@@ -37,11 +37,12 @@
 | Recoverable prior generation | One previous successful save retained per profile with explicit restore action |
 | Translation and accessibility | Runtime translation removed for speed; documented high-contrast display and control conventions remain |
 | Separate bestiary application | Dolphin Bestiary is a separate FAP declared in the same manifest with an exclusive source list and asset namespace |
-| Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, complete OK-opened details, and buffered diagnostics |
+| Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, complete OK-opened details, full-screen scrollable stat-field readers, and buffered diagnostics |
 | Custom monster lifecycle | Stable-ID edit, custom-only delete, and atomic rewrite/rollback within the shared index/stat-block framework |
 | Campaign pack manager | On-device selection, per-profile/per-campaign progress, manifest diagnostics, schema, and starter template |
 | Complete structured editors | Full attack-template and grant editors with autosave |
 | Device resilience | Allocation stress runner, SD read-only fallback, unsaved warning, retry control, and published hardware matrix |
+| Direct-launch memory safety | Empty profiles allocate only their used spell, feature, item, journal, and grant records; all five groups grow on demand with checked limits |
 | Asset namespace | Runtime access uses only `APP_ASSETS_PATH`; additions extend the normal streamed catalog/pack files |
 | Cross-FAP navigation | Each application ends with a menu entry that queues the other FAP and exits cleanly |
 

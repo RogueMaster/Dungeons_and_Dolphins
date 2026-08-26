@@ -1,6 +1,6 @@
 # Dungeons & Dolphins
 
-Dungeons & Dolphins 2.7.1 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
+Dungeons & Dolphins 2.7.2 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
 
 - **Dungeons & Dolphins** — character profiles, rules tracking, spells, equipment, notes, dice, combat, initiative, and campaigns.
 - **Dolphin Bestiary** — the monster stat-block browser, custom monsters, diagnostics, and party-level encounter generation.
@@ -139,6 +139,18 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Runtime translation loading and pre-release save migration code were removed.
 - Bestiary reads now use 512-byte buffering, cached browse counts, early page completion, and one-pass diagnostics instead of repeated per-record scans.
 - Character saves use schema 2; older pre-release schemas are intentionally rejected without migration.
+
+### Bestiary reader hotfix in 2.7.2
+
+- Short OK on any monster stat row opens that field in a dedicated full-screen reader.
+- Long fields use word-aware wrapping with a five-line viewport; Up/Down scrolls one line and Left/Right pages through the text.
+- Short OK or Back closes the reader and restores the exact stat row and list position.
+- Custom-monster editing remains available through its own explicit row instead of intercepting stat-row selection.
+- Character startup memory was reduced by moving spells, features, items, journal entries, and structured grants to grow-on-demand storage.
+- An empty default character now reserves one item and one journal entry instead of every maximum-size record array, reducing the core save object from about 34.6 KB to about 6.3 KB.
+- Direct launch and first-run character creation use the same bounded memory model as app-to-app launch while retaining the existing record limits and text-save format.
+- Persistent text is copied into UI rows with explicit bounds, satisfying strict format-truncation checks while retaining complete detail fields for horizontal scrolling.
+- The Bestiary reader's line-range display is sized for the complete range of its 16-bit counters under strict compiler checks.
 
 ## Controls
 

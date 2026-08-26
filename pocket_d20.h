@@ -351,22 +351,27 @@ typedef struct {
     int32_t currency_pp;
 
     uint8_t spell_count;
-    PocketSpell spells[POCKET_D20_MAX_SPELLS];
+    uint8_t spell_capacity;
+    void* spell_storage;
+    PocketSpell* spells;
+    uint8_t* spell_known;
+    uint8_t* spell_always_prepared;
+    uint8_t* spell_free_casts_current;
+    uint8_t* spell_free_casts_max;
     uint8_t feature_count;
-    PocketFeature features[POCKET_D20_MAX_FEATURES];
+    uint8_t feature_capacity;
+    PocketFeature* features;
     uint8_t item_count;
-    PocketItem items[POCKET_D20_MAX_ITEMS];
+    uint8_t item_capacity;
+    PocketItem* items;
     uint8_t language_count;
     char languages[POCKET_D20_MAX_LANGUAGES][POCKET_D20_SHORT_LEN];
     uint8_t journal_count;
-    PocketJournalEntry journal[POCKET_D20_MAX_JOURNAL];
+    uint8_t journal_capacity;
+    PocketJournalEntry* journal;
 
     int8_t saving_throw_misc[POCKET_D20_ABILITY_COUNT];
     int8_t skill_misc[POCKET_D20_SKILL_COUNT];
-    uint8_t spell_known[POCKET_D20_MAX_SPELLS];
-    uint8_t spell_always_prepared[POCKET_D20_MAX_SPELLS];
-    uint8_t spell_free_casts_current[POCKET_D20_MAX_SPELLS];
-    uint8_t spell_free_casts_max[POCKET_D20_MAX_SPELLS];
 
     char conditions[POCKET_D20_DETAIL_LEN];
     char concentration[POCKET_D20_NAME_LEN];
@@ -378,7 +383,8 @@ typedef struct {
     char movement_modes[POCKET_D20_DETAIL_LEN];
 
     uint8_t grant_count;
-    PocketGrant grants[POCKET_D20_MAX_GRANTS];
+    uint8_t grant_capacity;
+    PocketGrant* grants;
     uint8_t attack_template_count;
     PocketAttackTemplate attack_templates[POCKET_D20_MAX_ATTACK_TEMPLATES];
     uint8_t encumbrance_mode;
@@ -401,4 +407,10 @@ typedef struct {
 } PocketSaveData;
 
 void pocket_d20_data_set_defaults(PocketSaveData* data);
+void pocket_d20_data_clear(PocketSaveData* data);
 void pocket_d20_data_sanitize(PocketSaveData* data);
+bool pocket_d20_data_reserve_spells(PocketCharacter* character, uint8_t required);
+bool pocket_d20_data_reserve_features(PocketCharacter* character, uint8_t required);
+bool pocket_d20_data_reserve_items(PocketCharacter* character, uint8_t required);
+bool pocket_d20_data_reserve_journal(PocketCharacter* character, uint8_t required);
+bool pocket_d20_data_reserve_grants(PocketCharacter* character, uint8_t required);

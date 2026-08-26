@@ -1,5 +1,18 @@
 # Dungeons & Dolphins changelog
 
+## 2.7.2
+
+- Added a full-screen reader for every monster stat-block line item.
+- Added word-aware 20-character wrapping with a five-line viewport, one-line Up/Down scrolling, and Left/Right page movement.
+- Made OK and Back return from the reader to the exact previously selected stat row.
+- Kept custom-monster editing on a separate explicit row so ordinary stat lines always open for reading.
+- Replaced fixed maximum-size spell, feature, item, journal, and structured-grant arrays with grow-on-demand allocations.
+- Reduced the empty character save object from about 34.6 KB to about 6.3 KB to prevent direct-launch and first-profile memory exhaustion.
+- Preserved the existing record limits and text-save layout while adding allocation checks to every record creation and loading path.
+- Replaced unsafe unbounded UI string formatting with explicitly bounded text composition so strict RogueMaster builds no longer fail on `-Wformat-truncation`.
+- Expanded record-detail row storage so long spell, feature, item, and journal notes remain available to the horizontal scroller instead of being cut to a short display buffer.
+- Enlarged the Bestiary full-screen reader position buffer for the maximum `start-end/total` range reported by its 16-bit line counters.
+
 ## 2.7.1
 
 - Buffered catalog and structured-grant reads to eliminate hundreds or thousands of one-byte SD operations.

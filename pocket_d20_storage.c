@@ -579,7 +579,7 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
     char key[48];
     char value[64];
     int32_t n[32];
-    memset(data, 0, sizeof(*data));
+    pocket_d20_data_clear(data);
 
     if(!pocket_d20_read_value(file, "PocketD20Character", value, sizeof(value))) return false;
     unsigned long schema = strtoul(value, NULL, 10);
@@ -698,7 +698,9 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
 
     if(!pocket_d20_read_value(file, "SpellCount", value, sizeof(value))) return false;
     c->spell_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->spell_count > POCKET_D20_MAX_SPELLS) return false;
+    if(c->spell_count > POCKET_D20_MAX_SPELLS ||
+       !pocket_d20_data_reserve_spells(c, c->spell_count))
+        return false;
     for(uint8_t i = 0U; i < c->spell_count; ++i) {
         snprintf(key, sizeof(key), "Spell%uName", i);
         if(!pocket_d20_read_string(file, key, c->spells[i].name, sizeof(c->spells[i].name)))
@@ -733,7 +735,9 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
 
     if(!pocket_d20_read_value(file, "FeatureCount", value, sizeof(value))) return false;
     c->feature_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->feature_count > POCKET_D20_MAX_FEATURES) return false;
+    if(c->feature_count > POCKET_D20_MAX_FEATURES ||
+       !pocket_d20_data_reserve_features(c, c->feature_count))
+        return false;
     for(uint8_t i = 0U; i < c->feature_count; ++i) {
         snprintf(key, sizeof(key), "Feature%uName", i);
         if(!pocket_d20_read_string(file, key, c->features[i].name, sizeof(c->features[i].name)))
@@ -755,7 +759,9 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
 
     if(!pocket_d20_read_value(file, "ItemCount", value, sizeof(value))) return false;
     c->item_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->item_count > POCKET_D20_MAX_ITEMS) return false;
+    if(c->item_count > POCKET_D20_MAX_ITEMS ||
+       !pocket_d20_data_reserve_items(c, c->item_count))
+        return false;
     for(uint8_t i = 0U; i < c->item_count; ++i) {
         PocketItem* item = &c->items[i];
         snprintf(key, sizeof(key), "Item%uName", i);
@@ -805,7 +811,9 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
 
     if(!pocket_d20_read_value(file, "JournalCount", value, sizeof(value))) return false;
     c->journal_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->journal_count > POCKET_D20_MAX_JOURNAL) return false;
+    if(c->journal_count > POCKET_D20_MAX_JOURNAL ||
+       !pocket_d20_data_reserve_journal(c, c->journal_count))
+        return false;
     for(uint8_t i = 0U; i < c->journal_count; ++i) {
         snprintf(key, sizeof(key), "Journal%uTitle", i);
         if(!pocket_d20_read_string(file, key, c->journal[i].title, sizeof(c->journal[i].title)))
@@ -884,7 +892,9 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
 
     if(!pocket_d20_read_value(file, "GrantCount", value, sizeof(value))) return false;
     c->grant_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->grant_count > POCKET_D20_MAX_GRANTS) return false;
+    if(c->grant_count > POCKET_D20_MAX_GRANTS ||
+       !pocket_d20_data_reserve_grants(c, c->grant_count))
+        return false;
     for(uint8_t i = 0U; i < c->grant_count; ++i) {
         PocketGrant* grant = &c->grants[i];
         snprintf(key, sizeof(key), "Grant%uStableId", i);
@@ -1220,6 +1230,7 @@ bool pocket_d20_storage_load_profile(
         if(recovered_backup) *recovered_backup = true;
         return true;
     }
+    pocket_d20_data_clear(data);
     pocket_d20_data_set_defaults(data);
     return false;
 }
