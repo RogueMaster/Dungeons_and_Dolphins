@@ -1,5 +1,0 @@
-# Copy this directory and change the stable ID before authoring a new pack.
-S|arrival|Arrival|A new current carries the party toward adventure.|wave
-C|arrival|Explore the horizon|-1|0|journey|journey|-|-|255|255
-S|journey|Open Water|Replace this scene with your own original campaign.|dolphin
-C|journey|Return to port|-1|0|arrival|arrival|-|-|255|255

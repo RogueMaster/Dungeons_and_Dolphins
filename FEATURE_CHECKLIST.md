@@ -1,6 +1,6 @@
 # Request checklist
 
-| Requested capability | Version 2.6 status |
+| Requested capability | Version 2.7 status |
 |---|---|
 | Flipper FAP d20 icon | `icon.png`, 10x10 1-bit, assigned by `fap_icon` and FBT-validated |
 | Buttons and screen only | Implemented |
@@ -17,7 +17,7 @@
 | Spell slots and Wizard Arcane Recovery | Implemented with Short/Long Rest rules |
 | Feature recharge cadence | Manual, turn, encounter, dawn, Short/Long, or Long |
 | Items, equipment, weapons, attack/damage rolls | Implemented |
-| Multi-die individual results plus sum | Implemented with paging |
+| Multi-die individual results plus sum | Implemented with paging; Guidance mode adds a visible d4 to d20 rolls |
 | Animated dice sequence | Implemented with original code-drawn frames |
 | CP/SP/EP/GP/PP | Implemented |
 | Notes, adventure notes, item notes, milestones | Implemented; milestones can level a selected class once |
@@ -38,10 +38,10 @@
 | Translation and accessibility | Stable zero-allocation UI keys, translation template, and documented display/control conventions |
 | Separate bestiary application | Dolphin Bestiary is a separate FAP declared in the same manifest with an exclusive source list and asset namespace |
 | Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, and per-record diagnostics |
-| Custom monster lifecycle | Stable-ID edit, custom-only delete, atomic index rewrite, recovery journal, orphan completion, and rollback |
+| Custom monster lifecycle | Stable-ID edit, custom-only delete, and atomic rewrite/rollback within the shared index/stat-block framework |
 | Campaign pack manager | On-device selection, per-profile/per-campaign progress, manifest diagnostics, schema, and starter template |
 | Complete structured editors | Full attack-template and grant editors with autosave |
 | Device resilience | Allocation stress runner, SD read-only fallback, unsaved warning, retry control, and published hardware matrix |
-| Asset namespace | Runtime access uses only `APP_ASSETS_PATH`; custom reference filenames use the `custom_` prefix |
+| Asset namespace | Runtime access uses only `APP_ASSETS_PATH`; additions extend the normal streamed catalog/pack files |
 
 The expansion catalogs intentionally contain option names and original metadata rather than proprietary descriptions or mechanics. Custom text and notes support owned books, homebrew, errata, and table rulings.

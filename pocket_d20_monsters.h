@@ -86,6 +86,13 @@ uint16_t pocket_monster_query(
     PocketMonsterSummary* output,
     uint16_t capacity,
     uint16_t* total_matches);
+uint16_t pocket_monster_sample(
+    Storage* storage,
+    PocketMonsterFilter filter,
+    void* context,
+    PocketMonsterSummary* output,
+    uint16_t capacity,
+    uint16_t* total_matches);
 bool pocket_monster_load(Storage* storage, const PocketMonsterSummary* summary, PocketMonsterDetail* output);
 bool pocket_monster_save_custom(Storage* storage, PocketMonsterDetail* detail);
 bool pocket_monster_update_custom(Storage* storage, PocketMonsterDetail* detail);

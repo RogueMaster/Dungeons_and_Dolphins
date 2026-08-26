@@ -1,5 +1,23 @@
 # Dungeons & Dolphins changelog
 
+## 2.7
+
+- Expanded the species/lineage selector to 103 names, including ancestry-specific Dragonborn, Dwarf, Elf, Genasi, Gnome, Goliath, Halfling, and Tiefling choices.
+- Expanded the subclass catalog to 139 class-associated choices across all 13 bundled classes; the picker defaults to the selected class and retains its All view.
+- Corrected list-parent navigation so Classes returns to Character, Spells returns to Magic, and Features/Perks and Inventory return to their opening screens instead of reopening the last record.
+- Added long-Back navigation from ordinary screens to Main and long-Back exit from Main in both applications.
+- Replaced selected-row ellipses with timed horizontal scrolling while keeping unselected rows allocation-free.
+- Added short-OK numeric currency editing for Copper, Silver, Electrum, Gold, and Platinum.
+- Added a nine-option alignment picker covering every Lawful, Neutral, and Chaotic combination with Good, Neutral, and Evil.
+- Added reusable hold-OK number entry for Vitals, ability and save adjustments, skill adjustments, spell settings and slots, class and record fields, dice settings, and combat values.
+- Extended long-Back handling through text and number entry modules so it still returns directly to Main.
+- Added Guidance dice mode, which rolls and displays a d4 alongside a d20 and includes both dice in the total.
+- Removed separate character-catalog overlay scans; additional records now extend the normal class, subclass, species, background, feat, spell, item, and metadata files.
+- Consolidated 340 packaged stat blocks into one streamed section file and integrated editable custom monsters into the same index/stat-block framework with atomic two-file rollback.
+- Deferred profile, catalog, and monster scans until needed, reused known profile paths during autosave, and released large catalog/detail allocations when their screens close.
+- Reworked encounter generation into a single streaming eligibility pass with a bounded randomized candidate pool, eliminating repeated full-index scans that could stall the interface.
+- Updated the feature documentation and future-only roadmap for the performance-focused release.
+
 ## 2.6
 
 - Split the monster reference and encounter generator into the independent Dolphin Bestiary FAP while keeping both applications in one `application.fam` with explicit, mutually exclusive source lists.

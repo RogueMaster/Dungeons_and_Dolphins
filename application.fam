@@ -17,7 +17,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dragons",
-    fap_version="2.6",
+    fap_version="2.7",
     fap_description="Offline 5E-compatible character, journal, dice, and initiative tracker.",
 )
 
@@ -36,6 +36,6 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dragons",
-    fap_version="2.6",
+    fap_version="2.7",
     fap_description="Offline monster reference and party-level encounter generator.",
 )

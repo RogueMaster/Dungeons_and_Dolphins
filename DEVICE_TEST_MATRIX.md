@@ -1,10 +1,10 @@
 # Physical-device qualification matrix
 
-This is the complete 2.6 hardware procedure. Compiler, API, package, and host-test results are recorded separately in `BUILD_VERIFICATION.md`. A row remains `Pending hardware` until it is performed on a physical Flipper Zero; build success is never substituted for device evidence.
+This is the complete 2.7 hardware procedure. Compiler and automated validation are performed before packaging. A row remains `Pending hardware` until it is performed on a physical Flipper Zero; build success is never substituted for device evidence.
 
 Record device serial suffix, SD-card model/capacity, battery level, firmware commit, operator, date, observed result, and any issue ID for every run.
 
-| ID | Area | Setup and action | Expected result | 2.6 status |
+| ID | Area | Setup and action | Expected result | 2.7 status |
 |---|---|---|---|---|
 | CTRL-01 | Navigation | Visit every Home destination; use Up/Down, short OK, and Back. | Selection remains visible, screens open once, Back returns one level, Home Back autosaves and exits. | Pending hardware |
 | CTRL-02 | Long press | Exercise long OK/Left/Right on profiles, catalogs, Dolphin Bestiary, adventure, initiative, and dice. | Only documented alternate action fires; short action does not also fire. | Pending hardware |
@@ -27,7 +27,7 @@ Record device serial suffix, SD-card model/capacity, battery level, firmware com
 | PROF-01 | Profiles | Create, switch, duplicate, rename, export, import, archive, restore, and delete profiles. | Separate character, campaign progress, inventory, party preset, and initiative state remain isolated. | Pending hardware |
 | PACK-01 | User packs | Install valid and intentionally broken monster/campaign/language packs. | Valid packs work; diagnostics identify exact invalid IDs/files/links; bundled assets remain read-only. | Pending hardware |
 
-## Automated qualification recorded for 2.6
+## Automated qualification for 2.7
 
 | Check | Expected | Status |
 |---|---|---|

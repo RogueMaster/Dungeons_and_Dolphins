@@ -7,6 +7,6 @@
 - Stable IDs must be unique, lowercase, and durable across spelling corrections where practical.
 - Annotated records declare option type, prerequisites, level, class association, and grant value. Unknown or incomplete mechanics remain review-gated or custom.
 - On-device diagnostics must pass before a metadata pack is treated as rules-aware.
-- Homebrew and table rulings belong in `custom_` overlays under each application's asset namespace, leaving packaged records reproducible.
+- Homebrew and table rulings extend the normal catalog or pack files with stable IDs and explicit source labels; the app streams those files without loading a second overlay.
 
 See `ATTRIBUTION.md` for code and rules-reference attribution.

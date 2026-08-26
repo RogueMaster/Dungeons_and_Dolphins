@@ -1,3 +1,0 @@
-# MonsterPack=1
-# id|name|CR in eighths|XP|AC|HP|type|environment
-sample_dolphin|Sample Dolphin|4|100|12|18|Beast|Aquatic

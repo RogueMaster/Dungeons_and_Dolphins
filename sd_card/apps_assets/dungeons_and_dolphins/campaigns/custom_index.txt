@@ -1,2 +1,0 @@
-# id|name|pack version|min app|max app|entry scene|scenes file
-starter_voyage|Starter Voyage|1|100|999|arrival|custom_scenes.txt

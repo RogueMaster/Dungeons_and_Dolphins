@@ -1128,10 +1128,11 @@ static bool pocket_d20_find_profile_path(
     return found;
 }
 
-bool pocket_d20_storage_save_profile(
+static bool pocket_d20_storage_save_profile_internal(
     Storage* storage,
     uint32_t profile,
-    const PocketSaveData* data) {
+    const PocketSaveData* data,
+    const char* known_old_path) {
     furi_assert(storage);
     furi_assert(data);
     storage_common_mkdir(storage, POCKET_D20_DATA_DIR);
@@ -1139,7 +1140,13 @@ bool pocket_d20_storage_save_profile(
     char new_path[128];
     char temp_path[96];
     char backup_path[96];
-    bool had_save = pocket_d20_find_profile_path(storage, profile, old_path, sizeof(old_path));
+    bool had_save = false;
+    if(known_old_path && storage_file_exists(storage, known_old_path)) {
+        pocket_d20_copy(old_path, sizeof(old_path), known_old_path);
+        had_save = true;
+    } else {
+        had_save = pocket_d20_find_profile_path(storage, profile, old_path, sizeof(old_path));
+    }
     pocket_d20_profile_path(new_path, sizeof(new_path), profile, &data->character);
     pocket_d20_work_path(temp_path, sizeof(temp_path), profile, "write");
     pocket_d20_work_path(backup_path, sizeof(backup_path), profile, "backup");
@@ -1178,6 +1185,33 @@ bool pocket_d20_storage_save_profile(
         return false;
     }
     return true;
+}
+
+bool pocket_d20_storage_save_profile(
+    Storage* storage,
+    uint32_t profile,
+    const PocketSaveData* data) {
+    return pocket_d20_storage_save_profile_internal(storage, profile, data, NULL);
+}
+
+bool pocket_d20_storage_save_profile_known(
+    Storage* storage,
+    const PocketProfileEntry* current_entry,
+    const PocketSaveData* data) {
+    furi_assert(current_entry);
+    char safe_name[POCKET_D20_NAME_LEN];
+    char current_path[128];
+    pocket_d20_filename_name(safe_name, sizeof(safe_name), current_entry->name);
+    snprintf(
+        current_path,
+        sizeof(current_path),
+        "%s/ch_%lu_%s_%u.txt",
+        POCKET_D20_DATA_DIR,
+        (unsigned long)current_entry->id,
+        safe_name,
+        current_entry->level);
+    return pocket_d20_storage_save_profile_internal(
+        storage, current_entry->id, data, current_path);
 }
 
 bool pocket_d20_storage_load_profile(

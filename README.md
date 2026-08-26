@@ -1,6 +1,6 @@
 # Dungeons & Dolphins
 
-Dungeons & Dolphins 2.6 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
+Dungeons & Dolphins 2.7 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
 
 - **Dungeons & Dolphins** — character profiles, rules tracking, spells, equipment, notes, dice, combat, initiative, and campaigns.
 - **Dolphin Bestiary** — the monster stat-block browser, custom monsters, diagnostics, and party-level encounter generation.
@@ -23,7 +23,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 
 ### Character sheet
 
-- Name, player, species, background, alignment, experience, milestone leveling, and inspiration.
+- Name, player, species, background, a picker containing all nine alignments, experience, milestone leveling, and inspiration.
 - Up to four classes with independent class level, subclass, Hit Point Die, Hit Dice pool, and feature ownership.
 - Total level and Proficiency Bonus calculated across all classes.
 - All six ability scores and saving throws with proficiency and miscellaneous modifiers.
@@ -31,10 +31,11 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - HP, temporary HP, Armor Class, speed, initiative, exhaustion, death saves, and class-specific Hit Dice spending.
 - Pass. Perception, Pass. Insight, and Pass. Investigation remain fully visible and editable without abbreviating the governing attribute.
 - Languages, Origin Feat, tools, armor training, weapon training, size, senses, and general proficiencies.
+- The 103-name species/lineage catalog includes ancestry-specific Dragonborn, Dwarf, Elf, Genasi, Gnome, Goliath, Halfling, and Tiefling choices plus compatible standalone species and lineages.
 
 ### Classes, subclasses, features, and grants
 
-- Every bundled class has associated subclass choices, including all four core 2024 choices for each of the twelve core classes; class filtering is the default and an All view remains available.
+- All 13 bundled classes have class-associated subclass choices: 139 selectable core, add-on, legacy-compatible, and alias records. Class filtering is the default and an All view remains available.
 - Class-linked features retain the granting class and level gained.
 - Feature uses support manual, Proficiency Bonus, or ability-modifier maximums.
 - Recharge choices include turn, encounter, dawn, Short Rest, Long Rest, or manual recovery.
@@ -45,7 +46,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 ### Catalogs and low-memory browsing
 
 - Packaged catalogs cover classes, subclasses, species, backgrounds, feats/features, spells, and items.
-- Custom reference files use the `custom_` filename prefix and are merged after packaged records.
+- Each catalog uses one streamed file. Additional names and annotated rows are appended to the matching normal catalog instead of loading a second overlay.
 - Item and spell pickers stream from SD and retain at most 50 matching records in RAM.
 - Left/Right changes the current 50-record catalog page; buffers are released immediately when the picker closes.
 - Catalog source files, long descriptions, campaigns, and language data are not retained in steady-state RAM.
@@ -80,7 +81,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Conditions, concentration, reaction state, temporary effects, resistances, immunities, vulnerabilities, senses, and movement remain character fields.
 - Weapon attack and damage rolls use current character and item data.
 - Critical damage, Advantage/Disadvantage, finesse/ranged selection, magic bonuses, versatile damage, ammunition, and extra riders.
-- Generic animated rolls support d4, d6, d8, d10, d12, d20, d100, modifiers, Advantage, and Disadvantage.
+- Generic animated rolls support d4, d6, d8, d10, d12, d20, d100, modifiers, Advantage, Disadvantage, and Guidance mode. Guidance adds a visible d4 result to a d20 roll.
 - Roll Now remains unchanged while configuring a modifier and changes only after a roll is made.
 - Multi-die results show every individual die, the dice sum, modifier, and final total.
 
@@ -97,33 +98,39 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 ### Dolphin Bestiary
 
 - Separate FAP and asset namespace, so the character tracker never loads monster tables or encounter state.
-- 340 unique packaged monster records, including 120 records added in 2.6.
+- 340 unique packaged monster records.
 - Monster browser filters combine name, maximum challenge, creature type, source category, environment, and encounter role.
 - Browser pages hold at most 50 summaries; full stat blocks are allocated only while one is open and released on exit.
+- All packaged stat blocks share one streamed section file, reducing first-launch asset deployment and avoiding hundreds of simultaneous file entries.
 - Stat blocks show challenge, XP, Armor Class, HP, type, source, role, size, movement, abilities, skills, defenses, senses, languages, traits, actions, and extra actions.
 - Low, Moderate, and High encounter budgets use party level and party size.
 - Aquatic, Dungeon, Planar, Urban, Wilderness, or unrestricted encounter environments.
 - Balanced, Horde, and Elite templates, repeated-creature control, and optional Leader, Controller, Skirmisher, Artillery, Brute, or Minion weighting.
 - Custom monster creation and editing preserve stable IDs.
 - Two-step deletion applies only to custom records; packaged records are read-only.
-- Atomic custom index replacement, transaction recovery, block backup, and rollback.
+- Atomic shared-index/stat-block replacement, transaction recovery, backup, and rollback for custom edits.
 - Pack diagnostics report valid/invalid records, pack versions, recovery results, and free heap.
+- Encounter generation performs one streaming eligibility pass, retains at most sixteen randomized candidates, and releases that pool immediately after generation.
 
-### Interface changes in 2.6
+### Interface and performance changes in 2.7
 
-- Removed the About section.
-- Removed the separate Character Builder entry; character, class, catalog, and grant screens already provide the relevant editing flows.
-- Removed the redundant Combat Sheet entry.
-- Removed monster and encounter screens from the character FAP.
-- Added a 10×10, 1-bit d20 icon showing a roll of 20.
+- Short Back from Classes, Spells, Features/Perks, and Inventory returns to the screen that opened that list instead of reopening the last record.
+- Long Back returns directly to Main from ordinary application screens; long Back on Main exits.
+- Selected long rows scroll horizontally instead of ending in an ellipsis.
+- Currency values open a numeric editor with short OK; hold OK opens direct number entry for Vitals and other editable numerical settings.
+- Both applications defer catalog counts and large-file scans until the relevant browser opens.
+- Profile autosaves reuse the known profile path and avoid rescanning the profile directory after every change.
+- Removed separate custom catalog overlay scans and consolidated monster stat blocks into the normal streamed pack files.
+- Reworked encounter generation to avoid repeated full-index scans and interface stalls.
 
 ## Controls
 
 - Up/Down: move through rows.
 - Left/Right: adjust a value or change a 50-record page.
 - Short OK: open, toggle, apply, save, or roll.
-- Long OK: custom text, alternate spell/subclass view, or screen-specific action.
-- Back: return to the prior screen; Back from the main screen exits.
+- Long OK: direct numerical entry on numeric rows, custom text on text rows, alternate spell/subclass view, or another screen-specific action.
+- Short Back: return to the correct parent screen.
+- Long Back: return to Main; long Back on Main exits.
 
 ## SD-card asset locations
 
@@ -132,9 +139,9 @@ All runtime files are accessed through `APP_ASSETS_PATH`; the code does not use 
 - Character assets and profiles: `/ext/apps_assets/dungeons_and_dolphins/`
 - Bestiary assets and custom monsters: `/ext/apps_assets/dolphin_bestiary/`
 
-Packaged records use their normal filenames. User-maintained reference indexes and overlays use names such as `custom_spells.txt`, `custom_items.txt`, `custom_options.txt`, and `custom_index.txt`. Character saves remain in the requested `ch_{id}_{name}_{level}.txt` format beneath `profiles/`.
+Catalog additions are appended to the matching normal file, such as `catalogs/spells.txt`, `catalogs/classes.txt`, or `catalogs/items.txt`. Monster summaries and stat blocks use `monsters/index.txt` and `monsters/statblocks.txt`; custom records are identified by their `Custom` source field rather than a separate overlay filename. Character saves remain in the requested `ch_{id}_{name}_{level}.txt` format beneath `profiles/`.
 
-The optional `sd_card/apps_assets/` tree contains ready-to-copy custom-file templates.
+The FAP assets contain the ready-to-use catalog and bestiary files; no duplicate SD-card tree is required in the source release.
 
 ## Build
 
@@ -144,14 +151,8 @@ Place this directory in RogueMaster's `applications_user` tree, then build both 
 ./fbt fap_dungeons_and_dolphins fap_dolphin_bestiary
 ```
 
-The manifest uses explicit `sources=[...]` lists so each FAP excludes the other application's entry point and feature modules. Run host checks with:
-
-```sh
-./tests/run_host_tests.sh
-```
-
-Release ZIPs contain source and assets only. They intentionally exclude `dist`, compiled FAPs, ELF files, and object files.
+The manifest uses explicit `sources=[...]` lists so each FAP excludes the other application's entry point and feature modules. Release ZIPs contain source, assets, and user documentation only. They exclude validation tests, development tools, `dist`, compiled FAPs, ELF files, and object files.
 
 ## Hardware status
 
-Firmware compilation and automated validation are recorded in `BUILD_VERIFICATION.md`. Physical-device results remain unclaimed until the cases in `DEVICE_TEST_MATRIX.md` are completed on hardware.
+Both FAP targets are compiler-validated against the stated RogueMaster release before packaging. Physical-device results remain unclaimed until the cases in `DEVICE_TEST_MATRIX.md` are completed on hardware.

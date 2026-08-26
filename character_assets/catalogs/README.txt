@@ -4,14 +4,14 @@ Copy this catalogs folder to:
 /ext/apps_assets/dungeons_and_dolphins/catalogs/
 
 Each file normally uses one option per line. Blank lines and lines beginning with # are ignored.
-Dungeons & Dolphins reads packaged files directly and merges any matching custom_ file.
-Append homebrew or legally obtained add-on names to the appropriate custom_ file. The app stores only
-the selected name in the character save; rules text and licensed add-on content are not bundled.
+Dungeons & Dolphins streams the selected catalog directly and does not load a second overlay.
+Append additional names or annotated records to the appropriate normal file. The app stores only the
+selected name in the character save; long descriptions and restricted add-on content are not bundled.
 
 Short OK on an item, spell, feature/feat, class, subclass, or Background opens its catalog.
 Hold OK on that name to enter fully custom text instead.
 
-Background names are kept separately in backgrounds.txt and custom_backgrounds.txt. The selected
+Background names are kept separately in backgrounds.txt. The selected
 background is stored in the active character's own ch_{id}_{name}_{level}.txt save.
 
 Spell lines may optionally provide filtering metadata:

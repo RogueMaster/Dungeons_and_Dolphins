@@ -101,3 +101,53 @@ Storm Sorcery|Sorcerer
 The Celestial|Warlock
 The Hexblade|Warlock
 War Magic|Wizard
+
+# Additional compatible subclass names (names and class associations only)
+Path of the Battlerager|Barbarian
+Path of the Beast|Barbarian
+Path of the Giant|Barbarian
+Path of the Totem Warrior|Barbarian
+Path of Wild Magic|Barbarian
+College of Creation|Bard
+College of Eloquence|Bard
+Arcana Domain|Cleric
+Death Domain|Cleric
+Nature Domain|Cleric
+Order Domain|Cleric
+Peace Domain|Cleric
+Tempest Domain|Cleric
+Twilight Domain|Cleric
+Circle of Spores|Druid
+Circle of Wildfire|Druid
+Echo Knight|Fighter
+Rune Knight|Fighter
+Way of the Ascendant Dragon|Monk
+Way of the Astral Self|Monk
+Way of the Long Death|Monk
+Way of Mercy|Monk
+Way of Shadow|Monk
+Way of the Four Elements|Monk
+Way of the Open Hand|Monk
+Oath of the Crown|Paladin
+Oath of the Watchers|Paladin
+Oathbreaker|Paladin
+Drakewarden|Ranger
+Swarmkeeper|Ranger
+Phantom|Rogue
+Aberrant Mind|Sorcerer
+Clockwork Soul|Sorcerer
+Lunar Sorcery|Sorcerer
+The Fathomless|Warlock
+The Genie|Warlock
+The Undying|Warlock
+Chronurgy Magic|Wizard
+Graviturgy Magic|Wizard
+Order of Scribes|Wizard
+School of Abjuration|Wizard
+School of Conjuration|Wizard
+School of Divination|Wizard
+School of Enchantment|Wizard
+School of Evocation|Wizard
+School of Illusion|Wizard
+School of Necromancy|Wizard
+School of Transmutation|Wizard

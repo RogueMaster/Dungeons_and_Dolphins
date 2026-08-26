@@ -5,12 +5,16 @@
 #include <gui/modules/text_input.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
+#include <input/input.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #define TAG "DolphinBestiary"
 #define BESTIARY_WINDOW 50U
+#define BESTIARY_MARQUEE_EVENT 0xB357U
+#define BESTIARY_LONG_BACK_EVENT 0xB358U
+#define BESTIARY_MARQUEE_MS 350U
 
 typedef enum {
     BestiaryViewMain,
@@ -48,6 +52,10 @@ typedef struct {
     ViewDispatcher* dispatcher;
     View* view;
     TextInput* text_input;
+    FuriPubSub* input_events;
+    FuriPubSubSubscription* input_subscription;
+    uint8_t text_input_active;
+    FuriTimer* marquee_timer;
     BestiaryScreen screen;
     BestiaryScreen return_screen;
     BestiaryEdit edit;
@@ -71,6 +79,7 @@ typedef struct {
     uint8_t allow_repeats;
 
     uint16_t monster_total;
+    uint8_t monster_total_valid;
     uint16_t page_start;
     uint16_t window_count;
     PocketMonsterSummary* window;
@@ -88,6 +97,8 @@ typedef struct {
     uint8_t custom_version;
     bool custom_present;
 } BestiaryApp;
+
+static uint8_t bestiary_marquee_offset = 0U;
 
 static const char* const type_names[] = {
     "Any", "Aberration", "Beast", "Celestial", "Construct", "Dragon", "Elemental",
@@ -125,6 +136,7 @@ static void bestiary_enter(BestiaryApp* app, BestiaryScreen screen) {
     app->selection = 0U;
     app->scroll = 0U;
     app->status[0] = '\0';
+    bestiary_marquee_offset = 0U;
 }
 
 static bool bestiary_move_event(const InputEvent* event) {
@@ -137,6 +149,7 @@ static void bestiary_move(BestiaryApp* app, uint16_t count, int8_t delta) {
     if(next < 0) next = count - 1U;
     if(next >= count) next = 0;
     app->selection = (uint16_t)next;
+    bestiary_marquee_offset = 0U;
     if(app->selection < app->scroll) app->scroll = app->selection;
     if(app->selection >= app->scroll + 5U) app->scroll = app->selection - 4U;
 }
@@ -190,6 +203,7 @@ static bool bestiary_load_window(BestiaryApp* app) {
         app->window,
         BESTIARY_WINDOW,
         &app->monster_total);
+    app->monster_total_valid = 1U;
     if(app->page_start >= app->monster_total && app->page_start) {
         app->page_start =
             ((app->monster_total ? app->monster_total - 1U : 0U) / BESTIARY_WINDOW) *
@@ -209,6 +223,7 @@ static bool bestiary_load_window(BestiaryApp* app) {
 static void bestiary_refresh_count(BestiaryApp* app) {
     pocket_monster_query(
         app->storage, bestiary_filter, app, 0U, NULL, 0U, &app->monster_total);
+    app->monster_total_valid = 1U;
 }
 
 static void bestiary_release_detail(BestiaryApp* app) {
@@ -254,12 +269,19 @@ static void bestiary_header(Canvas* canvas, const char* title, const char* statu
 static void bestiary_row(Canvas* canvas, uint8_t row, bool selected, const char* text) {
     uint8_t y = 11U + row * 10U;
     char display[32];
-    bestiary_copy(display, sizeof(display), text);
-    if(strlen(display) > 20U) {
-        display[17] = '.';
-        display[18] = '.';
-        display[19] = '.';
+    size_t length = strlen(text);
+    if(selected && length > 20U) {
+        size_t cycle = length + 4U;
+        size_t start = bestiary_marquee_offset % cycle;
+        for(size_t i = 0U; i < 20U; ++i) {
+            size_t position = (start + i) % cycle;
+            display[i] = position < length ? text[position] : ' ';
+        }
         display[20] = '\0';
+    } else {
+        size_t copy = length > 20U ? 20U : length;
+        memcpy(display, text, copy);
+        display[copy] = '\0';
     }
     if(selected) {
         canvas_draw_box(canvas, 0, y, 128, 10);
@@ -288,7 +310,10 @@ static void bestiary_draw_home(Canvas* canvas, BestiaryApp* app) {
     char encounter_role[32], repeats[32], template_row[32];
     char cr_value[8];
     bestiary_cr(cr_value, sizeof(cr_value), app->max_cr_eighths);
-    snprintf(browse, sizeof(browse), "Browse Monsters (%u)", app->monster_total);
+    if(app->monster_total_valid)
+        snprintf(browse, sizeof(browse), "Browse Monsters (%u)", app->monster_total);
+    else
+        snprintf(browse, sizeof(browse), "Browse Monsters");
     snprintf(search, sizeof(search), "Search: %.24s", app->search[0] ? app->search : "Any");
     snprintf(cr, sizeof(cr), "Max CR: %s", app->max_cr_eighths ? cr_value : "Any");
     snprintf(type, sizeof(type), "Type: %s", type_names[app->type_filter]);
@@ -315,7 +340,7 @@ static void bestiary_draw_list(Canvas* canvas, BestiaryApp* app) {
     uint16_t page_count = (app->monster_total + BESTIARY_WINDOW - 1U) / BESTIARY_WINDOW;
     snprintf(page, sizeof(page), "Page %u/%u <>", app->page_start / BESTIARY_WINDOW + 1U,
              page_count ? page_count : 1U);
-    bestiary_header(canvas, "Monster Manual", app->status[0] ? app->status : page);
+    bestiary_header(canvas, "Monster Catalog", app->status[0] ? app->status : page);
     for(uint8_t visible = 0U; visible < 5U; ++visible) {
         uint16_t index = app->scroll + visible;
         if(index >= app->window_count) break;
@@ -423,6 +448,7 @@ static void bestiary_begin_text(
 
 static void bestiary_text_done(void* context) {
     BestiaryApp* app = context;
+    app->text_input_active = 0U;
     PocketMonsterDetail* m = app->detail;
     switch(app->edit) {
     case BestiaryEditSearch: bestiary_copy(app->search, sizeof(app->search), app->edit_buffer); break;
@@ -440,7 +466,7 @@ static void bestiary_text_done(void* context) {
     default: break;
     }
     app->edit = BestiaryEditNone;
-    if(app->screen == BestiaryScreenHome) bestiary_refresh_count(app);
+    if(app->screen == BestiaryScreenHome) app->monster_total_valid = 0U;
     view_dispatcher_switch_to_view(app->dispatcher, BestiaryViewMain);
     bestiary_refresh(app);
 }
@@ -451,6 +477,7 @@ static void bestiary_begin_text(
     const char* title,
     const char* initial) {
     app->edit = target;
+    app->text_input_active = 1U;
     bestiary_copy(app->edit_buffer, sizeof(app->edit_buffer), initial);
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, title);
@@ -637,7 +664,8 @@ static void bestiary_handle_home(BestiaryApp* app, const InputEvent* event) {
             int16_t value = app->encounter_template + delta;
             app->encounter_template = (uint8_t)(value < 0 ? 2 : value > 2 ? 0 : value);
         } else return;
-        if(app->selection >= 2U && app->selection <= 6U) bestiary_refresh_count(app);
+        if(app->selection >= 2U && app->selection <= 6U)
+            app->monster_total_valid = 0U;
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection == 0U) {
             app->page_start = 0U;
@@ -772,6 +800,18 @@ static void bestiary_handle_edit(BestiaryApp* app, const InputEvent* event) {
 
 static bool bestiary_input(InputEvent* event, void* context) {
     BestiaryApp* app = context;
+    if(event->type == InputTypeLong && event->key == InputKeyBack) {
+        if(app->screen == BestiaryScreenHome) {
+            view_dispatcher_stop(app->dispatcher);
+        } else {
+            bestiary_release_window(app);
+            bestiary_release_detail(app);
+            bestiary_release_encounter(app);
+            bestiary_enter(app, BestiaryScreenHome);
+        }
+        bestiary_refresh(app);
+        return true;
+    }
     if(event->type == InputTypeShort && event->key == InputKeyBack) {
         bestiary_back(app);
         bestiary_refresh(app);
@@ -793,8 +833,45 @@ static bool bestiary_input(InputEvent* event, void* context) {
     return true;
 }
 
+static void bestiary_marquee_timer_callback(void* context) {
+    BestiaryApp* app = context;
+    view_dispatcher_send_custom_event(app->dispatcher, BESTIARY_MARQUEE_EVENT);
+}
+
+static void bestiary_go_home(BestiaryApp* app) {
+    bestiary_release_window(app);
+    bestiary_release_detail(app);
+    bestiary_release_encounter(app);
+    bestiary_enter(app, BestiaryScreenHome);
+}
+
+static void bestiary_input_events_callback(const void* value, void* context) {
+    BestiaryApp* app = context;
+    const InputEvent* event = value;
+    if(app->text_input_active && event && event->key == InputKeyBack &&
+       event->type == InputTypeLong)
+        view_dispatcher_send_custom_event(app->dispatcher, BESTIARY_LONG_BACK_EVENT);
+}
+
+static bool bestiary_custom_event(void* context, uint32_t event) {
+    BestiaryApp* app = context;
+    if(event == BESTIARY_LONG_BACK_EVENT) {
+        app->text_input_active = 0U;
+        app->edit = BestiaryEditNone;
+        view_dispatcher_switch_to_view(app->dispatcher, BestiaryViewMain);
+        bestiary_go_home(app);
+        bestiary_refresh(app);
+        return true;
+    }
+    if(event != BESTIARY_MARQUEE_EVENT) return false;
+    ++bestiary_marquee_offset;
+    bestiary_refresh(app);
+    return true;
+}
+
 static bool bestiary_navigation(void* context) {
     BestiaryApp* app = context;
+    app->text_input_active = 0U;
     app->edit = BestiaryEditNone;
     view_dispatcher_switch_to_view(app->dispatcher, BestiaryViewMain);
     bestiary_refresh(app);
@@ -810,10 +887,13 @@ static BestiaryApp* bestiary_alloc(void) {
     app->allow_repeats = 1U;
     app->storage = furi_record_open(RECORD_STORAGE);
     app->gui = furi_record_open(RECORD_GUI);
-    bestiary_refresh_count(app);
     app->dispatcher = view_dispatcher_alloc();
     view_dispatcher_set_event_callback_context(app->dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->dispatcher, bestiary_navigation);
+    view_dispatcher_set_custom_event_callback(app->dispatcher, bestiary_custom_event);
+    app->input_events = furi_record_open(RECORD_INPUT_EVENTS);
+    app->input_subscription =
+        furi_pubsub_subscribe(app->input_events, bestiary_input_events_callback, app);
     app->view = view_alloc();
     view_allocate_model(app->view, ViewModelTypeLockFree, sizeof(BestiaryApp*));
     BestiaryApp** model = view_get_model(app->view);
@@ -823,9 +903,12 @@ static BestiaryApp* bestiary_alloc(void) {
     view_set_draw_callback(app->view, bestiary_draw);
     view_set_input_callback(app->view, bestiary_input);
     app->text_input = text_input_alloc();
+    app->marquee_timer =
+        furi_timer_alloc(bestiary_marquee_timer_callback, FuriTimerTypePeriodic, app);
     view_dispatcher_add_view(app->dispatcher, BestiaryViewMain, app->view);
     view_dispatcher_add_view(app->dispatcher, BestiaryViewText, text_input_get_view(app->text_input));
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+    furi_timer_start(app->marquee_timer, furi_ms_to_ticks(BESTIARY_MARQUEE_MS));
     return app;
 }
 
@@ -837,6 +920,11 @@ static void bestiary_free(BestiaryApp* app) {
     view_dispatcher_remove_view(app->dispatcher, BestiaryViewText);
     view_dispatcher_remove_view(app->dispatcher, BestiaryViewMain);
     text_input_free(app->text_input);
+    furi_timer_stop(app->marquee_timer);
+    furi_timer_free(app->marquee_timer);
+    if(app->input_subscription)
+        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
     view_free(app->view);
     view_dispatcher_free(app->dispatcher);
     furi_record_close(RECORD_GUI);

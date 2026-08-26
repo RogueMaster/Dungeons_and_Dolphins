@@ -342,7 +342,7 @@ PocketAttackRoll pocket_d20_roll_attack(
     PocketAttackRoll result = {0};
     result.first_die = pocket_d20_roll_one(20U);
     result.natural_roll = result.first_die;
-    if(mode != PocketRollNormal) {
+    if(mode == PocketRollAdvantage || mode == PocketRollDisadvantage) {
         result.second_die = pocket_d20_roll_one(20U);
         if(mode == PocketRollAdvantage) {
             if(result.second_die > result.natural_roll) result.natural_roll = result.second_die;

@@ -34,6 +34,10 @@ bool pocket_d20_storage_save_profile(
     Storage* storage,
     uint32_t profile,
     const PocketSaveData* data);
+bool pocket_d20_storage_save_profile_known(
+    Storage* storage,
+    const PocketProfileEntry* current_entry,
+    const PocketSaveData* data);
 bool pocket_d20_storage_delete_profile(Storage* storage, uint32_t profile);
 bool pocket_d20_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t destination);
 bool pocket_d20_storage_export_profile(Storage* storage, uint32_t profile);

@@ -6,6 +6,7 @@ typedef enum {
     PocketRollNormal,
     PocketRollAdvantage,
     PocketRollDisadvantage,
+    PocketRollGuidance,
 } PocketRollMode;
 
 #define POCKET_D20_MAX_DAMAGE_ROLLS 80U
