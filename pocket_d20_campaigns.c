@@ -8,6 +8,8 @@
 #define CAMPAIGN_USER_INDEX APP_ASSETS_PATH("campaigns/custom_index.txt")
 #define CAMPAIGN_BUNDLED_SCENES APP_ASSETS_PATH("campaigns/%s/%s")
 #define CAMPAIGN_USER_SCENES APP_ASSETS_PATH("campaigns/custom_%s/%s")
+#define CAMPAIGN_PROGRESS_DIR APP_DATA_PATH("campaigns")
+#define CAMPAIGN_LEGACY_PROGRESS_DIR APP_ASSETS_PATH("campaigns")
 #define CAMPAIGN_LINE_LEN 512U
 #define CAMPAIGN_MAX_SCENES 64U
 
@@ -139,8 +141,72 @@ static void campaign_progress_path(
     uint32_t profile_id,
     const char* campaign_id,
     const char* suffix) {
-    snprintf(output, size, APP_ASSETS_PATH("campaigns/custom_progress_%08lx_%s.%s"),
+    snprintf(output, size, APP_DATA_PATH("campaigns/custom_progress_%08lx_%s.%s"),
              (unsigned long)profile_id, campaign_id, suffix);
+}
+
+static bool campaign_copy_without_replace(
+    Storage* storage,
+    const char* source,
+    const char* destination) {
+    if(storage_file_exists(storage, destination)) return true;
+    char temporary[224];
+    int length = snprintf(temporary, sizeof(temporary), "%s.migrate", destination);
+    if(length < 0 || (size_t)length >= sizeof(temporary)) return false;
+    storage_common_remove(storage, temporary);
+    File* input = storage_file_alloc(storage);
+    File* output = storage_file_alloc(storage);
+    bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
+              storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    uint8_t buffer[256];
+    while(ok) {
+        size_t count = storage_file_read(input, buffer, sizeof(buffer));
+        if(!count) break;
+        ok = storage_file_write(output, buffer, count) == count;
+    }
+    if(ok) ok = storage_file_get_error(input) == FSE_OK && storage_file_sync(output);
+    storage_file_close(input);
+    storage_file_close(output);
+    storage_file_free(input);
+    storage_file_free(output);
+    if(!ok || storage_file_exists(storage, destination) ||
+       storage_common_rename(storage, temporary, destination) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return ok && storage_file_exists(storage, destination);
+    }
+    return true;
+}
+
+bool pocket_campaign_migrate_legacy_progress(Storage* storage) {
+    storage_common_mkdir(storage, APP_DATA_PATH(""));
+    storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
+    File* directory = storage_file_alloc(storage);
+    if(!storage_dir_open(directory, CAMPAIGN_LEGACY_PROGRESS_DIR)) {
+        storage_file_free(directory);
+        return true;
+    }
+    FileInfo info;
+    char filename[128];
+    bool ok = true;
+    while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        size_t length = strlen(filename);
+        if(file_info_is_dir(&info) || strncmp(filename, "custom_progress_", 16U) ||
+           length < 5U || strcmp(filename + length - 4U, ".txt"))
+            continue;
+        char source[192];
+        char destination[192];
+        int source_length = snprintf(
+            source, sizeof(source), "%s/%s", CAMPAIGN_LEGACY_PROGRESS_DIR, filename);
+        int destination_length = snprintf(
+            destination, sizeof(destination), "%s/%s", CAMPAIGN_PROGRESS_DIR, filename);
+        if(source_length < 0 || (size_t)source_length >= sizeof(source) ||
+           destination_length < 0 || (size_t)destination_length >= sizeof(destination) ||
+           !campaign_copy_without_replace(storage, source, destination))
+            ok = false;
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return ok;
 }
 
 bool pocket_campaign_progress_save(
@@ -148,7 +214,8 @@ bool pocket_campaign_progress_save(
     uint32_t profile_id,
     const PocketCampaignSummary* campaign,
     const PocketCharacter* character) {
-    storage_common_mkdir(storage, APP_ASSETS_PATH("campaigns"));
+    storage_common_mkdir(storage, APP_DATA_PATH(""));
+    storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
     char path[192], temp[192], backup[192], line[160];
     campaign_progress_path(path, sizeof(path), profile_id, campaign->id, "txt");
     campaign_progress_path(temp, sizeof(temp), profile_id, campaign->id, "tmp");

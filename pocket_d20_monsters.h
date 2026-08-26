@@ -102,6 +102,7 @@ bool pocket_monster_load(Storage* storage, const PocketMonsterSummary* summary, 
 bool pocket_monster_save_custom(Storage* storage, PocketMonsterDetail* detail);
 bool pocket_monster_update_custom(Storage* storage, PocketMonsterDetail* detail);
 bool pocket_monster_delete_custom(Storage* storage, const PocketMonsterSummary* summary);
+bool pocket_monster_migrate_legacy_custom(Storage* storage, uint16_t* copied_files);
 bool pocket_monster_recover_user_pack(
     Storage* storage,
     uint16_t* recovered,
