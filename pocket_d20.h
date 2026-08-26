@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#define POCKET_D20_SAVE_VERSION 1U
+#define POCKET_D20_SAVE_VERSION 2U
 
 #define POCKET_D20_NAME_LEN 32U
 #define POCKET_D20_SHORT_LEN 24U
@@ -260,6 +260,9 @@ typedef struct {
 typedef struct {
     char name[POCKET_D20_SHORT_LEN];
     int8_t initiative_modifier;
+    int16_t hp_current;
+    int16_t hp_max;
+    int16_t armor_class;
 } PocketPartyMember;
 
 typedef struct {

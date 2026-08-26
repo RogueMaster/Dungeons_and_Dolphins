@@ -24,10 +24,10 @@ This document contains planned work only. Implemented work belongs in `CHANGELOG
 
 - Add compact, standard, and large-text row layouts with per-screen truncation previews.
 - Add configurable long-press shortcuts and left/right behavior with a reset-to-default control map.
-- Add language-pack completeness diagnostics, fallback counts, and an on-device preview before activation.
+- Add a low-memory UI diagnostics page showing row widths, heap headroom, and input-module allocation state.
 
 ## 3.2 — stable pack platform
 
-- Define save schema 2 with forward migration, rollback snapshots, and host-side golden-file compatibility tests.
-- Add checksummed catalog, campaign, language, and monster pack manifests with transactional installation.
+- Freeze the first stable save contract with forward migration from pre-release schema 2, rollback snapshots, and host-side golden-file compatibility tests.
+- Add checksummed catalog, campaign, and monster pack manifests with transactional installation.
 - Require a release qualification gate combining host tests, RogueMaster validation, stress-test evidence, and a signed physical-device matrix.

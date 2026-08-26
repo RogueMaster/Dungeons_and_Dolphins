@@ -1,2 +1,0 @@
-# id|display_name|file
-xx|Example Language|custom_strings.txt

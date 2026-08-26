@@ -14,6 +14,7 @@
 #define MONSTER_BLOCKS_BACKUP APP_ASSETS_PATH("monsters/statblocks.bak")
 #define MONSTER_TRANSACTION APP_ASSETS_PATH("monsters/transaction.txt")
 #define MONSTER_LINE_LEN 768U
+#define MONSTER_READ_BUFFER 512U
 
 static const uint16_t pocket_budget[20][3] = {
     {50,75,100},{100,150,200},{150,225,400},{250,375,500},{500,750,1100},
@@ -29,16 +30,40 @@ static void monster_copy(char* out, size_t size, const char* value) {
     out[size - 1U] = '\0';
 }
 
-static bool monster_read_line(File* file, char* line, size_t size) {
+typedef struct {
+    File* file;
+    uint8_t buffer[MONSTER_READ_BUFFER];
+    uint16_t position;
+    uint16_t count;
+    bool eof;
+} MonsterReader;
+
+static void monster_reader_init(MonsterReader* reader, File* file) {
+    memset(reader, 0, sizeof(*reader));
+    reader->file = file;
+}
+
+static bool monster_read_line(MonsterReader* reader, char* line, size_t size) {
     size_t position = 0U;
-    char value;
-    while(position + 1U < size && storage_file_read(file, &value, 1U) == 1U) {
+    bool consumed = false;
+    while(!reader->eof) {
+        if(reader->position >= reader->count) {
+            reader->count = (uint16_t)storage_file_read(
+                reader->file, reader->buffer, sizeof(reader->buffer));
+            reader->position = 0U;
+            if(!reader->count) {
+                reader->eof = true;
+                break;
+            }
+        }
+        char value = (char)reader->buffer[reader->position++];
+        consumed = true;
         if(value == '\r') continue;
         if(value == '\n') break;
-        line[position++] = value;
+        if(position + 1U < size) line[position++] = value;
     }
     line[position] = '\0';
-    return position > 0U;
+    return consumed;
 }
 
 static bool monster_parse_summary(char* line, PocketMonsterSummary* output) {
@@ -74,7 +99,9 @@ static uint16_t monster_count_path(Storage* storage, const char* path) {
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
         PocketMonsterSummary summary;
-        while(monster_read_line(file, line, sizeof(line)))
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line)))
             if(monster_parse_summary(line, &summary) && count < UINT16_MAX) ++count;
     }
     storage_file_close(file);
@@ -92,7 +119,9 @@ static bool monster_at_path(
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
         uint16_t index = 0U;
-        while(monster_read_line(file, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
             PocketMonsterSummary summary;
             if(!monster_parse_summary(line, &summary)) continue;
             if(index++ == wanted) {
@@ -123,6 +152,61 @@ uint16_t pocket_monster_count(Storage* storage) {
     return monster_count_path(storage, MONSTER_INDEX);
 }
 
+void pocket_monster_validate_pack(
+    Storage* storage,
+    uint16_t* total,
+    uint16_t* valid,
+    uint16_t* invalid) {
+    uint16_t index_total = monster_count_path(storage, MONSTER_INDEX);
+    uint16_t section_total = 0U;
+    uint16_t valid_total = 0U;
+    uint16_t present_fields = 0U;
+    bool active = false;
+    File* file = storage_file_alloc(storage);
+    if(storage_file_open(file, MONSTER_BLOCKS, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        char line[MONSTER_LINE_LEN];
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
+            size_t length = strlen(line);
+            if(length > 2U && line[0] == '[' && line[length - 1U] == ']') {
+                if(active) {
+                    ++section_total;
+                    if((present_fields & PocketMonsterRequiredFields) ==
+                       PocketMonsterRequiredFields)
+                        ++valid_total;
+                }
+                active = true;
+                present_fields = 0U;
+                continue;
+            }
+            if(!active) continue;
+            char* separator = strchr(line, '=');
+            if(!separator) continue;
+            *separator = '\0';
+            if(!strcmp(line, "SizeAlignment")) present_fields |= PocketMonsterFieldSize;
+            else if(!strcmp(line, "Speed")) present_fields |= PocketMonsterFieldSpeed;
+            else if(!strcmp(line, "Abilities")) present_fields |= PocketMonsterFieldAbilities;
+            else if(!strcmp(line, "Senses")) present_fields |= PocketMonsterFieldSenses;
+            else if(!strcmp(line, "Languages")) present_fields |= PocketMonsterFieldLanguages;
+            else if(!strcmp(line, "Actions")) present_fields |= PocketMonsterFieldActions;
+        }
+        if(active) {
+            ++section_total;
+            if((present_fields & PocketMonsterRequiredFields) == PocketMonsterRequiredFields)
+                ++valid_total;
+        }
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    uint16_t record_total = index_total > section_total ? index_total : section_total;
+    if(valid_total > index_total) valid_total = index_total;
+    uint16_t invalid_total = record_total - valid_total;
+    if(total) *total = record_total;
+    if(valid) *valid = valid_total;
+    if(invalid) *invalid = invalid_total;
+}
+
 bool pocket_monster_at(Storage* storage, uint16_t index, PocketMonsterSummary* output) {
     return monster_at_path(storage, MONSTER_INDEX, index, output);
 }
@@ -136,11 +220,14 @@ static void monster_query_path(
     PocketMonsterSummary* output,
     uint16_t capacity,
     uint16_t* matched,
-    uint16_t* loaded) {
+    uint16_t* loaded,
+    bool count_all) {
     File* file = storage_file_alloc(storage);
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
-        while(monster_read_line(file, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
             PocketMonsterSummary summary;
             if(!monster_parse_summary(line, &summary) ||
                (filter && !filter(&summary, context)))
@@ -148,6 +235,7 @@ static void monster_query_path(
             if(*matched >= start && *loaded < capacity && output)
                 output[(*loaded)++] = summary;
             if(*matched < UINT16_MAX) ++*matched;
+            if(!count_all && *loaded >= capacity) break;
         }
     }
     storage_file_close(file);
@@ -173,7 +261,8 @@ uint16_t pocket_monster_query(
         output,
         capacity,
         &matched,
-        &loaded);
+        &loaded,
+        total_matches != NULL);
     if(total_matches) *total_matches = matched;
     return loaded;
 }
@@ -189,7 +278,9 @@ static void monster_sample_path(
     File* file = storage_file_alloc(storage);
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
-        while(monster_read_line(file, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
             PocketMonsterSummary summary;
             if(!monster_parse_summary(line, &summary) ||
                (filter && !filter(&summary, context)))
@@ -241,7 +332,9 @@ static bool monster_load_section(
     bool found = false;
     if(opened) {
         char line[MONSTER_LINE_LEN];
-        while(monster_read_line(file, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
             size_t length = strlen(line);
             if(length > 2U && line[0] == '[' && line[length - 1U] == ']') {
                 line[length - 1U] = '\0';
@@ -277,7 +370,9 @@ static uint8_t monster_pack_version_path(Storage* storage, const char* path, boo
     *present = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
     if(*present) {
         char line[MONSTER_LINE_LEN];
-        for(uint8_t i = 0U; i < 4U && monster_read_line(file, line, sizeof(line)); ++i)
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        for(uint8_t i = 0U; i < 4U && monster_read_line(&reader, line, sizeof(line)); ++i)
             if(sscanf(line, "# MonsterPack=%hhu", &version) == 1) break;
     }
     storage_file_close(file);
@@ -297,7 +392,9 @@ void pocket_monster_pack_versions(
     File* file = storage_file_alloc(storage);
     if(storage_file_open(file, MONSTER_INDEX, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
-        while(monster_read_line(file, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, file);
+        while(monster_read_line(&reader, line, sizeof(line))) {
             PocketMonsterSummary summary;
             if(monster_parse_summary(line, &summary) && !strcmp(summary.source, "Custom")) {
                 *user_present = true;
@@ -400,7 +497,9 @@ static bool monster_rewrite_index(
     File* input = storage_file_alloc(storage);
     if(storage_file_open(input, MONSTER_INDEX, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
-        while(ok && monster_read_line(input, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, input);
+        while(ok && monster_read_line(&reader, line, sizeof(line))) {
             PocketMonsterSummary current;
             if(!monster_parse_summary(line, &current)) continue;
             if(remove_id && !strcmp(current.id, remove_id)) continue;
@@ -451,7 +550,9 @@ static bool monster_rewrite_blocks(
     bool skip = false;
     if(ok && storage_file_open(input, MONSTER_BLOCKS, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[MONSTER_LINE_LEN];
-        while(ok && monster_read_line(input, line, sizeof(line))) {
+        MonsterReader reader;
+        monster_reader_init(&reader, input);
+        while(ok && monster_read_line(&reader, line, sizeof(line))) {
             size_t length = strlen(line);
             if(length > 2U && line[0] == '[' && line[length - 1U] == ']') {
                 line[length - 1U] = '\0';
@@ -601,14 +702,16 @@ typedef struct {
     uint32_t budget;
     uint8_t party_level;
     PocketEncounterTemplate template_kind;
+    const char* environment;
 } MonsterGenerateFilter;
 
 static bool monster_generate_filter(
     const PocketMonsterSummary* candidate,
     void* context) {
     const MonsterGenerateFilter* filter = context;
-    if(candidate->xp > filter->budget ||
-       candidate->cr_eighths > (uint8_t)(filter->party_level * 8U))
+    if(candidate->xp > filter->budget) return false;
+    if(filter->environment && strcmp(filter->environment, "Any") &&
+       strcmp(candidate->environment, filter->environment))
         return false;
     if(filter->template_kind == PocketEncounterHorde &&
        candidate->cr_eighths > (uint8_t)(filter->party_level * 4U))
@@ -616,6 +719,45 @@ static bool monster_generate_filter(
     if(filter->template_kind == PocketEncounterElite &&
        candidate->cr_eighths < (uint8_t)(filter->party_level * 4U))
         return false;
+    return true;
+}
+
+typedef struct {
+    uint8_t candidates[POCKET_MONSTER_ENCOUNTER_MAX];
+    uint8_t quantities[POCKET_MONSTER_ENCOUNTER_MAX];
+    uint8_t count;
+    uint8_t creature_count;
+    uint32_t spent;
+} MonsterEncounterPlan;
+
+static int8_t monster_plan_find(
+    const MonsterEncounterPlan* plan,
+    uint8_t candidate_index) {
+    for(uint8_t i = 0U; i < plan->count; ++i)
+        if(plan->candidates[i] == candidate_index) return (int8_t)i;
+    return -1;
+}
+
+static bool monster_plan_add(
+    MonsterEncounterPlan* plan,
+    uint8_t candidate_index,
+    uint32_t xp,
+    bool allow_repeats,
+    uint8_t maximum_creatures,
+    uint8_t maximum_types) {
+    if(plan->creature_count >= maximum_creatures) return false;
+    int8_t existing = monster_plan_find(plan, candidate_index);
+    if(existing >= 0) {
+        if(!allow_repeats || plan->quantities[(uint8_t)existing] == UINT8_MAX) return false;
+        ++plan->quantities[(uint8_t)existing];
+    } else {
+        if(plan->count >= maximum_types || plan->count >= POCKET_MONSTER_ENCOUNTER_MAX)
+            return false;
+        plan->candidates[plan->count] = candidate_index;
+        plan->quantities[plan->count++] = 1U;
+    }
+    ++plan->creature_count;
+    plan->spent += xp;
     return true;
 }
 
@@ -639,6 +781,7 @@ bool pocket_monster_generate(
         .budget = output->budget,
         .party_level = party_level,
         .template_kind = template_kind,
+        .environment = environment,
     };
     uint16_t total_eligible = 0U;
     uint16_t candidate_count = pocket_monster_sample(
@@ -652,31 +795,42 @@ bool pocket_monster_generate(
         free(candidates);
         return false;
     }
-    uint8_t attempts = 0U;
-    while(attempts++ < 80U && output->count < POCKET_MONSTER_ENCOUNTER_MAX) {
-        PocketMonsterSummary candidate =
-            candidates[furi_hal_random_get() % candidate_count];
-        if(candidate.xp > output->budget - output->spent) continue;
-        if(environment && strcmp(environment, "Any") &&
-           strcmp(candidate.environment, environment) && (furi_hal_random_get() % 4U)) continue;
-        if(preferred_role && strcmp(preferred_role, "Any") &&
-           strcmp(candidate.role, preferred_role) && (furi_hal_random_get() % 4U)) continue;
-        uint8_t existing = UINT8_MAX;
-        for(uint8_t i = 0U; i < output->count; ++i)
-            if(!strcmp(output->monsters[i].id, candidate.id)) existing = i;
-        if(existing != UINT8_MAX) {
-            if(!allow_repeats) continue;
-            if(output->quantities[existing] >= party_size * 2U) continue;
-            ++output->quantities[existing];
-        } else {
-            if(template_kind == PocketEncounterElite && output->count >= 2U) continue;
-            output->monsters[output->count] = candidate;
-            output->quantities[output->count++] = 1U;
+    uint8_t maximum_creatures = party_size * 2U;
+    if(maximum_creatures < 1U) maximum_creatures = 1U;
+    uint8_t maximum_types = template_kind == PocketEncounterElite ? 2U : 3U;
+    MonsterEncounterPlan best = {0};
+    for(uint8_t trial = 0U; trial < 48U && best.spent < output->budget; ++trial) {
+        MonsterEncounterPlan plan = {0};
+        for(uint16_t attempt = 0U; attempt < 160U && plan.spent < output->budget; ++attempt) {
+            uint8_t candidate_index = (uint8_t)(furi_hal_random_get() % candidate_count);
+            const PocketMonsterSummary* candidate = &candidates[candidate_index];
+            if(candidate->xp > output->budget - plan.spent) continue;
+            if(preferred_role && strcmp(preferred_role, "Any") &&
+               strcmp(candidate->role, preferred_role) && (furi_hal_random_get() % 4U))
+                continue;
+            monster_plan_add(
+                &plan,
+                candidate_index,
+                candidate->xp,
+                allow_repeats,
+                maximum_creatures,
+                maximum_types);
         }
-        output->spent += candidate.xp;
-        uint32_t target = template_kind == PocketEncounterHorde ?
-            output->budget * 9U / 10U : output->budget * 3U / 4U;
-        if(output->spent >= target && (furi_hal_random_get() & 1U)) break;
+        if(plan.spent > best.spent) best = plan;
+    }
+    uint32_t lower_budget = difficulty > PocketEncounterLow ?
+        pocket_monster_xp_budget(
+            party_level, party_size, (PocketEncounterDifficulty)(difficulty - 1U)) :
+        0U;
+    if(!best.count || (difficulty > PocketEncounterLow && best.spent <= lower_budget)) {
+        free(candidates);
+        return false;
+    }
+    output->count = best.count;
+    output->spent = best.spent;
+    for(uint8_t i = 0U; i < best.count; ++i) {
+        output->monsters[i] = candidates[best.candidates[i]];
+        output->quantities[i] = best.quantities[i];
     }
     free(candidates);
     return output->count > 0U;

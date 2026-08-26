@@ -28,8 +28,7 @@ bool pocket_d20_storage_load_profile(
     Storage* storage,
     uint32_t profile,
     PocketSaveData* data,
-    bool* recovered_backup,
-    bool* migrated);
+    bool* recovered_backup);
 bool pocket_d20_storage_save_profile(
     Storage* storage,
     uint32_t profile,

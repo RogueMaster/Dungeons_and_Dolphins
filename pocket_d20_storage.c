@@ -6,8 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define POCKET_D20_TEXT_VERSION 1U
-#define POCKET_D20_LEGACY_TEXT_VERSION 8U
+#define POCKET_D20_TEXT_VERSION 2U
 #define POCKET_D20_LINE_LEN 768U
 #define POCKET_D20_DATA_DIR APP_ASSETS_PATH("profiles")
 #define POCKET_D20_EXPORT_DIR APP_ASSETS_PATH("profiles/exports")
@@ -15,16 +14,6 @@
 
 #define POCKET_D20_ACTIVE_PROFILE_PATH APP_ASSETS_PATH("profiles/custom_active_profile.txt")
 #define POCKET_D20_ACTIVE_PROFILE_TEMP_PATH APP_ASSETS_PATH("profiles/custom_active_profile.tmp")
-
-static uint32_t pocket_d20_checksum(const void* data, size_t size) {
-    const uint8_t* bytes = data;
-    uint32_t hash = 2166136261UL;
-    for(size_t i = 0U; i < size; ++i) {
-        hash ^= bytes[i];
-        hash *= 16777619UL;
-    }
-    return hash;
-}
 
 static void pocket_d20_copy(char* destination, size_t size, const char* source) {
     if(size == 0U) return;
@@ -462,7 +451,13 @@ static bool pocket_d20_write_character(File* file, const PocketSaveData* data) {
         snprintf(key, sizeof(key), "Party%uName", i);
         if(!pocket_d20_write_string(file, key, data->party[i].name) ||
            !pocket_d20_writef(
-               file, "Party%uInitiativeModifier=%d\n", i, data->party[i].initiative_modifier))
+               file,
+               "Party%uData=%d,%d,%d,%d\n",
+               i,
+               data->party[i].initiative_modifier,
+               data->party[i].hp_current,
+               data->party[i].hp_max,
+               data->party[i].armor_class))
             return false;
     }
 
@@ -579,19 +574,16 @@ static bool pocket_d20_write_character(File* file, const PocketSaveData* data) {
     return pocket_d20_writef(file, "End=OK\n");
 }
 
-static bool pocket_d20_read_character(File* file, PocketSaveData* data, bool* migrated) {
+static bool pocket_d20_read_character(File* file, PocketSaveData* data) {
     PocketCharacter* c = &data->character;
     char key[48];
     char value[64];
     int32_t n[32];
     memset(data, 0, sizeof(*data));
 
-    if(migrated) *migrated = false;
     if(!pocket_d20_read_value(file, "PocketD20Character", value, sizeof(value))) return false;
     unsigned long schema = strtoul(value, NULL, 10);
-    if(schema != POCKET_D20_TEXT_VERSION && schema != POCKET_D20_LEGACY_TEXT_VERSION)
-        return false;
-    if(migrated) *migrated = schema == POCKET_D20_LEGACY_TEXT_VERSION;
+    if(schema != POCKET_D20_TEXT_VERSION) return false;
     if(
        !pocket_d20_read_string(file, "Name", c->name, sizeof(c->name)) ||
        !pocket_d20_read_string(file, "Player", c->player, sizeof(c->player)) ||
@@ -836,9 +828,12 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data, bool* mi
         snprintf(key, sizeof(key), "Party%uName", i);
         if(!pocket_d20_read_string(file, key, data->party[i].name, sizeof(data->party[i].name)))
             return false;
-        snprintf(key, sizeof(key), "Party%uInitiativeModifier", i);
-        if(!pocket_d20_read_value(file, key, value, sizeof(value))) return false;
-        data->party[i].initiative_modifier = (int8_t)strtol(value, NULL, 10);
+        snprintf(key, sizeof(key), "Party%uData", i);
+        if(!pocket_d20_read_numbers(file, key, n, 4U)) return false;
+        data->party[i].initiative_modifier = (int8_t)n[0];
+        data->party[i].hp_current = (int16_t)n[1];
+        data->party[i].hp_max = (int16_t)n[2];
+        data->party[i].armor_class = (int16_t)n[3];
     }
 
     if(!pocket_d20_read_numbers(file, "InitiativeState", n, 4U)) return false;
@@ -951,12 +946,6 @@ static bool pocket_d20_read_character(File* file, PocketSaveData* data, bool* mi
         data->encounter_history[i].value_after = (int16_t)n[5];
     }
 
-    if(schema == POCKET_D20_LEGACY_TEXT_VERSION) {
-        if(!pocket_d20_read_value(file, "DataChecksum", value, sizeof(value))) return false;
-        uint32_t expected_checksum = (uint32_t)strtoul(value, NULL, 16);
-        pocket_d20_data_sanitize(data);
-        return expected_checksum == pocket_d20_checksum(data, sizeof(*data));
-    }
     if(!pocket_d20_read_value(file, "End", value, sizeof(value)) || strcmp(value, "OK") != 0 ||
        !pocket_d20_read_value(file, "FileChecksum", value, sizeof(value)))
         return false;
@@ -1047,16 +1036,15 @@ static bool pocket_d20_validate_file_checksum(
 static bool pocket_d20_load_text_path(
     Storage* storage,
     const char* path,
-    PocketSaveData* data,
-    bool* migrated) {
+    PocketSaveData* data) {
     bool has_checksum = false;
     if(!pocket_d20_validate_file_checksum(storage, path, &has_checksum)) return false;
     File* file = storage_file_alloc(storage);
     bool success = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING) &&
-                   pocket_d20_read_character(file, data, migrated);
+                   pocket_d20_read_character(file, data);
     storage_file_close(file);
     storage_file_free(file);
-    return success && (has_checksum || (migrated && *migrated));
+    return success && has_checksum;
 }
 
 static void pocket_d20_work_path(char* output, size_t size, uint32_t profile, const char* kind) {
@@ -1218,19 +1206,17 @@ bool pocket_d20_storage_load_profile(
     Storage* storage,
     uint32_t profile,
     PocketSaveData* data,
-    bool* recovered_backup,
-    bool* migrated) {
+    bool* recovered_backup) {
     furi_assert(storage);
     furi_assert(data);
     if(recovered_backup) *recovered_backup = false;
-    if(migrated) *migrated = false;
     char path[128];
     char backup_path[96];
     if(pocket_d20_find_profile_path(storage, profile, path, sizeof(path)) &&
-       pocket_d20_load_text_path(storage, path, data, migrated))
+       pocket_d20_load_text_path(storage, path, data))
         return true;
     pocket_d20_work_path(backup_path, sizeof(backup_path), profile, "backup");
-    if(pocket_d20_load_text_path(storage, backup_path, data, migrated)) {
+    if(pocket_d20_load_text_path(storage, backup_path, data)) {
         if(recovered_backup) *recovered_backup = true;
         return true;
     }
@@ -1356,8 +1342,7 @@ bool pocket_d20_storage_restore_backup(
     char primary_path[128];
     char rejected_path[96];
     pocket_d20_work_path(backup_path, sizeof(backup_path), profile, "backup");
-    bool migrated = false;
-    if(!pocket_d20_load_text_path(storage, backup_path, data, &migrated)) return false;
+    if(!pocket_d20_load_text_path(storage, backup_path, data)) return false;
     bool had_primary =
         pocket_d20_find_profile_path(storage, profile, primary_path, sizeof(primary_path));
     pocket_d20_work_path(rejected_path, sizeof(rejected_path), profile, "rejected");
@@ -1392,8 +1377,7 @@ bool pocket_d20_storage_import_first(
             continue;
         char path[192];
         snprintf(path, sizeof(path), "%s/%s", POCKET_D20_EXPORT_DIR, filename);
-        bool migrated = false;
-        if(pocket_d20_load_text_path(storage, path, data, &migrated) &&
+        if(pocket_d20_load_text_path(storage, path, data) &&
            pocket_d20_storage_save_profile(storage, destination, data)) {
             imported = true;
             break;

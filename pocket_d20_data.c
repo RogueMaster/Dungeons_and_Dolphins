@@ -26,7 +26,7 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
     pocket_d20_copy(character->player, sizeof(character->player), "Player");
     pocket_d20_copy(character->species, sizeof(character->species), "Human");
     pocket_d20_copy(character->background, sizeof(character->background), "Adventurer");
-    pocket_d20_copy(character->alignment, sizeof(character->alignment), "Neutral");
+    pocket_d20_copy(character->alignment, sizeof(character->alignment), "True Neutral");
     pocket_d20_copy(character->origin_feat, sizeof(character->origin_feat), "None");
     character->size = PocketSizeMedium;
     pocket_d20_copy(character->senses, sizeof(character->senses), "Normal vision");
@@ -133,6 +133,9 @@ void pocket_d20_data_sanitize(PocketSaveData* data) {
     character->species[sizeof(character->species) - 1U] = '\0';
     character->background[sizeof(character->background) - 1U] = '\0';
     character->alignment[sizeof(character->alignment) - 1U] = '\0';
+    if(!character->alignment[0])
+        pocket_d20_copy(
+            character->alignment, sizeof(character->alignment), "True Neutral");
     character->other_proficiencies[sizeof(character->other_proficiencies) - 1U] = '\0';
     character->origin_feat[sizeof(character->origin_feat) - 1U] = '\0';
     character->tool_proficiencies[sizeof(character->tool_proficiencies) - 1U] = '\0';

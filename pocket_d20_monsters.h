@@ -77,6 +77,11 @@ uint32_t pocket_monster_xp_budget(
     uint8_t party_size,
     PocketEncounterDifficulty difficulty);
 uint16_t pocket_monster_count(Storage* storage);
+void pocket_monster_validate_pack(
+    Storage* storage,
+    uint16_t* total,
+    uint16_t* valid,
+    uint16_t* invalid);
 bool pocket_monster_at(Storage* storage, uint16_t index, PocketMonsterSummary* output);
 uint16_t pocket_monster_query(
     Storage* storage,

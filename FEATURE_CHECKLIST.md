@@ -1,6 +1,6 @@
 # Request checklist
 
-| Requested capability | Version 2.7 status |
+| Requested capability | Version 2.7.1 status |
 |---|---|
 | Flipper FAP d20 icon | `icon.png`, 10x10 1-bit, assigned by `fap_icon` and FBT-validated |
 | Buttons and screen only | Implemented |
@@ -16,12 +16,12 @@
 | Class-and-level spell catalog default | Implemented for annotated records; hold OK for All |
 | Spell slots and Wizard Arcane Recovery | Implemented with Short/Long Rest rules |
 | Feature recharge cadence | Manual, turn, encounter, dawn, Short/Long, or Long |
-| Items, equipment, weapons, attack/damage rolls | Implemented |
+| Items, equipment, weapons, attack/damage rolls | Implemented; standard armor and weapon selections populate supported combat and AC fields |
 | Multi-die individual results plus sum | Implemented with paging; Guidance mode adds a visible d4 to d20 rolls |
 | Animated dice sequence | Implemented with original code-drawn frames |
 | CP/SP/EP/GP/PP | Implemented |
 | Notes, adventure notes, item notes, milestones | Implemented; milestones can level a selected class once |
-| Party initiative presets and turn tracking | Per character with round/current turn, participant HP/AC/conditions, history, and undo |
+| Party initiative presets and turn tracking | Per character with preset HP/AC, round/current turn, negative HP, participant field editor, armed removal, conditions, history, and undo |
 | SD catalogs and custom long-OK text | Implemented for names; Background uses short catalog/long custom |
 | Background catalog in its own SD file | `catalogs/backgrounds.txt` included |
 | Core and add-on option names | Names-only catalogs include packaged and optional add-on selections |
@@ -31,17 +31,18 @@
 | Inventory resources | Containers, carried/equipped weight, capacity, armor/shield AC, attunement, ammo groups, and charges |
 | Catalog diagnostics | Stable-ID validation, duplicate detection, required-field checks, and packaged-asset fallback |
 | Fantasy quest / choices / skill checks / achievements | Data-driven Adventure mode with branches, rewards, flags, achievements, sprite tags, and checkpoints |
-| Old save backward compatibility | Pre-0.8 layouts remain unsupported; verified 0.8 text saves migrate to schema 1 |
-| Stable save schema and migration | Schema 1 frozen; verified 0.8 text saves migrate once and rewrite atomically |
+| Old save backward compatibility | Intentionally unsupported during pre-release development; no migration reader is included |
+| Stable save schema and migration | Current checksummed schema only; migration deferred until a later stable-format decision |
 | Profile portability | Rename, chunked duplicate/export/archive, validated import, and checksum diagnostics |
 | Recoverable prior generation | One previous successful save retained per profile with explicit restore action |
-| Translation and accessibility | Stable zero-allocation UI keys, translation template, and documented display/control conventions |
+| Translation and accessibility | Runtime translation removed for speed; documented high-contrast display and control conventions remain |
 | Separate bestiary application | Dolphin Bestiary is a separate FAP declared in the same manifest with an exclusive source list and asset namespace |
-| Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, and per-record diagnostics |
+| Monster discovery and encounter roles | 340 bundled records, 50-record windows, combinable source/environment/name/challenge/type filters, role weighting, complete OK-opened details, and buffered diagnostics |
 | Custom monster lifecycle | Stable-ID edit, custom-only delete, and atomic rewrite/rollback within the shared index/stat-block framework |
 | Campaign pack manager | On-device selection, per-profile/per-campaign progress, manifest diagnostics, schema, and starter template |
 | Complete structured editors | Full attack-template and grant editors with autosave |
 | Device resilience | Allocation stress runner, SD read-only fallback, unsaved warning, retry control, and published hardware matrix |
 | Asset namespace | Runtime access uses only `APP_ASSETS_PATH`; additions extend the normal streamed catalog/pack files |
+| Cross-FAP navigation | Each application ends with a menu entry that queues the other FAP and exits cleanly |
 
 The expansion catalogs intentionally contain option names and original metadata rather than proprietary descriptions or mechanics. Custom text and notes support owned books, homebrew, errata, and table rulings.

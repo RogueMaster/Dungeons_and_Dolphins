@@ -6,6 +6,7 @@
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
 #include <input/input.h>
+#include <loader/loader.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -195,6 +196,7 @@ static bool bestiary_load_window(BestiaryApp* app) {
         bestiary_status(app, "Not enough memory");
         return false;
     }
+    uint16_t* total_output = app->monster_total_valid ? NULL : &app->monster_total;
     app->window_count = pocket_monster_query(
         app->storage,
         bestiary_filter,
@@ -202,7 +204,7 @@ static bool bestiary_load_window(BestiaryApp* app) {
         app->page_start,
         app->window,
         BESTIARY_WINDOW,
-        &app->monster_total);
+        total_output);
     app->monster_total_valid = 1U;
     if(app->page_start >= app->monster_total && app->page_start) {
         app->page_start =
@@ -215,7 +217,7 @@ static bool bestiary_load_window(BestiaryApp* app) {
             app->page_start,
             app->window,
             BESTIARY_WINDOW,
-            &app->monster_total);
+            NULL);
     }
     return true;
 }
@@ -330,9 +332,10 @@ static void bestiary_draw_home(Canvas* canvas, BestiaryApp* app) {
     const char* rows[] = {
         browse, search, cr, type, source, environment, role, party_level, party_size,
         difficulty, encounter_environment, encounter_role, repeats, template_row,
-        "Generate Encounter", "Pack Diagnostics", "Create Custom Monster"};
+        "Generate Encounter", "Pack Diagnostics", "Create Custom Monster",
+        "Open Dungeons & Dolphins"};
     bestiary_header(canvas, "Dolphin Bestiary", app->status);
-    bestiary_rows(canvas, app, rows, 17U);
+    bestiary_rows(canvas, app, rows, 18U);
 }
 
 static void bestiary_draw_list(Canvas* canvas, BestiaryApp* app) {
@@ -354,16 +357,17 @@ static void bestiary_draw_list(Canvas* canvas, BestiaryApp* app) {
 static void bestiary_draw_detail(Canvas* canvas, BestiaryApp* app) {
     if(!app->detail) return;
     PocketMonsterDetail* m = app->detail;
-    char cr[8], core[64], abilities[64], source[40], role[32];
+    char cr[8], core[64], type[48], abilities[64], source[40], role[32];
     bestiary_cr(cr, sizeof(cr), m->summary.cr_eighths);
     snprintf(core, sizeof(core), "CR %s XP %lu AC%u HP%u", cr,
              (unsigned long)m->summary.xp, m->summary.armor_class, m->summary.hit_points);
     snprintf(abilities, sizeof(abilities), "S%d D%d C%d I%d W%d C%d",
              m->abilities[0], m->abilities[1], m->abilities[2], m->abilities[3],
              m->abilities[4], m->abilities[5]);
+    snprintf(type, sizeof(type), "Type: %s", m->summary.type);
     snprintf(source, sizeof(source), "Source: %s", m->summary.source);
     snprintf(role, sizeof(role), "Role: %s", m->summary.role);
-    const char* rows[] = {core, m->summary.type, source, role, m->size_alignment, m->speed,
+    const char* rows[] = {core, type, source, role, m->size_alignment, m->speed,
         abilities, m->skills, m->defenses, m->senses, m->languages, m->traits, m->actions,
         m->extra};
     bestiary_header(canvas, m->summary.name, app->status);
@@ -390,7 +394,11 @@ static void bestiary_draw_encounter(Canvas* canvas, BestiaryApp* app) {
 static void bestiary_draw_diagnostics(Canvas* canvas, BestiaryApp* app) {
     char total[32], valid[32], invalid[32], bundled[32], custom[32], recovered[32],
         rolled_back[32], heap[32];
-    snprintf(total, sizeof(total), "Records: %u", pocket_monster_count(app->storage));
+    snprintf(
+        total,
+        sizeof(total),
+        "Records: %u",
+        app->diagnostic_valid + app->diagnostic_invalid);
     snprintf(valid, sizeof(valid), "Valid: %u", app->diagnostic_valid);
     snprintf(invalid, sizeof(invalid), "Invalid: %u", app->diagnostic_invalid);
     snprintf(bundled, sizeof(bundled), "Bundled Pack: v%u", app->bundled_version);
@@ -476,6 +484,15 @@ static void bestiary_begin_text(
     BestiaryEdit target,
     const char* title,
     const char* initial) {
+    if(!app->text_input) {
+        app->text_input = text_input_alloc();
+        if(!app->text_input) {
+            bestiary_status(app, "Text input memory low");
+            return;
+        }
+        view_dispatcher_add_view(
+            app->dispatcher, BestiaryViewText, text_input_get_view(app->text_input));
+    }
     app->edit = target;
     app->text_input_active = 1U;
     bestiary_copy(app->edit_buffer, sizeof(app->edit_buffer), initial);
@@ -541,17 +558,8 @@ static void bestiary_diagnose(BestiaryApp* app) {
         app->storage, &app->diagnostic_recovered, &app->diagnostic_rolled_back);
     pocket_monster_pack_versions(
         app->storage, &app->bundled_version, &app->custom_version, &app->custom_present);
-    uint16_t total = pocket_monster_count(app->storage);
-    for(uint16_t i = 0U; i < total; ++i) {
-        PocketMonsterSummary summary;
-        PocketMonsterDetail detail;
-        if(pocket_monster_at(app->storage, i, &summary) &&
-           pocket_monster_load(app->storage, &summary, &detail) &&
-           (detail.present_fields & PocketMonsterRequiredFields) == PocketMonsterRequiredFields)
-            ++app->diagnostic_valid;
-        else
-            ++app->diagnostic_invalid;
-    }
+    pocket_monster_validate_pack(
+        app->storage, NULL, &app->diagnostic_valid, &app->diagnostic_invalid);
     bestiary_enter(app, BestiaryScreenDiagnostics);
     bestiary_status(app, app->diagnostic_invalid ? "Issues found" : "Pack valid");
 }
@@ -622,8 +630,8 @@ static void bestiary_back(BestiaryApp* app) {
 }
 
 static void bestiary_handle_home(BestiaryApp* app, const InputEvent* event) {
-    if(bestiary_move_event(event) && event->key == InputKeyUp) bestiary_move(app, 17U, -1);
-    else if(bestiary_move_event(event) && event->key == InputKeyDown) bestiary_move(app, 17U, 1);
+    if(bestiary_move_event(event) && event->key == InputKeyUp) bestiary_move(app, 18U, -1);
+    else if(bestiary_move_event(event) && event->key == InputKeyDown) bestiary_move(app, 18U, 1);
     else if(bestiary_move_event(event) &&
             (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
@@ -675,6 +683,16 @@ static void bestiary_handle_home(BestiaryApp* app, const InputEvent* event) {
         } else if(app->selection == 14U) bestiary_generate(app);
         else if(app->selection == 15U) bestiary_diagnose(app);
         else if(app->selection == 16U) bestiary_new_custom(app);
+        else if(app->selection == 17U) {
+            Loader* loader = furi_record_open(RECORD_LOADER);
+            loader_enqueue_launch(
+                loader,
+                "/ext/apps/Games/dungeons_and_dolphins.fap",
+                NULL,
+                LoaderDeferredLaunchFlagGui);
+            furi_record_close(RECORD_LOADER);
+            view_dispatcher_stop(app->dispatcher);
+        }
     }
 }
 
@@ -902,11 +920,9 @@ static BestiaryApp* bestiary_alloc(void) {
     view_set_context(app->view, app);
     view_set_draw_callback(app->view, bestiary_draw);
     view_set_input_callback(app->view, bestiary_input);
-    app->text_input = text_input_alloc();
     app->marquee_timer =
         furi_timer_alloc(bestiary_marquee_timer_callback, FuriTimerTypePeriodic, app);
     view_dispatcher_add_view(app->dispatcher, BestiaryViewMain, app->view);
-    view_dispatcher_add_view(app->dispatcher, BestiaryViewText, text_input_get_view(app->text_input));
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     furi_timer_start(app->marquee_timer, furi_ms_to_ticks(BESTIARY_MARQUEE_MS));
     return app;
@@ -917,9 +933,10 @@ static void bestiary_free(BestiaryApp* app) {
     bestiary_release_window(app);
     bestiary_release_detail(app);
     bestiary_release_encounter(app);
-    view_dispatcher_remove_view(app->dispatcher, BestiaryViewText);
+    if(app->text_input)
+        view_dispatcher_remove_view(app->dispatcher, BestiaryViewText);
     view_dispatcher_remove_view(app->dispatcher, BestiaryViewMain);
-    text_input_free(app->text_input);
+    if(app->text_input) text_input_free(app->text_input);
     furi_timer_stop(app->marquee_timer);
     furi_timer_free(app->marquee_timer);
     if(app->input_subscription)

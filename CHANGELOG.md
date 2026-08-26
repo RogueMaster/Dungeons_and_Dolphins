@@ -1,5 +1,25 @@
 # Dungeons & Dolphins changelog
 
+## 2.7.1
+
+- Buffered catalog and structured-grant reads to eliminate hundreds or thousands of one-byte SD operations.
+- Stopped catalog scans after filling the current 50-record page and detecting one additional match.
+- Replaced nine catalog heap allocations with one bounded allocation and released it before autosave and grant lookup.
+- Made text and number input modules lazy so they consume no heap during startup or catalog browsing until first used.
+- Skipped redundant full-profile writes when the save-state fingerprint is unchanged.
+- Added automatic standard armor and weapon stat population from the selected inventory name.
+- Changed the new-character alignment default to True Neutral.
+- Removed runtime translation loading and pre-release character-save migration paths.
+- Expanded party presets with Armor Class, current HP, and maximum HP, and copied those values into new combats.
+- Added a hold-OK initiative participant editor for name, roll, modifier, Armor Class, current/maximum HP, conditions, and armed deletion.
+- Allowed negative current HP in active initiative combat and direct participant entry.
+- Replaced Bestiary one-byte reads and repeated per-monster diagnostics with buffered reads and one-pass pack validation.
+- Cached Bestiary filter totals across page changes and stopped page reads as soon as the requested window is full.
+- Added reciprocal final-menu launch entries between Dungeons & Dolphins and Dolphin Bestiary.
+- Clarified the manual save row as Retry Save / Status; ordinary changes continue to autosave.
+- Updated encounter generation to target the selected party-level/size budget without exceeding it, distinguish adjacent difficulty tiers, and cap creatures at two per party member.
+- Advanced the current pre-release character format to schema 2 for complete party presets; older schemas remain intentionally unsupported.
+
 ## 2.7
 
 - Expanded the species/lineage selector to 103 names, including ancestry-specific Dragonborn, Dwarf, Elf, Genasi, Gnome, Goliath, Halfling, and Tiefling choices.

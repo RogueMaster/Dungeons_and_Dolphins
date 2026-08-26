@@ -15,7 +15,7 @@ Record device serial suffix, SD-card model/capacity, battery level, firmware com
 | DISP-04 | Icon/sprites | Inspect launcher icon, campaign sprites, monster lists, and diagnostics. | 10x10 icon is crisp; rows and monochrome sprites render without corruption. | Pending hardware |
 | SD-01 | Removal while idle | Remove SD on Home, edit a value, navigate through several screens. | App remains responsive, enters read-only fallback, and shows a persistent UNSAVED warning. | Pending hardware |
 | SD-02 | Removal during save | Remove SD immediately after a rapid value change. | Save failure is detected; in-memory state remains usable; no false Saved message appears. | Pending hardware |
-| SD-03 | Retry | Reinsert SD and select Home > Save Now. | Read-only mode clears only after success; pending character state is written and warning disappears. | Pending hardware |
+| SD-03 | Retry | Reinsert SD and select Home > Retry Save / Status. | Read-only mode clears only after success; pending character state is written and warning disappears. | Pending hardware |
 | SD-04 | Removal during reads | Remove SD while opening a catalog, campaign, monster, profile list, and language pack. | Each operation fails with a clear status and returns safely without stale pointers or a crash. | Pending hardware |
 | PWR-01 | Character interruption | Cut power during character temp-file write and again during publish. | Original or new checksummed generation loads; backup restore remains available; no mixed record is accepted. | Pending hardware |
 | PWR-02 | Monster interruption | Cut power during custom block update, index rewrite, and delete. | Transaction recovery completes or rolls back; stable ID survives; bundled records are untouched. | Pending hardware |

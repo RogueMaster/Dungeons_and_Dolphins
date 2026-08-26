@@ -1,6 +1,6 @@
 # Dungeons & Dolphins
 
-Dungeons & Dolphins 2.7 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
+Dungeons & Dolphins 2.7.1 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
 
 - **Dungeons & Dolphins** — character profiles, rules tracking, spells, equipment, notes, dice, combat, initiative, and campaigns.
 - **Dolphin Bestiary** — the monster stat-block browser, custom monsters, diagnostics, and party-level encounter generation.
@@ -19,7 +19,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Immediate autosave after character, stat, spell, feature, item, inventory, currency, journal, party, initiative, or resource changes.
 - Atomic temporary-file publication, retained backup generation, checksum verification, and manual backup restore.
 - Rename, switch, duplicate, export, import, archive, delete, verify, and restore profile actions.
-- Save failures show a persistent UNSAVED warning; Save Now retries SD access.
+- Save failures show a persistent UNSAVED warning; Retry Save / Status retries SD access and otherwise confirms that autosave is current.
 
 ### Character sheet
 
@@ -49,9 +49,9 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Each catalog uses one streamed file. Additional names and annotated rows are appended to the matching normal catalog instead of loading a second overlay.
 - Item and spell pickers stream from SD and retain at most 50 matching records in RAM.
 - Left/Right changes the current 50-record catalog page; buffers are released immediately when the picker closes.
-- Catalog source files, long descriptions, campaigns, and language data are not retained in steady-state RAM.
+- Catalog source files, long descriptions, and campaigns are not retained in steady-state RAM.
 - Annotated spell rows can include level, class associations, school, ritual state, and source category.
-- Optional structured metadata and runtime language packs use bounded allocations with English fallback.
+- Navigation labels are compiled directly into the application; runtime translation tables are intentionally omitted to reduce startup work and heap use.
 
 ### Spellcasting
 
@@ -87,9 +87,10 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 
 ### Initiative, journal, and campaigns
 
-- Per-character party presets with names and initiative modifiers.
+- Per-character party presets with name, initiative modifier, Armor Class, current HP, and maximum HP.
 - Current-character insertion, temporary participants, manual/automatic rolls, sorting, tie reordering, rounds, and current turn.
-- Per-participant HP, Armor Class, and conditions, plus history/undo for turn, HP, and resource mistakes.
+- Per-participant name, roll, modifier, HP, Armor Class, and conditions, plus history/undo for turn, HP, and resource mistakes.
+- Hold OK on an active combat participant to edit every tracked field or remove that participant with two-step confirmation; current HP accepts negative values for damage-before-total tracking.
 - Quick, adventure, item, and milestone notes with completion and class-level advancement.
 - Inventory items can be created from journal entries.
 - Disk-backed campaign manifests, per-profile/per-campaign progress, checkpoints, quest flags, achievements, branches, skill checks, and rewards.
@@ -103,14 +104,16 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Browser pages hold at most 50 summaries; full stat blocks are allocated only while one is open and released on exit.
 - All packaged stat blocks share one streamed section file, reducing first-launch asset deployment and avoiding hundreds of simultaneous file entries.
 - Stat blocks show challenge, XP, Armor Class, HP, type, source, role, size, movement, abilities, skills, defenses, senses, languages, traits, actions, and extra actions.
-- Low, Moderate, and High encounter budgets use party level and party size.
+- Short OK on a browser result opens its complete, scrollable stat block.
+- Low, Moderate, and High encounter budgets use the selected party level and size; generation spends as much of the selected budget as possible without exceeding it and keeps Moderate above Low and High above Moderate.
 - Aquatic, Dungeon, Planar, Urban, Wilderness, or unrestricted encounter environments.
 - Balanced, Horde, and Elite templates, repeated-creature control, and optional Leader, Controller, Skirmisher, Artillery, Brute, or Minion weighting.
 - Custom monster creation and editing preserve stable IDs.
 - Two-step deletion applies only to custom records; packaged records are read-only.
 - Atomic shared-index/stat-block replacement, transaction recovery, backup, and rollback for custom edits.
-- Pack diagnostics report valid/invalid records, pack versions, recovery results, and free heap.
-- Encounter generation performs one streaming eligibility pass, retains at most sixteen randomized candidates, and releases that pool immediately after generation.
+- Pack diagnostics report valid/invalid records, pack versions, recovery results, and free heap using one buffered stat-block pass.
+- Encounter generation performs one streaming eligibility pass, retains at most sixteen randomized candidates, limits total creatures to two per party member, and releases that pool immediately after generation.
+- Each FAP has a final menu entry that exits cleanly and queues the other installed FAP.
 
 ### Interface and performance changes in 2.7
 
@@ -122,6 +125,20 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Profile autosaves reuse the known profile path and avoid rescanning the profile directory after every change.
 - Removed separate custom catalog overlay scans and consolidated monster stat blocks into the normal streamed pack files.
 - Reworked encounter generation to avoid repeated full-index scans and interface stalls.
+
+### Performance and inventory hotfixes in 2.7.1
+
+- Replaced byte-at-a-time catalog and grant-file reads with buffered SD reads.
+- Catalog pages stop scanning after the next page is proven to exist instead of counting every remaining record.
+- A catalog uses one bounded heap block rather than nine independent allocations, reducing heap fragmentation.
+- Catalog memory is released before grant lookup and autosave, lowering peak memory during item, class, species, background, and feat selection.
+- Text and number input modules are allocated only when opened; both FAPs avoid their startup allocation.
+- Unchanged-state save calls are skipped after a lightweight fingerprint check.
+- Standard armor and weapon choices populate weight, damage, damage type, supported properties, ammunition group, versatile die, Armor Class base, Dexterity cap, and shield bonus.
+- New characters default to True Neutral.
+- Runtime translation loading and pre-release save migration code were removed.
+- Bestiary reads now use 512-byte buffering, cached browse counts, early page completion, and one-pass diagnostics instead of repeated per-record scans.
+- Character saves use schema 2; older pre-release schemas are intentionally rejected without migration.
 
 ## Controls
 
@@ -155,4 +172,4 @@ The manifest uses explicit `sources=[...]` lists so each FAP excludes the other 
 
 ## Hardware status
 
-Both FAP targets are compiler-validated against the stated RogueMaster release before packaging. Physical-device results remain unclaimed until the cases in `DEVICE_TEST_MATRIX.md` are completed on hardware.
+The included host-side rules, parser, catalog, checksum, schema, filter, and packaging checks pass. This source-only archive does not claim a fresh RogueMaster compilation or physical-device result; those remain pending recipient testing.
