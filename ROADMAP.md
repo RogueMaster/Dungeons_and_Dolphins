@@ -1,33 +1,33 @@
 # Dungeons & Dolphins roadmap
 
-This document contains planned work only. Implemented work belongs in `CHANGELOG.md`. A roadmap item moves to the changelog only after its code, tests, documentation, and RogueMaster build verification are complete.
+This document contains planned work only. Implemented work belongs in `CHANGELOG.md`. Each release is ordered by play value and memory/SD impact.
 
-## 3.1 — encounter workspace
+## 3.3 — pack lifecycle
 
-- Add named, reusable encounter files with duplicate, rename, archive, and resume controls.
-- Add configurable role targets and composition warnings for leader support, artillery protection, and excessive minion density.
-- Add a non-destructive difficulty simulator for changing party size/level and creature quantities before committing an encounter.
+- Add transactional uninstall and export for installed campaign and monster packs with an explicit stable-ID conflict preview.
+- Add an on-device manifest preview showing record count, compatibility range, source files, and destination before installation.
+- Add installed-pack rename and notes fields while keeping every text file manually editable and fully offline.
 
-## 3.2 — compendium operations
+## 3.4 — low-latency state
 
-- Add on-device install, enable/disable, and uninstall controls for user monster packs without touching bundled assets.
-- Add custom-monster export and pack merge with stable-ID conflict review.
-- Add monster favorites, recent records, and saved filter presets using disk-backed indexes.
+- Persist compact summary-ID indexes so favorites, recents, and saved encounters can reopen without rebuilding unchanged caches after app launch.
+- Batch adjacent Bestiary state updates into one transactional write while flushing immediately on app switch or exit.
+- Add a low-memory diagnostics page for current heap headroom, peak transient allocation, cache sizes, and SD transaction recovery.
 
-## 3.3 — campaign state engine
+## 3.5 — campaign state engine
 
 - Add typed campaign variables and conditional choice visibility without embedding executable scripts.
-- Add campaign objectives that synchronize selected scene events with journal milestones and inventory rewards.
-- Add campaign import/export with manifest preview, compatibility checks, and conflict-safe progress mapping.
+- Add campaign objectives synchronized with journal milestones and inventory rewards.
+- Add conflict-safe campaign progress import/export with manifest compatibility preview.
 
-## 3.4 — accessibility and controls
+## 3.6 — accessibility and controls
 
-- Add compact, standard, and large-text row layouts with per-screen truncation previews.
+- Add compact, standard, and large-text row layouts with per-screen previews.
 - Add configurable long-press shortcuts and left/right behavior with a reset-to-default control map.
-- Add a low-memory UI diagnostics page showing row widths, heap headroom, and input-module allocation state.
+- Add a reduced-motion option that stops marquee and dice animation timers on static screens.
 
-## 3.5 — stable pack platform
+## 3.7 — encounter history
 
-- Add a version-to-version migration harness that treats schema 2 as the permanent baseline, retains rollback snapshots, and verifies golden profile files.
-- Add checksummed catalog, campaign, and monster pack manifests with transactional installation.
-- Require a release qualification gate combining host tests, RogueMaster validation, stress-test evidence, and a signed physical-device matrix.
+- Add a compact completed-encounter log with date, rounds, party state, and surviving opponents.
+- Allow a completed encounter to be cloned into a new named encounter without retaining its old initiative state.
+- Add streamed encounter-history export and pruning controls with no full-history RAM allocation.

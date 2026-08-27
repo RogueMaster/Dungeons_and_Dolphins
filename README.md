@@ -6,7 +6,7 @@
 
 # Dungeons & Dolphins
 
-Dungeons & Dolphins 3.0.2 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
+Dungeons & Dolphins 3.2.5 is an offline, 5E-compatible Flipper Zero toolkit for RogueMaster. One source tree and one `application.fam` build two independent FAPs with explicit source lists:
 
 - **Dungeons & Dolphins** — character profiles, rules tracking, spells, equipment, notes, dice, combat, initiative, and campaigns.
 - **Dolphin Bestiary** — the monster stat-block browser, custom monsters, diagnostics, and party-level encounter generation.
@@ -18,16 +18,16 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 ### Character profiles and saves
 
 - Dynamically indexed profiles with no fixed profile-count limit.
-- One readable, versioned, checksummed text save per character in the FAP's persistent app-data `profiles/` directory.
+- One readable, versioned, manually editable text save per character in the FAP's persistent app-data `profiles/` directory.
 - Save names use `ch_{id}_{characterName}_{characterLevel}.txt`.
 - Main and newly created heroes remain visible in Characters even when the first write fails.
 - Transactional new-character creation restores the previous active character after a failed write.
-- Immediate autosave after character, stat, spell, feature, item, inventory, currency, journal, party, initiative, or resource changes.
-- Atomic temporary-file publication, retained backup generation, checksum verification, and manual backup restore.
+- Autosave after character, stat, spell, feature, item, inventory, currency, journal, party, initiative, or resource changes. Rapid edits within 450 ms are coalesced into one profile write; leaving a screen, switching profiles/apps, or exiting flushes immediately.
+- Atomic temporary-file publication, retained backup generation, structural reload validation, and manual backup restore.
 - First-run migration relocates legacy asset-path profiles into app data without replacing an existing profile ID or file. Each legacy source is deleted only after its app-data destination is safely present.
 - Failed, corrupt, or unsupported profile loads are preserved and cannot trigger a blank-profile overwrite.
-- Schema 2 is the compatibility baseline; future readers retain explicit older-schema branches and migrate only after a validated load.
-- Rename, switch, duplicate, export, import, archive, delete, verify, and restore profile actions.
+- Schema 3 is the current writer and schema 2 is the permanent compatibility baseline. A validated schema-2 profile is snapshotted, transactionally rewritten, reloaded, and automatically restored if publication fails.
+- Rename, switch, duplicate, export, import, archive, delete, verify, backup restore, and migration rollback profile actions.
 - Save failures show a persistent UNSAVED warning; Retry Save / Status retries SD access and otherwise confirms that autosave is current.
 
 ### Character sheet
@@ -99,30 +99,38 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 ### Initiative, journal, and campaigns
 
 - Per-character party presets with name, initiative modifier, Armor Class, current HP, and maximum HP.
-- Current-character insertion, temporary participants, manual/automatic rolls, sorting, tie reordering, rounds, and current turn.
-- Per-participant name, roll, modifier, HP, Armor Class, and conditions, plus history/undo for turn, HP, and resource mistakes.
+- Bestiary **Add to Initiative** is available from individual monsters, generated encounters, and saved encounters. It launches `/ext/apps/Games/dungeons_and_dolphins.fap` with args in the form `initiative;Name,HP,AC;...`; Dungeons & Dolphins loads the current character, appends those monsters to its saved Party Roster, and opens the Initiative screen. Generated encounter quantities are expanded into one roster entry per monster instance.
+- Generated encounters expose a visible **Save Encounter** action that prompts for a name and stores the encounter for later resume, rename, duplicate, archive, delete, or Add to Initiative actions.
+- Current-character insertion, temporary participants, **Roll for All**, individual automatic rolls, hold-OK manual d20 entry, sorting, tie reordering, rounds, and current turn.
+- During active combat, short Back moves to the previous turn (wrapping to the prior round when applicable) and hold Back returns to the Initiative menu.
+- Per-participant name, roll, modifier, HP, Armor Class, and conditions; hold OK opens the participant editor.
 - Hold OK on an active combat participant to edit every tracked field or remove that participant with two-step confirmation; current HP accepts negative values for damage-before-total tracking.
 - Quick, adventure, item, and milestone notes with completion and class-level advancement.
 - Inventory items can be created from journal entries.
 - Disk-backed campaign manifests, per-profile/per-campaign progress, checkpoints, quest flags, achievements, branches, skill checks, and rewards.
 - Campaign diagnostics detect incompatible manifests, missing scenes, duplicate IDs, and broken links.
+- Transactional campaign packs install from an app-data inbox and can be enabled or disabled on device. Only the enabled app-data index is rebuilt; packaged campaigns remain read-only.
 
 ### Dolphin Bestiary
 
 - Separate FAP and asset namespace, so the character tracker never loads monster tables or encounter state.
 - 340 unique packaged monster records.
 - Monster browser filters combine name, maximum challenge, creature type, source category, environment, and encounter role.
-- Browser pages hold at most 20 summaries; full stat blocks are allocated only while one is open and released on exit.
+- Favorites, 20 recent records, and up to eight named filter presets provide fast repeat access without loading the catalog into memory.
+- Browser pages hold at most 35 summaries; full stat blocks are allocated only while one is open and released on exit.
 - All packaged stat blocks share one streamed section file, reducing first-launch asset deployment and avoiding hundreds of simultaneous file entries.
 - Stat blocks show challenge, XP, Armor Class, HP, type, source, role, size, movement, abilities, skills, defenses, senses, languages, traits, actions, and extra actions.
 - Short OK on a browser result opens its complete, scrollable stat block.
 - Short OK on a generated-encounter monster opens that monster's complete stat block; short OK on any stat row then opens the attribute in a full-screen wrapped reader.
 - Low, Moderate, and High encounter budgets use the selected party level and size; generation spends as much of the selected budget as possible without exceeding it and keeps Moderate above Low and High above Moderate.
+- The difficulty simulator changes party level, party size, and individual creature quantities in place, then recomputes XP and tier without allocating another encounter.
+- Named encounters are plain-text, replaceable by name, resumable through stable monster IDs, and deletable from the saved-encounter list.
 - Aquatic, Dungeon, Planar, Urban, Wilderness, or unrestricted encounter environments.
 - Balanced, Horde, and Elite templates, repeated-creature control, and optional Leader, Controller, Skirmisher, Artillery, Brute, or Minion weighting.
 - Custom monster creation and editing preserve stable IDs.
 - A visible Delete Custom Monster row uses two-step confirmation; packaged records are read-only.
 - Custom records use atomic `custom_index.txt` and `custom_statblocks.txt` files, while packaged `index.txt` and `statblocks.txt` remain untouched.
+- Transactional monster packs install from an app-data inbox and expose enable/disable controls. Enabled installed records form a third streamed layer after packaged and directly created custom monsters.
 - Custom records are stored under persistent app data. A legacy asset-path custom pair is relocated on first launch without replacing an existing app-data pair, and its legacy files are deleted only after the persistent pair is safely present.
 - Browser, filter, diagnostic, and encounter scans stream the packaged and custom layers together without retaining either complete table in RAM.
 - Transaction recovery, backup, rollback, and orphan cleanup apply only to the custom layer.
@@ -134,7 +142,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 
 - Short Back from Classes, Spells, Features/Perks, and Inventory returns to the screen that opened that list instead of reopening the last record.
 - Long Back returns directly to Main from ordinary application screens; long Back on Main exits.
-- Selected long rows scroll horizontally instead of ending in an ellipsis.
+- Selected long rows scroll horizontally instead of ending in an ellipsis, with up to 24 characters shown per scrolling window where the display permits.
 - Currency values open a numeric editor with short OK; hold OK opens direct number entry for Vitals and other editable numerical settings.
 - Both applications defer catalog counts and large-file scans until the relevant browser opens.
 - Profile autosaves reuse the known profile path and avoid rescanning the profile directory after every change.
@@ -180,7 +188,7 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Moved writable character profiles, campaign progress, and custom monster packs to persistent app data so FAP asset deployment cannot erase them.
 - Added non-overwriting legacy migration from the former asset locations while retaining the original files as recovery copies.
 - Prevented failed or unsupported character loads from being replaced with a blank character during startup, switching, restore, import, autosave, or exit.
-- Streamed packaged and custom monsters through the same complete result count with 20-record pages.
+- Streamed packaged and custom monsters through the same complete result count with 35-record pages.
 - Added custom-stat fallback for records created by older combined packs so their stat block and custom-only edit/delete controls remain reachable.
 
 ### Asset/data separation repair in 3.0.2
@@ -190,6 +198,22 @@ Both applications use only the screen, buttons, and SD card. No network or exter
 - Custom campaigns now stream from `APP_DATA_PATH` alongside bundled campaigns from `APP_ASSETS_PATH`.
 - Custom monsters continue to stream as a second layer after every packaged monster, so adding a custom record never replaces or hides the bundled Bestiary.
 - Removed each legacy mutable source only after its persistent destination was safely published; existing app-data records remain authoritative and are never overwritten.
+
+### SD and heap performance pass in 3.0.3
+
+- Character profiles, profile metadata, campaign indexes, campaign progress, and campaign scene files use 512-byte buffered readers rather than one SD call per byte.
+- Campaign indexes are scanned once into compact record-offset caches; counts and ID lookups reuse those offsets, and diagnostics perform one streamed index pass with in-memory duplicate checks.
+- Unfiltered Bestiary pages seek through cached packaged/custom summary offsets. Monster details use compact hashed section offsets and verify the exact stable ID before parsing the stat block.
+- Rapid consecutive character edits share a 450 ms one-shot autosave window. Screen exit, profile operations, reciprocal app launch, and application shutdown still synchronously flush pending data.
+- Host stress coverage fragments the heap before maximum spell/inventory growth, monster detail/encounter allocation, and 300 repeated character/Bestiary lifecycle switches, checking both peak usage and complete release.
+
+### Migration, packs, and encounter workspace in 3.1
+
+- The schema-2 compatibility reader now upgrades to schema 3 only after a verified rollback snapshot has been published. The upgraded file is reloaded before success is reported, and any injected publish failure restores the original.
+- Campaign and monster packs install from separate app-data inboxes after manifest, format, and stable-ID checks. Enable/disable controls rebuild only the app-data enabled layer.
+- Packaged records remain first, directly created custom records remain editable as the second layer, and enabled installed-pack records are streamed as a read-only third layer.
+- Stable-ID summary hashes let favorites, recent records, and resumed encounters seek to a small set of candidate offsets rather than reopen every monster row.
+- Named encounters, saved filters, favorites, and recents use small editable line records and do not remain allocated while ordinary browsing is active.
 
 ## Controls
 
@@ -209,8 +233,8 @@ Packaged reference files remain in the read-only FAP asset namespaces:
 
 Writable user state uses the firmware-managed persistent app-data namespaces:
 
-- Character profiles, exports, archives, custom campaigns, and campaign progress: `/ext/apps_data/dungeons_and_dolphins/`
-- Custom monster index and stat blocks: `/ext/apps_data/dolphin_bestiary/`
+- Character profiles, exports, archives, custom campaigns, campaign progress, and installed campaign packs: `/ext/apps_data/dungeons_and_dolphins/`
+- Custom monsters, installed monster packs, favorites, recents, filters, and saved encounters: `/ext/apps_data/dolphin_bestiary/`
 
 Catalog additions made manually on the SD card are appended to the matching normal asset file, such as `catalogs/spells.txt`, `catalogs/classes.txt`, or `catalogs/items.txt`. On-device custom character text remains inside its character save. Packaged monster summaries and stat blocks use asset files `monsters/index.txt` and `monsters/statblocks.txt`; on-device custom monsters use app-data files `monsters/custom_index.txt` and `monsters/custom_statblocks.txt`. Character saves retain the requested `ch_{id}_{name}_{level}.txt` format beneath the app-data `profiles/` directory.
 
@@ -228,4 +252,4 @@ The manifest uses explicit `sources=[...]` lists so each FAP excludes the other 
 
 ## Hardware status
 
-The included host-side rules, parser, catalog, checksum, schema, filter, and packaging checks pass. This source-only archive does not claim a fresh RogueMaster compilation or physical-device result; those remain pending recipient testing.
+The included host-side rules, parser, catalog, editable-text, schema, filter, and packaging checks pass. This source-only archive does not claim a fresh RogueMaster compilation or physical-device result; those remain pending recipient testing.

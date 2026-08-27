@@ -1,5 +1,7 @@
 #include "pocket_d20.h"
 #include "pocket_d20_campaigns.h"
+#include "pocket_d20_handoff.h"
+#include "pocket_d20_packs.h"
 #include "pocket_d20_rules.h"
 #include "pocket_d20_storage.h"
 
@@ -15,14 +17,17 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TAG "PocketD20"
-#define POCKET_D20_MAX_GENERIC_ROLLS 20U
+#define TAG                              "PocketD20"
+#define POCKET_D20_MAX_GENERIC_ROLLS     20U
 #define POCKET_D20_DICE_ANIMATION_FRAMES 8U
-#define POCKET_D20_DICE_ANIMATION_EVENT 0xD120U
-#define POCKET_D20_LONG_BACK_EVENT 0xD121U
-#define POCKET_D20_MAX_CATALOG_ENTRIES 50U
-#define POCKET_D20_SPELL_PAGE_ENTRIES 10U
-#define POCKET_D20_MARQUEE_MS 350U
+#define POCKET_D20_DICE_ANIMATION_EVENT  0xD120U
+#define POCKET_D20_LONG_BACK_EVENT       0xD121U
+#define POCKET_D20_AUTOSAVE_EVENT        0xD122U
+#define POCKET_D20_MAX_CATALOG_ENTRIES   50U
+#define POCKET_D20_SPELL_PAGE_ENTRIES    10U
+#define POCKET_D20_MARQUEE_MS            350U
+#define POCKET_D20_AUTOSAVE_MS           450U
+#define POCKET_D20_FILE_READ_BUFFER      512U
 
 typedef enum {
     PocketViewMain,
@@ -63,6 +68,7 @@ typedef enum {
     PocketScreenInitiativeEdit,
     PocketScreenCampaigns,
     PocketScreenCampaignDiagnostics,
+    PocketScreenCampaignPacks,
     PocketScreenAdventure,
     PocketScreenMonsters,
     PocketScreenMonsterList,
@@ -239,6 +245,14 @@ typedef enum {
 } PocketNumberContext;
 
 typedef struct {
+    File* file;
+    uint8_t buffer[POCKET_D20_FILE_READ_BUFFER];
+    uint16_t position;
+    uint16_t count;
+    uint8_t eof;
+} PocketFileReader;
+
+typedef struct {
     Gui* gui;
     Storage* storage;
     ViewDispatcher* dispatcher;
@@ -246,6 +260,7 @@ typedef struct {
     TextInput* text_input;
     NumberInput* number_input;
     FuriTimer* dice_timer;
+    FuriTimer* autosave_timer;
 
     PocketSaveData data;
     PocketProfileState profiles;
@@ -267,7 +282,7 @@ typedef struct {
     uint16_t catalog_page_size;
     uint16_t catalog_return_selection;
     void* catalog_storage;
-    char(*catalog_entries)[POCKET_D20_NAME_LEN];
+    char (*catalog_entries)[POCKET_D20_NAME_LEN];
     uint8_t* catalog_levels;
     uint16_t* catalog_class_masks;
     uint8_t* catalog_has_metadata;
@@ -298,6 +313,8 @@ typedef struct {
     uint32_t profile_action_id;
     PocketAdventureScene* adventure_scene;
     uint16_t campaign_count;
+    uint16_t campaign_pack_count;
+    char campaign_pack_rows[17][48];
     PocketCampaignSummary campaign_active;
     uint8_t campaign_active_valid;
     PocketCampaignDiagnostics campaign_diagnostics;
@@ -306,6 +323,7 @@ typedef struct {
     uint8_t active_profile_loaded;
     uint8_t storage_read_only;
     uint8_t storage_unsaved;
+    uint8_t autosave_pending;
     uint16_t migrated_profile_files;
     uint16_t migrated_campaign_files;
     uint16_t storage_failure_count;
@@ -351,6 +369,7 @@ static void pocket_adventure_release(PocketD20App* app);
 static bool pocket_adventure_load(PocketD20App* app);
 static void pocket_release_text_input(PocketD20App* app);
 static void pocket_release_number_input(PocketD20App* app);
+static bool pocket_flush_save(PocketD20App* app, bool report);
 static void pocket_history_push(
     PocketD20App* app,
     uint8_t kind,
@@ -361,29 +380,50 @@ static void pocket_history_push(
 static uint8_t pocket_marquee_offset = 0U;
 
 static const char* const pocket_home_items[] = {
-    "Characters", "Character", "Vitals", "Abilities & Saves", "Skills",
-    "Magic & Spells", "Features & Perks", "Inventory", "Currency",
-    "Inventory Resources", "Journal", "Adventure", "Combat", "Initiative",
-    "Dice Roller", "Retry Save / Status", "Open Dolphin Bestiary",
+    "Characters",
+    "Character",
+    "Vitals",
+    "Abilities & Saves",
+    "Skills",
+    "Magic & Spells",
+    "Features & Perks",
+    "Inventory",
+    "Currency",
+    "Inventory Resources",
+    "Journal",
+    "Adventure",
+    "Combat",
+    "Initiative",
+    "Dice Roller",
+    "Retry Save / Status",
+    "Open Dolphin Bestiary",
 };
 
 static const char* const pocket_profile_actions[] = {
-    "Switch / Open", "Rename Active", "Duplicate", "Export", "Import First Export",
-    "Archive", "Delete", "Verify Save", "Restore Backup",
+    "Switch / Open",
+    "Rename Active",
+    "Duplicate",
+    "Export",
+    "Import First Export",
+    "Archive",
+    "Delete",
+    "Verify Save",
+    "Restore Backup",
+    "Rollback Migration",
 };
 
 static const uint8_t pocket_die_choices[] = {4U, 6U, 8U, 10U, 12U, 20U, 100U};
 static const uint8_t pocket_damage_die_choices[] = {4U, 6U, 8U, 10U, 12U};
-static const char* const pocket_roll_mode_names[] = {
-    "Normal", "Advantage", "Disadvantage", "Guidance"};
+static const char* const pocket_roll_mode_names[] =
+    {"Normal", "Advantage", "Disadvantage", "Guidance"};
 static const char* const pocket_attack_ability_names[] = {"Auto", "Strength", "Dexterity", "Best"};
-static const char* const pocket_recharge_names[] = {
-    "Manual", "Turn", "Encounter", "Dawn", "Short/Long", "Long"};
-static const char* const pocket_attack_template_type_names[] = {
-    "Unarmed", "Spell Attack", "Saving Throw", "Custom"};
+static const char* const pocket_recharge_names[] =
+    {"Manual", "Turn", "Encounter", "Dawn", "Short/Long", "Long"};
+static const char* const pocket_attack_template_type_names[] =
+    {"Unarmed", "Spell Attack", "Saving Throw", "Custom"};
 static const char* const pocket_size_names[] = {"Tiny", "Small", "Medium", "Large"};
-static const char* const pocket_spellcasting_mode_names[] = {
-    "None", "Full", "Half", "Third", "Pact", "Spell Points", "Custom"};
+static const char* const pocket_spellcasting_mode_names[] =
+    {"None", "Full", "Half", "Third", "Pact", "Spell Points", "Custom"};
 static const char* const pocket_resource_formula_names[] = {"Manual", "PB", "Ability"};
 #if 0 /* v2.6: monster UI moved to the separate Dolphin Bestiary FAP. */
 static const char* const pocket_monster_type_names[] = {
@@ -398,21 +438,52 @@ static const char* const pocket_monster_role_names[] = {
 static const char* const pocket_encounter_template_names[] = {"Balanced", "Horde", "Elite"};
 #endif
 static const char* const pocket_spell_school_names[] = {
-    "Any", "Abjuration", "Conjuration", "Divination", "Enchantment",
-    "Evocation", "Illusion", "Necromancy", "Transmutation"};
+    "Any",
+    "Abjuration",
+    "Conjuration",
+    "Divination",
+    "Enchantment",
+    "Evocation",
+    "Illusion",
+    "Necromancy",
+    "Transmutation"};
 
 /* Group the standard skills by governing ability without changing their save indexes. */
 static const uint8_t pocket_skill_display_order[POCKET_D20_SKILL_COUNT] = {
-    3U,                    /* STR: Athletics */
-    0U, 15U, 16U,         /* DEX: Acrobatics, Sleight of Hand, Stealth */
-    2U, 5U, 8U, 10U, 14U, /* INT: Arcana, History, Investigation, Nature, Religion */
-    1U, 6U, 9U, 11U, 17U, /* WIS: Animal Handling, Insight, Medicine, Perception, Survival */
-    4U, 7U, 12U, 13U,     /* CHA: Deception, Intimidation, Performance, Persuasion */
+    3U, /* STR: Athletics */
+    0U,
+    15U,
+    16U, /* DEX: Acrobatics, Sleight of Hand, Stealth */
+    2U,
+    5U,
+    8U,
+    10U,
+    14U, /* INT: Arcana, History, Investigation, Nature, Religion */
+    1U,
+    6U,
+    9U,
+    11U,
+    17U, /* WIS: Animal Handling, Insight, Medicine, Perception, Survival */
+    4U,
+    7U,
+    12U,
+    13U, /* CHA: Deception, Intimidation, Performance, Persuasion */
 };
 
 static const char* const pocket_catalog_classes[] = {
-    "Artificer", "Barbarian", "Bard", "Cleric", "Druid", "Fighter", "Monk",
-    "Paladin", "Ranger", "Rogue", "Sorcerer", "Warlock", "Wizard"};
+    "Artificer",
+    "Barbarian",
+    "Bard",
+    "Cleric",
+    "Druid",
+    "Fighter",
+    "Monk",
+    "Paladin",
+    "Ranger",
+    "Rogue",
+    "Sorcerer",
+    "Warlock",
+    "Wizard"};
 
 static const PocketBuiltinSubclass pocket_catalog_subclasses[] = {
     {"Path of the Berserker", PocketClassMaskBarbarian},
@@ -470,19 +541,45 @@ static const char* const pocket_catalog_backgrounds[] = {
 
 static const char* const pocket_catalog_species[] = {
     "Aasimar",
-    "Black Dragonborn", "Blue Dragonborn", "Brass Dragonborn", "Bronze Dragonborn",
-    "Copper Dragonborn", "Gold Dragonborn", "Green Dragonborn", "Red Dragonborn",
-    "Silver Dragonborn", "White Dragonborn",
-    "Dwarf", "Drow Elf", "High Elf", "Wood Elf", "Forest Gnome", "Rock Gnome",
-    "Cloud Giant Goliath", "Fire Giant Goliath", "Frost Giant Goliath",
-    "Hill Giant Goliath", "Stone Giant Goliath", "Storm Giant Goliath",
-    "Halfling", "Human", "Orc", "Abyssal Tiefling", "Chthonic Tiefling",
+    "Black Dragonborn",
+    "Blue Dragonborn",
+    "Brass Dragonborn",
+    "Bronze Dragonborn",
+    "Copper Dragonborn",
+    "Gold Dragonborn",
+    "Green Dragonborn",
+    "Red Dragonborn",
+    "Silver Dragonborn",
+    "White Dragonborn",
+    "Dwarf",
+    "Drow Elf",
+    "High Elf",
+    "Wood Elf",
+    "Forest Gnome",
+    "Rock Gnome",
+    "Cloud Giant Goliath",
+    "Fire Giant Goliath",
+    "Frost Giant Goliath",
+    "Hill Giant Goliath",
+    "Stone Giant Goliath",
+    "Storm Giant Goliath",
+    "Halfling",
+    "Human",
+    "Orc",
+    "Abyssal Tiefling",
+    "Chthonic Tiefling",
     "Infernal Tiefling"};
 
 static const char* const pocket_catalog_alignments[] = {
-    "Lawful Good", "Neutral Good", "Chaotic Good",
-    "Lawful Neutral", "True Neutral", "Chaotic Neutral",
-    "Lawful Evil", "Neutral Evil", "Chaotic Evil"};
+    "Lawful Good",
+    "Neutral Good",
+    "Chaotic Good",
+    "Lawful Neutral",
+    "True Neutral",
+    "Chaotic Neutral",
+    "Lawful Evil",
+    "Neutral Evil",
+    "Chaotic Evil"};
 
 static const char* const pocket_catalog_feats[] = {
     "Alert",
@@ -512,12 +609,27 @@ static const PocketBuiltinSpell pocket_catalog_spells[] = {
     {"Aura of Life", 4U, PocketClassMaskCleric | PocketClassMaskPaladin},
     {"Bless", 1U, PocketClassMaskCleric | PocketClassMaskPaladin},
     {"Burning Hands", 1U, PocketClassMaskSorcerer | PocketClassMaskWizard},
-    {"Charm Monster", 4U, PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
-    {"Charm Person", 1U, PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
+    {"Charm Monster",
+     4U,
+     PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer |
+         PocketClassMaskWarlock | PocketClassMaskWizard},
+    {"Charm Person",
+     1U,
+     PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer |
+         PocketClassMaskWarlock | PocketClassMaskWizard},
     {"Chromatic Orb", 1U, PocketClassMaskSorcerer | PocketClassMaskWizard},
-    {"Cure Wounds", 1U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin | PocketClassMaskRanger},
-    {"Detect Magic", 1U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin | PocketClassMaskRanger | PocketClassMaskSorcerer | PocketClassMaskWizard},
-    {"Dispel Magic", 3U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
+    {"Cure Wounds",
+     1U,
+     PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin |
+         PocketClassMaskRanger},
+    {"Detect Magic",
+     1U,
+     PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin |
+         PocketClassMaskRanger | PocketClassMaskSorcerer | PocketClassMaskWizard},
+    {"Dispel Magic",
+     3U,
+     PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskPaladin |
+         PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
     {"Dissonant Whispers", 1U, PocketClassMaskBard},
     {"Divine Smite", 1U, PocketClassMaskPaladin},
     {"Dragon's Breath", 2U, PocketClassMaskSorcerer | PocketClassMaskWizard},
@@ -528,13 +640,25 @@ static const PocketBuiltinSpell pocket_catalog_spells[] = {
     {"Guidance", 0U, PocketClassMaskCleric | PocketClassMaskDruid},
     {"Healing Word", 1U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid},
     {"Hex", 1U, PocketClassMaskWarlock},
-    {"Hold Person", 2U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
+    {"Hold Person",
+     2U,
+     PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskSorcerer |
+         PocketClassMaskWarlock | PocketClassMaskWizard},
     {"Ice Knife", 1U, PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWizard},
     {"Identify", 1U, PocketClassMaskBard | PocketClassMaskWizard},
-    {"Invisibility", 2U, PocketClassMaskBard | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
-    {"Light", 0U, PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskSorcerer | PocketClassMaskWizard},
+    {"Invisibility",
+     2U,
+     PocketClassMaskBard | PocketClassMaskSorcerer | PocketClassMaskWarlock |
+         PocketClassMaskWizard},
+    {"Light",
+     0U,
+     PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskSorcerer |
+         PocketClassMaskWizard},
     {"Mage Armor", 1U, PocketClassMaskSorcerer | PocketClassMaskWizard},
-    {"Mage Hand", 0U, PocketClassMaskBard | PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
+    {"Mage Hand",
+     0U,
+     PocketClassMaskBard | PocketClassMaskSorcerer | PocketClassMaskWarlock |
+         PocketClassMaskWizard},
     {"Magic Missile", 1U, PocketClassMaskSorcerer | PocketClassMaskWizard},
     {"Mind Spike", 2U, PocketClassMaskSorcerer | PocketClassMaskWarlock | PocketClassMaskWizard},
     {"Phantasmal Force", 2U, PocketClassMaskBard | PocketClassMaskSorcerer | PocketClassMaskWizard},
@@ -547,20 +671,50 @@ static const PocketBuiltinSpell pocket_catalog_spells[] = {
     {"Starry Wisp", 0U, PocketClassMaskBard | PocketClassMaskDruid},
     {"Summon Dragon", 5U, PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWizard},
     {"Thaumaturgy", 0U, PocketClassMaskCleric},
-    {"Thunderwave", 1U, PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWizard},
+    {"Thunderwave",
+     1U,
+     PocketClassMaskBard | PocketClassMaskDruid | PocketClassMaskSorcerer | PocketClassMaskWizard},
     {"Tsunami", 8U, PocketClassMaskDruid},
     {"Vitriolic Sphere", 4U, PocketClassMaskSorcerer | PocketClassMaskWizard},
 };
 
 static const char* const pocket_catalog_items[] = {
-    "Battleaxe", "Club", "Dagger", "Dart", "Greatclub", "Greataxe", "Greatsword",
-    "Handaxe", "Javelin", "Light Crossbow", "Longbow", "Longsword", "Mace",
-    "Musket", "Pistol", "Quarterstaff", "Rapier", "Shortbow", "Shortsword", "Spear",
-    "Bead of Nourishment", "Cloak of Invisibility", "Elixir of Health", "Energy Bow",
-    "Gloves of Thievery", "Hat of Many Spells", "Potion of Healing",
-    "Potion of Invulnerability", "Potion of Longevity", "Potion of Vitality",
-    "Quarterstaff of the Acrobat", "Rod of Resurrection", "Sending Stones",
-    "Sentinel Shield", "Shield of the Cavalier", "Thunderous Greatclub",
+    "Battleaxe",
+    "Club",
+    "Dagger",
+    "Dart",
+    "Greatclub",
+    "Greataxe",
+    "Greatsword",
+    "Handaxe",
+    "Javelin",
+    "Light Crossbow",
+    "Longbow",
+    "Longsword",
+    "Mace",
+    "Musket",
+    "Pistol",
+    "Quarterstaff",
+    "Rapier",
+    "Shortbow",
+    "Shortsword",
+    "Spear",
+    "Bead of Nourishment",
+    "Cloak of Invisibility",
+    "Elixir of Health",
+    "Energy Bow",
+    "Gloves of Thievery",
+    "Hat of Many Spells",
+    "Potion of Healing",
+    "Potion of Invulnerability",
+    "Potion of Longevity",
+    "Potion of Vitality",
+    "Quarterstaff of the Acrobat",
+    "Rod of Resurrection",
+    "Sending Stones",
+    "Sentinel Shield",
+    "Shield of the Cavalier",
+    "Thunderous Greatclub",
 };
 
 static const char* const pocket_bundled_catalog_paths[PocketCatalogCount] = {
@@ -587,6 +741,33 @@ static void pocket_copy(char* destination, size_t size, const char* source) {
     if(size == 0U) return;
     strncpy(destination, source, size - 1U);
     destination[size - 1U] = '\0';
+}
+
+static void pocket_file_reader_init(PocketFileReader* reader, File* file) {
+    memset(reader, 0, sizeof(*reader));
+    reader->file = file;
+}
+
+static bool pocket_file_read_line(PocketFileReader* reader, char* line, size_t size) {
+    size_t output = 0U;
+    bool consumed = false;
+    while(!reader->eof) {
+        if(reader->position >= reader->count) {
+            reader->count =
+                (uint16_t)storage_file_read(reader->file, reader->buffer, sizeof(reader->buffer));
+            reader->position = 0U;
+            if(!reader->count) {
+                reader->eof = 1U;
+                break;
+            }
+        }
+        char value = (char)reader->buffer[reader->position++];
+        consumed = true;
+        if(value == '\n') break;
+        if(value != '\r' && output + 1U < size) line[output++] = value;
+    }
+    line[output] = '\0';
+    return consumed;
 }
 
 /*
@@ -645,15 +826,12 @@ static bool pocket_catalog_ensure_capacity(PocketD20App* app, uint16_t needed) {
     if(needed > page_limit || app->catalog_storage) return false;
     const size_t capacity = page_limit;
     const size_t bytes =
-        capacity * sizeof(*app->catalog_entries) +
-        capacity * sizeof(*app->catalog_levels) +
+        capacity * sizeof(*app->catalog_entries) + capacity * sizeof(*app->catalog_levels) +
         capacity * sizeof(*app->catalog_class_masks) +
         capacity * sizeof(*app->catalog_has_metadata) +
         capacity * sizeof(*app->catalog_item_categories) +
-        capacity * sizeof(*app->catalog_item_magic) +
-        capacity * sizeof(*app->catalog_schools) +
-        capacity * sizeof(*app->catalog_sources) +
-        capacity * sizeof(*app->catalog_ritual);
+        capacity * sizeof(*app->catalog_item_magic) + capacity * sizeof(*app->catalog_schools) +
+        capacity * sizeof(*app->catalog_sources) + capacity * sizeof(*app->catalog_ritual);
     uint8_t* cursor = malloc(bytes);
     if(!cursor) return false;
     app->catalog_storage = cursor;
@@ -708,6 +886,11 @@ static void pocket_dice_timer_callback(void* context) {
     view_dispatcher_send_custom_event(app->dispatcher, POCKET_D20_DICE_ANIMATION_EVENT);
 }
 
+static void pocket_autosave_timer_callback(void* context) {
+    PocketD20App* app = context;
+    view_dispatcher_send_custom_event(app->dispatcher, POCKET_D20_AUTOSAVE_EVENT);
+}
+
 static void pocket_input_events_callback(const void* value, void* context) {
     PocketD20App* app = context;
     const InputEvent* event = value;
@@ -727,6 +910,11 @@ static void pocket_start_dice_animation(PocketD20App* app, uint8_t count, uint8_
 
 static bool pocket_custom_event_callback(void* context, uint32_t event) {
     PocketD20App* app = context;
+    if(event == POCKET_D20_AUTOSAVE_EVENT) {
+        pocket_flush_save(app, false);
+        pocket_refresh(app);
+        return true;
+    }
     if(event == POCKET_D20_LONG_BACK_EVENT) {
         app->input_module_active = 0U;
         app->edit_target = PocketEditNone;
@@ -754,19 +942,18 @@ static bool pocket_custom_event_callback(void* context, uint32_t event) {
 static uint32_t pocket_data_fingerprint(const PocketSaveData* data) {
     uint32_t hash = 2166136261UL;
     const uint8_t* bytes = (const uint8_t*)data;
-#define POCKET_HASH_BYTES(pointer, length)                 \
-    do {                                                   \
+#define POCKET_HASH_BYTES(pointer, length)                     \
+    do {                                                       \
         const uint8_t* hash_bytes = (const uint8_t*)(pointer); \
         for(size_t hash_i = 0U; hash_i < (length); ++hash_i) { \
-            hash ^= hash_bytes[hash_i];                    \
-            hash *= 16777619UL;                            \
-        }                                                  \
+            hash ^= hash_bytes[hash_i];                        \
+            hash *= 16777619UL;                                \
+        }                                                      \
     } while(false)
     POCKET_HASH_BYTES(bytes, sizeof(*data));
     const PocketCharacter* character = &data->character;
     if(character->spell_count) {
-        POCKET_HASH_BYTES(
-            character->spells, (size_t)character->spell_count * sizeof(PocketSpell));
+        POCKET_HASH_BYTES(character->spells, (size_t)character->spell_count * sizeof(PocketSpell));
         POCKET_HASH_BYTES(character->spell_known, character->spell_count);
         POCKET_HASH_BYTES(character->spell_always_prepared, character->spell_count);
         POCKET_HASH_BYTES(character->spell_free_casts_current, character->spell_count);
@@ -776,14 +963,12 @@ static uint32_t pocket_data_fingerprint(const PocketSaveData* data) {
         POCKET_HASH_BYTES(
             character->features, (size_t)character->feature_count * sizeof(PocketFeature));
     if(character->item_count)
-        POCKET_HASH_BYTES(
-            character->items, (size_t)character->item_count * sizeof(PocketItem));
+        POCKET_HASH_BYTES(character->items, (size_t)character->item_count * sizeof(PocketItem));
     if(character->journal_count)
         POCKET_HASH_BYTES(
             character->journal, (size_t)character->journal_count * sizeof(PocketJournalEntry));
     if(character->grant_count)
-        POCKET_HASH_BYTES(
-            character->grants, (size_t)character->grant_count * sizeof(PocketGrant));
+        POCKET_HASH_BYTES(character->grants, (size_t)character->grant_count * sizeof(PocketGrant));
 #undef POCKET_HASH_BYTES
     return hash;
 }
@@ -795,7 +980,7 @@ static PocketProfileEntry* pocket_active_profile_entry(PocketD20App* app) {
     return NULL;
 }
 
-static bool pocket_save(PocketD20App* app, bool report) {
+static bool pocket_save_now(PocketD20App* app, bool report) {
     if(!app->active_profile_loaded) {
         if(report) pocket_set_status(app, "Profile not loaded");
         return false;
@@ -827,9 +1012,35 @@ static bool pocket_save(PocketD20App* app, bool report) {
         app->storage_unsaved = 1U;
         if(app->storage_failure_count < UINT16_MAX) ++app->storage_failure_count;
     }
-    if(report || !result)
-        pocket_set_status(app, result ? "Saved" : "UNSAVED - SD unavailable");
+    if(report || !result) pocket_set_status(app, result ? "Saved" : "UNSAVED - SD unavailable");
     return result;
+}
+
+static bool pocket_flush_save(PocketD20App* app, bool report) {
+    if(app->autosave_timer) furi_timer_stop(app->autosave_timer);
+    app->autosave_pending = 0U;
+    return pocket_save_now(app, report);
+}
+
+static bool pocket_save(PocketD20App* app, bool report) {
+    if(report) return pocket_flush_save(app, true);
+    if(!app->active_profile_loaded) return false;
+    if(app->storage_read_only) {
+        app->storage_unsaved = 1U;
+        pocket_set_status(app, "UNSAVED - retry SD");
+        return false;
+    }
+    uint32_t fingerprint = pocket_data_fingerprint(&app->data);
+    if(!app->storage_unsaved && fingerprint == app->saved_fingerprint) {
+        if(app->autosave_timer) furi_timer_stop(app->autosave_timer);
+        app->autosave_pending = 0U;
+        return true;
+    }
+    if(!app->autosave_timer) return pocket_save_now(app, false);
+    app->autosave_pending = 1U;
+    furi_timer_stop(app->autosave_timer);
+    furi_timer_start(app->autosave_timer, furi_ms_to_ticks(POCKET_D20_AUTOSAVE_MS));
+    return true;
 }
 
 static uint16_t pocket_profile_count(const PocketD20App* app) {
@@ -850,12 +1061,11 @@ static bool pocket_profile_exists(const PocketD20App* app, uint32_t profile) {
 static bool pocket_profile_include_active(PocketD20App* app) {
     if(pocket_profile_exists(app, app->profiles.active_profile)) return true;
     if(app->profiles.count == app->profiles.capacity) {
-        uint16_t next_capacity = app->profiles.capacity ?
-                                     (uint16_t)(app->profiles.capacity * 2U) : 8U;
+        uint16_t next_capacity = app->profiles.capacity ? (uint16_t)(app->profiles.capacity * 2U) :
+                                                          8U;
         if(next_capacity <= app->profiles.capacity) return false;
-        PocketProfileEntry* resized = realloc(
-            app->profiles.entries,
-            (size_t)next_capacity * sizeof(PocketProfileEntry));
+        PocketProfileEntry* resized =
+            realloc(app->profiles.entries, (size_t)next_capacity * sizeof(PocketProfileEntry));
         if(!resized) return false;
         app->profiles.entries = resized;
         app->profiles.capacity = next_capacity;
@@ -869,13 +1079,16 @@ static bool pocket_profile_include_active(PocketD20App* app) {
 }
 
 static void pocket_enter_screen(PocketD20App* app, PocketScreen screen) {
+    if(app->screen != screen && app->autosave_pending) pocket_flush_save(app, false);
     app->screen = screen;
     app->selection = 0U;
     app->scroll = 0U;
     app->edit_modifier_mode = 0U;
     pocket_marquee_offset = 0U;
-    if(app->storage_unsaved) pocket_set_status(app, "UNSAVED - retry SD");
-    else pocket_clear_status(app);
+    if(app->storage_unsaved)
+        pocket_set_status(app, "UNSAVED - retry SD");
+    else
+        pocket_clear_status(app);
 }
 
 static void pocket_switch_profile(PocketD20App* app, uint32_t profile) {
@@ -884,7 +1097,7 @@ static void pocket_switch_profile(PocketD20App* app, uint32_t profile) {
         pocket_set_status(app, "Already active");
         return;
     }
-    if(app->active_profile_loaded && !pocket_save(app, false)) {
+    if(app->active_profile_loaded && !pocket_flush_save(app, false)) {
         pocket_set_status(app, "Save failed");
         return;
     }
@@ -893,13 +1106,12 @@ static void pocket_switch_profile(PocketD20App* app, uint32_t profile) {
     app->arcane_recovery_active = 0U;
     app->campaign_active_valid = 0U;
     bool recovered_backup = false;
-    bool loaded = pocket_d20_storage_load_profile(
-        app->storage, profile, &app->data, &recovered_backup);
+    bool loaded =
+        pocket_d20_storage_load_profile(app->storage, profile, &app->data, &recovered_backup);
     app->active_profile_loaded = loaded ? 1U : 0U;
     bool character_ready = loaded;
     if(loaded && recovered_backup)
-        character_ready = pocket_d20_storage_restore_backup(
-            app->storage, profile, &app->data);
+        character_ready = pocket_d20_storage_restore_backup(app->storage, profile, &app->data);
     if(!loaded) {
         app->storage_unsaved = 0U;
         pocket_enter_screen(app, PocketScreenHome);
@@ -923,7 +1135,7 @@ static void pocket_switch_profile(PocketD20App* app, uint32_t profile) {
 }
 
 static void pocket_create_profile(PocketD20App* app) {
-    if(app->active_profile_loaded && !pocket_save(app, false)) {
+    if(app->active_profile_loaded && !pocket_flush_save(app, false)) {
         pocket_set_status(app, "Save failed");
         return;
     }
@@ -942,8 +1154,7 @@ static void pocket_create_profile(PocketD20App* app) {
         sizeof(app->data.character.name),
         "New Hero %lu",
         (unsigned long)(profile + 1U));
-    bool character_saved =
-        pocket_d20_storage_save_profile(app->storage, profile, &app->data);
+    bool character_saved = pocket_d20_storage_save_profile(app->storage, profile, &app->data);
     if(!character_saved) {
         bool recovered = false;
         app->profiles.active_profile = previous_profile;
@@ -966,9 +1177,7 @@ static void pocket_create_profile(PocketD20App* app) {
     if(character_saved && metadata_saved)
         app->saved_fingerprint = pocket_data_fingerprint(&app->data);
     pocket_enter_screen(app, PocketScreenCharacter);
-    pocket_set_status(
-        app,
-        character_saved && metadata_saved ? "New character" : "Save failed");
+    pocket_set_status(app, character_saved && metadata_saved ? "New character" : "Save failed");
 }
 
 static void pocket_delete_profile(PocketD20App* app, uint32_t profile) {
@@ -987,14 +1196,12 @@ static void pocket_delete_profile(PocketD20App* app, uint32_t profile) {
     app->selection = 0U;
     app->scroll = 0U;
     pocket_set_status(
-        app,
-        metadata_saved && character_deleted ? "Character deleted" : "Delete failed");
+        app, metadata_saved && character_deleted ? "Character deleted" : "Delete failed");
 }
 
 static uint8_t pocket_wizard_level(const PocketCharacter* character) {
     for(uint8_t i = 0U; i < character->class_count; ++i)
-        if(strcmp(character->classes[i].name, "Wizard") == 0)
-            return character->classes[i].level;
+        if(strcmp(character->classes[i].name, "Wizard") == 0) return character->classes[i].level;
     return 0U;
 }
 
@@ -1087,12 +1294,14 @@ static uint16_t pocket_class_mask_from_name(const char* name) {
 
 static void pocket_configure_class_defaults(PocketClassLevel* level) {
     uint16_t mask = pocket_class_mask_from_name(level->name);
-    if(mask & (PocketClassMaskBarbarian)) level->hit_die = 12U;
+    if(mask & (PocketClassMaskBarbarian))
+        level->hit_die = 12U;
     else if(mask & (PocketClassMaskFighter | PocketClassMaskPaladin | PocketClassMaskRanger))
         level->hit_die = 10U;
-    else if(mask & (PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid |
-                    PocketClassMaskMonk | PocketClassMaskRogue | PocketClassMaskWarlock |
-                    PocketClassMaskArtificer))
+    else if(
+        mask &
+        (PocketClassMaskBard | PocketClassMaskCleric | PocketClassMaskDruid | PocketClassMaskMonk |
+         PocketClassMaskRogue | PocketClassMaskWarlock | PocketClassMaskArtificer))
         level->hit_die = 8U;
     else
         level->hit_die = 6U;
@@ -1114,14 +1323,12 @@ static void pocket_configure_class_defaults(PocketClassLevel* level) {
         level->spellcasting_ability = PocketAbilityIntelligence;
 }
 
-static bool pocket_subclass_allowed(
-    const PocketD20App* app,
-    uint16_t class_mask,
-    bool has_metadata) {
+static bool
+    pocket_subclass_allowed(const PocketD20App* app, uint16_t class_mask, bool has_metadata) {
     if(app->catalog_show_all) return true;
     if(!has_metadata || app->record_index >= app->data.character.class_count) return false;
-    uint16_t selected_class = pocket_class_mask_from_name(
-        app->data.character.classes[app->record_index].name);
+    uint16_t selected_class =
+        pocket_class_mask_from_name(app->data.character.classes[app->record_index].name);
     return selected_class && (class_mask & selected_class);
 }
 
@@ -1153,7 +1360,8 @@ static bool pocket_spell_allowed(
     if(!has_metadata || app->record_index >= app->data.character.spell_count) return false;
     const PocketSpell* spell = &app->data.character.spells[app->record_index];
     uint8_t class_index = app->spell_filter_class < app->data.character.class_count ?
-                              app->spell_filter_class : spell->class_index;
+                              app->spell_filter_class :
+                              spell->class_index;
     if(class_index >= app->data.character.class_count) return false;
     const PocketClassLevel* class_level = &app->data.character.classes[class_index];
     uint16_t selected_class = pocket_class_mask_from_name(class_level->name);
@@ -1192,8 +1400,9 @@ static bool pocket_catalog_add_metadata(
     bool has_metadata) {
     if(app->catalog_kind == PocketCatalogSpells) {
         if(!pocket_spell_allowed(app, level, class_mask, has_metadata)) return false;
-    } else if(app->catalog_kind == PocketCatalogSubclasses &&
-              !pocket_subclass_allowed(app, class_mask, has_metadata)) {
+    } else if(
+        app->catalog_kind == PocketCatalogSubclasses &&
+        !pocket_subclass_allowed(app, class_mask, has_metadata)) {
         return false;
     }
     if(!name[0]) return false;
@@ -1234,8 +1443,7 @@ static bool pocket_catalog_add_metadata(
 }
 
 static bool pocket_catalog_page_complete(const PocketD20App* app) {
-    return app->catalog_scan_count >
-           app->catalog_page_start + pocket_catalog_page_limit(app);
+    return app->catalog_scan_count > app->catalog_page_start + pocket_catalog_page_limit(app);
 }
 
 static bool pocket_catalog_add(PocketD20App* app, const char* name) {
@@ -1310,26 +1518,67 @@ typedef struct {
 
 static const PocketEquipmentPreset pocket_equipment_presets[] = {
     WEAPON("Club", 20, 1, 4, 0, PocketDamageBludgeoning, PocketWeaponLight, ""),
-    WEAPON("Dagger", 10, 1, 4, 0, PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponLight | PocketWeaponThrown, ""),
+    WEAPON(
+        "Dagger",
+        10,
+        1,
+        4,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponFinesse | PocketWeaponLight | PocketWeaponThrown,
+        ""),
     WEAPON("Greatclub", 100, 1, 8, 0, PocketDamageBludgeoning, 0U, ""),
-    WEAPON("Handaxe", 20, 1, 6, 0, PocketDamageSlashing,
-        PocketWeaponLight | PocketWeaponThrown, ""),
+    WEAPON("Handaxe", 20, 1, 6, 0, PocketDamageSlashing, PocketWeaponLight | PocketWeaponThrown, ""),
     WEAPON("Javelin", 20, 1, 6, 0, PocketDamagePiercing, PocketWeaponThrown, ""),
-    WEAPON("Light Hammer", 20, 1, 4, 0, PocketDamageBludgeoning,
-        PocketWeaponLight | PocketWeaponThrown, ""),
+    WEAPON(
+        "Light Hammer",
+        20,
+        1,
+        4,
+        0,
+        PocketDamageBludgeoning,
+        PocketWeaponLight | PocketWeaponThrown,
+        ""),
     WEAPON("Mace", 40, 1, 6, 0, PocketDamageBludgeoning, 0U, ""),
     WEAPON("Quarterstaff", 40, 1, 6, 8, PocketDamageBludgeoning, 0U, ""),
     WEAPON("Sickle", 20, 1, 4, 0, PocketDamageSlashing, PocketWeaponLight, ""),
     WEAPON("Spear", 30, 1, 6, 8, PocketDamagePiercing, PocketWeaponThrown, ""),
-    WEAPON("Dart", 3, 1, 4, 0, PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponRanged | PocketWeaponThrown, ""),
-    WEAPON("Light Crossbow", 50, 1, 8, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Bolts"),
-    WEAPON("Shortbow", 20, 1, 6, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Arrows"),
-    WEAPON("Sling", 0, 1, 4, 0, PocketDamageBludgeoning,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Sling bullets"),
+    WEAPON(
+        "Dart",
+        3,
+        1,
+        4,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponFinesse | PocketWeaponRanged | PocketWeaponThrown,
+        ""),
+    WEAPON(
+        "Light Crossbow",
+        50,
+        1,
+        8,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Bolts"),
+    WEAPON(
+        "Shortbow",
+        20,
+        1,
+        6,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Arrows"),
+    WEAPON(
+        "Sling",
+        0,
+        1,
+        4,
+        0,
+        PocketDamageBludgeoning,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Sling bullets"),
     WEAPON("Battleaxe", 40, 1, 8, 10, PocketDamageSlashing, 0U, ""),
     WEAPON("Flail", 20, 1, 8, 0, PocketDamageBludgeoning, 0U, ""),
     WEAPON("Glaive", 60, 1, 10, 0, PocketDamageSlashing, PocketWeaponHeavy, ""),
@@ -1342,26 +1591,82 @@ static const PocketEquipmentPreset pocket_equipment_presets[] = {
     WEAPON("Morningstar", 40, 1, 8, 0, PocketDamagePiercing, 0U, ""),
     WEAPON("Pike", 180, 1, 10, 0, PocketDamagePiercing, PocketWeaponHeavy, ""),
     WEAPON("Rapier", 20, 1, 8, 0, PocketDamagePiercing, PocketWeaponFinesse, ""),
-    WEAPON("Scimitar", 30, 1, 6, 0, PocketDamageSlashing,
-        PocketWeaponFinesse | PocketWeaponLight, ""),
-    WEAPON("Shortsword", 20, 1, 6, 0, PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponLight, ""),
+    WEAPON(
+        "Scimitar",
+        30,
+        1,
+        6,
+        0,
+        PocketDamageSlashing,
+        PocketWeaponFinesse | PocketWeaponLight,
+        ""),
+    WEAPON(
+        "Shortsword",
+        20,
+        1,
+        6,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponFinesse | PocketWeaponLight,
+        ""),
     WEAPON("Trident", 40, 1, 8, 10, PocketDamagePiercing, PocketWeaponThrown, ""),
     WEAPON("Warhammer", 50, 1, 8, 10, PocketDamageBludgeoning, 0U, ""),
     WEAPON("War Pick", 20, 1, 8, 10, PocketDamagePiercing, 0U, ""),
     WEAPON("Whip", 30, 1, 4, 0, PocketDamageSlashing, PocketWeaponFinesse, ""),
-    WEAPON("Blowgun", 10, 1, 1, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Needles"),
-    WEAPON("Hand Crossbow", 30, 1, 6, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponLight | PocketWeaponAmmunition, "Bolts"),
-    WEAPON("Heavy Crossbow", 180, 1, 10, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition, "Bolts"),
-    WEAPON("Longbow", 20, 1, 8, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition, "Arrows"),
-    WEAPON("Musket", 100, 1, 12, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Bullets"),
-    WEAPON("Pistol", 30, 1, 10, 0, PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition, "Bullets"),
+    WEAPON(
+        "Blowgun",
+        10,
+        1,
+        1,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Needles"),
+    WEAPON(
+        "Hand Crossbow",
+        30,
+        1,
+        6,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponLight | PocketWeaponAmmunition,
+        "Bolts"),
+    WEAPON(
+        "Heavy Crossbow",
+        180,
+        1,
+        10,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition,
+        "Bolts"),
+    WEAPON(
+        "Longbow",
+        20,
+        1,
+        8,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition,
+        "Arrows"),
+    WEAPON(
+        "Musket",
+        100,
+        1,
+        12,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Bullets"),
+    WEAPON(
+        "Pistol",
+        30,
+        1,
+        10,
+        0,
+        PocketDamagePiercing,
+        PocketWeaponRanged | PocketWeaponAmmunition,
+        "Bullets"),
     ARMOR("Padded Armor", 80, 11, -1, 0),
     ARMOR("Leather Armor", 100, 11, -1, 0),
     ARMOR("Studded Leather Armor", 130, 12, -1, 0),
@@ -1380,10 +1685,7 @@ static const PocketEquipmentPreset pocket_equipment_presets[] = {
 #undef WEAPON
 #undef ARMOR
 
-static void pocket_apply_equipment_preset(
-    PocketItem* item,
-    const char* name,
-    uint8_t category) {
+static void pocket_apply_equipment_preset(PocketItem* item, const char* name, uint8_t category) {
     item->weight_tenths = 0;
     item->is_weapon = category == PocketItemCategoryWeapon;
     item->attack_ability = PocketAttackAbilityAuto;
@@ -1413,18 +1715,13 @@ static void pocket_apply_equipment_preset(
         item->shield_bonus = preset->shield_bonus;
         item->add_ability_damage = item->is_weapon;
         pocket_copy(
-            item->ammunition_group,
-            sizeof(item->ammunition_group),
-            preset->ammunition_group);
+            item->ammunition_group, sizeof(item->ammunition_group), preset->ammunition_group);
         break;
     }
 }
 
-static void pocket_catalog_add_item(
-    PocketD20App* app,
-    const char* name,
-    uint8_t category,
-    bool magic) {
+static void
+    pocket_catalog_add_item(PocketD20App* app, const char* name, uint8_t category, bool magic) {
     if(!pocket_catalog_add(app, name)) return;
     for(uint16_t i = 0U; i < app->catalog_count; ++i) {
         if(strcmp(app->catalog_entries[i], name) == 0) {
@@ -1499,9 +1796,11 @@ static void pocket_catalog_add_builtins(PocketD20App* app, PocketCatalogKind kin
 
 static void pocket_catalog_process_line(PocketD20App* app, char* line) {
     char* start = line;
-    while(*start == ' ' || *start == '\t') ++start;
+    while(*start == ' ' || *start == '\t')
+        ++start;
     char* end = start + strlen(start);
-    while(end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r')) --end;
+    while(end > start && (end[-1] == ' ' || end[-1] == '\t' || end[-1] == '\r'))
+        --end;
     *end = '\0';
     if(!start[0] || start[0] == '#') return;
     if(app->catalog_kind == PocketCatalogItems) {
@@ -1523,7 +1822,8 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
             char* rarity = rarity_separator + 1U;
             char* source_separator = strchr(rarity, '|');
             if(source_separator) *source_separator = '\0';
-            while(*rarity == ' ' || *rarity == '\t') ++rarity;
+            while(*rarity == ' ' || *rarity == '\t')
+                ++rarity;
             magic = strcmp(rarity, "Mundane") != 0;
         }
         pocket_catalog_add_item(app, start, pocket_item_category_from_name(category), magic);
@@ -1537,7 +1837,8 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
         }
         *class_separator = '\0';
         char* class_name = class_separator + 1U;
-        while(*class_name == ' ' || *class_name == '\t') ++class_name;
+        while(*class_name == ' ' || *class_name == '\t')
+            ++class_name;
         uint16_t mask = pocket_class_mask_from_name(class_name);
         pocket_catalog_add_metadata(app, start, 0U, mask, mask != 0U);
         return;
@@ -1587,7 +1888,8 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
     while(class_name && class_name[0]) {
         char* comma = strchr(class_name, ',');
         if(comma) *comma = '\0';
-        while(*class_name == ' ' || *class_name == '\t') ++class_name;
+        while(*class_name == ' ' || *class_name == '\t')
+            ++class_name;
         char* class_end = class_name + strlen(class_name);
         while(class_end > class_name && (class_end[-1] == ' ' || class_end[-1] == '\t'))
             --class_end;
@@ -1604,7 +1906,8 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
                         app->catalog_schools[i] = school_index;
             }
             if(source) app->catalog_sources[i] = strcmp(source, "Core") == 0 ? 1U : 2U;
-            if(ritual) app->catalog_ritual[i] = strcmp(ritual, "1") == 0 || strcmp(ritual, "Yes") == 0;
+            if(ritual)
+                app->catalog_ritual[i] = strcmp(ritual, "1") == 0 || strcmp(ritual, "Yes") == 0;
             break;
         }
     }
@@ -1715,9 +2018,9 @@ static void pocket_adventure_process_line(
         pocket_copy(scene->body, sizeof(scene->body), fields[3]);
         pocket_copy(scene->sprite, sizeof(scene->sprite), fields[4]);
         *found = true;
-    } else if(count == 11U && strcmp(fields[0], "C") == 0 &&
-              strcmp(fields[1], target) == 0 &&
-              scene->choice_count < POCKET_ADVENTURE_MAX_CHOICES) {
+    } else if(
+        count == 11U && strcmp(fields[0], "C") == 0 && strcmp(fields[1], target) == 0 &&
+        scene->choice_count < POCKET_ADVENTURE_MAX_CHOICES) {
         PocketAdventureChoice* choice = &scene->choices[scene->choice_count++];
         pocket_copy(choice->label, sizeof(choice->label), fields[2]);
         choice->skill = (int8_t)strtol(fields[3], NULL, 10);
@@ -1736,9 +2039,9 @@ static bool pocket_campaign_resolve_active(PocketD20App* app) {
        !strcmp(app->campaign_active.id, app->data.character.adventure_campaign))
         return true;
     PocketCampaignSummary campaign;
-    bool found = app->data.character.adventure_campaign[0] &&
-                 pocket_campaign_find(
-                     app->storage, app->data.character.adventure_campaign, &campaign);
+    bool found =
+        app->data.character.adventure_campaign[0] &&
+        pocket_campaign_find(app->storage, app->data.character.adventure_campaign, &campaign);
     if(!found) found = pocket_campaign_at(app->storage, 0U, &campaign);
     if(!found) {
         app->campaign_active_valid = 0U;
@@ -1753,12 +2056,11 @@ static bool pocket_campaign_resolve_active(PocketD20App* app) {
 }
 
 static bool pocket_campaign_save_active_progress(PocketD20App* app) {
-    return pocket_campaign_resolve_active(app) &&
-           pocket_campaign_progress_save(
-               app->storage,
-               app->profiles.active_profile,
-               &app->campaign_active,
-               &app->data.character);
+    return pocket_campaign_resolve_active(app) && pocket_campaign_progress_save(
+                                                      app->storage,
+                                                      app->profiles.active_profile,
+                                                      &app->campaign_active,
+                                                      &app->data.character);
 }
 
 static bool pocket_adventure_load(PocketD20App* app) {
@@ -1771,8 +2073,7 @@ static bool pocket_adventure_load(PocketD20App* app) {
     memset(scene, 0, sizeof(*scene));
     char path[192];
     if(!pocket_campaign_resolve_active(app) ||
-       !pocket_campaign_scene_path(
-           app->storage, &app->campaign_active, path, sizeof(path))) {
+       !pocket_campaign_scene_path(app->storage, &app->campaign_active, path, sizeof(path))) {
         free(scene);
         pocket_set_status(app, "Campaign manifest missing");
         return false;
@@ -1785,23 +2086,11 @@ static bool pocket_adventure_load(PocketD20App* app) {
         return false;
     }
     char line[512];
-    size_t position = 0U;
-    char byte = '\0';
+    PocketFileReader reader;
+    pocket_file_reader_init(&reader, file);
     bool found = false;
-    while(storage_file_read(file, &byte, 1U) == 1U) {
-        if(byte == '\n') {
-            line[position] = '\0';
-            pocket_adventure_process_line(
-                scene, app->data.character.adventure_scene, line, &found);
-            position = 0U;
-        } else if(byte != '\r' && position + 1U < sizeof(line)) {
-            line[position++] = byte;
-        }
-    }
-    if(position) {
-        line[position] = '\0';
-        pocket_adventure_process_line(
-            scene, app->data.character.adventure_scene, line, &found);
+    while(pocket_file_read_line(&reader, line, sizeof(line))) {
+        pocket_adventure_process_line(scene, app->data.character.adventure_scene, line, &found);
     }
     storage_file_close(file);
     storage_file_free(file);
@@ -1870,24 +2159,18 @@ static void pocket_run_catalog_diagnostics(PocketD20App* app) {
         return;
     }
     char line[256];
-    size_t position = 0U;
-    char byte = '\0';
+    PocketFileReader reader;
+    pocket_file_reader_init(&reader, file);
     uint32_t* seen_ids = NULL;
     uint16_t seen_count = 0U;
     uint16_t seen_capacity = 0U;
-    while(storage_file_read(file, &byte, 1U) == 1U) {
-        if(byte != '\n' && position + 1U < sizeof(line)) {
-            if(byte != '\r') line[position++] = byte;
-            continue;
-        }
-        line[position] = '\0';
-        position = 0U;
+    while(pocket_file_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#') continue;
         char* fields[8];
         uint8_t count = pocket_split_metadata(line, fields);
         ++app->diagnostics_records;
-        bool valid = count == 8U && fields[0][0] && fields[1][0] && fields[2][0] &&
-                     fields[3][0] && pocket_metadata_option_valid(fields[2]);
+        bool valid = count == 8U && fields[0][0] && fields[1][0] && fields[2][0] && fields[3][0] &&
+                     pocket_metadata_option_valid(fields[2]);
         char* end = NULL;
         long level = count == 8U ? strtol(fields[5], &end, 10) : -1;
         if(!valid || !end || *end || level < 0 || level > 20) {
@@ -1945,16 +2228,14 @@ static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const
             }
             line[position] = '\0';
             position = 0U;
-            if(!line[0] || line[0] == '#' ||
-               character->grant_count >= POCKET_D20_MAX_GRANTS)
+            if(!line[0] || line[0] == '#' || character->grant_count >= POCKET_D20_MAX_GRANTS)
                 continue;
             char* fields[8];
             if(pocket_split_metadata(line, fields) != 8U ||
                pocket_grant_source_from_text(fields[2]) != source_type ||
                strcmp(fields[3], option) != 0 || !fields[7][0])
                 continue;
-            if(!pocket_d20_data_reserve_grants(character, character->grant_count + 1U))
-                continue;
+            if(!pocket_d20_data_reserve_grants(character, character->grant_count + 1U)) continue;
             PocketGrant* grant = &character->grants[character->grant_count++];
             memset(grant, 0, sizeof(*grant));
             pocket_copy(grant->stable_id, sizeof(grant->stable_id), fields[0]);
@@ -1963,8 +2244,8 @@ static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const
             pocket_copy(grant->prerequisites, sizeof(grant->prerequisites), fields[4]);
             pocket_copy(grant->grant_value, sizeof(grant->grant_value), fields[7]);
             grant->source_type = source_type;
-            grant->class_index =
-                app->record_index < character->class_count ? app->record_index : 0U;
+            grant->class_index = app->record_index < character->class_count ? app->record_index :
+                                                                              0U;
             grant->level_gained = (uint8_t)strtoul(fields[5], NULL, 10);
             grant->status = PocketGrantPending;
             ++staged;
@@ -1999,17 +2280,17 @@ static void pocket_apply_grant(PocketD20App* app, PocketGrant* grant) {
     else if(strcmp(payload, "size") == 0) {
         for(uint8_t i = 0U; i < PocketSizeCount; ++i)
             if(strcmp(value, pocket_size_names[i]) == 0) character->size = i;
-    } else if(strcmp(payload, "feature") == 0 &&
-              character->feature_count < POCKET_D20_MAX_FEATURES &&
-              pocket_d20_data_reserve_features(character, character->feature_count + 1U)) {
+    } else if(
+        strcmp(payload, "feature") == 0 && character->feature_count < POCKET_D20_MAX_FEATURES &&
+        pocket_d20_data_reserve_features(character, character->feature_count + 1U)) {
         PocketFeature* feature = &character->features[character->feature_count++];
         memset(feature, 0, sizeof(*feature));
         pocket_copy(feature->name, sizeof(feature->name), value);
         feature->class_index = grant->class_index;
         feature->class_level_gained = grant->level_gained;
-    } else if(strcmp(payload, "spell") == 0 &&
-              character->spell_count < POCKET_D20_MAX_SPELLS &&
-              pocket_d20_data_reserve_spells(character, character->spell_count + 1U)) {
+    } else if(
+        strcmp(payload, "spell") == 0 && character->spell_count < POCKET_D20_MAX_SPELLS &&
+        pocket_d20_data_reserve_spells(character, character->spell_count + 1U)) {
         uint8_t index = character->spell_count++;
         PocketSpell* spell = &character->spells[index];
         memset(spell, 0, sizeof(*spell));
@@ -2043,15 +2324,14 @@ static void pocket_catalog_apply_spell_filters(PocketD20App* app) {
     uint16_t output = 0U;
     for(uint16_t i = 0U; i < app->catalog_count; ++i) {
         bool keep = true;
-        if(app->spell_filter_level >= 0 && app->catalog_levels[i] != (uint8_t)app->spell_filter_level)
+        if(app->spell_filter_level >= 0 &&
+           app->catalog_levels[i] != (uint8_t)app->spell_filter_level)
             keep = false;
         if(app->spell_filter_ritual && !app->catalog_ritual[i]) keep = false;
         if(app->spell_filter_school && app->catalog_schools[i] != app->spell_filter_school)
             keep = false;
-        if(app->spell_filter_source == 1U && app->catalog_sources[i] != 1U)
-            keep = false;
-        if(app->spell_filter_source == 2U && app->catalog_sources[i] != 2U)
-            keep = false;
+        if(app->spell_filter_source == 1U && app->catalog_sources[i] != 1U) keep = false;
+        if(app->spell_filter_source == 2U && app->catalog_sources[i] != 2U) keep = false;
         if(!pocket_tracked_spell_matches_filter(app, app->catalog_entries[i])) keep = false;
         if(!keep) continue;
         if(output != i) {
@@ -2068,13 +2348,10 @@ static void pocket_catalog_apply_spell_filters(PocketD20App* app) {
     app->catalog_count = output;
 }
 
-static bool pocket_catalog_spell_after(
-    const PocketD20App* app,
-    uint16_t left,
-    uint16_t right) {
+static bool pocket_catalog_spell_after(const PocketD20App* app, uint16_t left, uint16_t right) {
     uint8_t left_level = app->catalog_has_metadata[left] ? app->catalog_levels[left] : UINT8_MAX;
-    uint8_t right_level =
-        app->catalog_has_metadata[right] ? app->catalog_levels[right] : UINT8_MAX;
+    uint8_t right_level = app->catalog_has_metadata[right] ? app->catalog_levels[right] :
+                                                             UINT8_MAX;
     if(left_level != right_level) return left_level > right_level;
     return strcmp(app->catalog_entries[left], app->catalog_entries[right]) > 0;
 }
@@ -2084,11 +2361,11 @@ static void pocket_catalog_swap(PocketD20App* app, uint16_t left, uint16_t right
     memcpy(name, app->catalog_entries[left], sizeof(name));
     memcpy(app->catalog_entries[left], app->catalog_entries[right], sizeof(name));
     memcpy(app->catalog_entries[right], name, sizeof(name));
-#define POCKET_SWAP_VALUE(values, type)      \
-    do {                                     \
-        type temporary = (values)[left];     \
-        (values)[left] = (values)[right];    \
-        (values)[right] = temporary;         \
+#define POCKET_SWAP_VALUE(values, type)   \
+    do {                                  \
+        type temporary = (values)[left];  \
+        (values)[left] = (values)[right]; \
+        (values)[right] = temporary;      \
     } while(false)
     POCKET_SWAP_VALUE(app->catalog_levels, uint8_t);
     POCKET_SWAP_VALUE(app->catalog_class_masks, uint16_t);
@@ -2127,8 +2404,7 @@ static void pocket_catalog_load_page(PocketD20App* app) {
     if(app->catalog_page_start >= app->catalog_total && app->catalog_page_start) {
         uint16_t page_limit = pocket_catalog_page_limit(app);
         app->catalog_page_start =
-            ((app->catalog_total ? app->catalog_total - 1U : 0U) /
-             page_limit) * page_limit;
+            ((app->catalog_total ? app->catalog_total - 1U : 0U) / page_limit) * page_limit;
         pocket_catalog_release(app);
         app->catalog_scan_count = 0U;
         app->catalog_has_more = 0U;
@@ -2152,7 +2428,7 @@ static void pocket_open_catalog(
     app->catalog_kind = kind;
     app->catalog_target = target;
     app->catalog_page_size = kind == PocketCatalogSpells ? POCKET_D20_SPELL_PAGE_ENTRIES :
-                                                          POCKET_D20_MAX_CATALOG_ENTRIES;
+                                                           POCKET_D20_MAX_CATALOG_ENTRIES;
     app->return_screen = app->screen;
     app->catalog_return_selection = app->selection;
     app->catalog_show_all = 0U;
@@ -2199,16 +2475,16 @@ static void pocket_draw_row(Canvas* canvas, uint8_t row, bool selected, const ch
     uint8_t y = (uint8_t)(11U + (row * 10U));
     char display[32];
     size_t length = strlen(text);
-    if(selected && length > 20U) {
+    if(selected && length > 25U) {
         size_t cycle = length + 4U;
         size_t start = pocket_marquee_offset % cycle;
-        for(size_t i = 0U; i < 20U; ++i) {
+        for(size_t i = 0U; i < 25U; ++i) {
             size_t position = (start + i) % cycle;
             display[i] = position < length ? text[position] : ' ';
         }
-        display[20] = '\0';
+        display[25] = '\0';
     } else {
-        size_t copy = length > 20U ? 20U : length;
+        size_t copy = length > 25U ? 25U : length;
         memcpy(display, text, copy);
         display[copy] = '\0';
     }
@@ -2279,11 +2555,8 @@ static const char* pocket_list_title(PocketListKind kind) {
     }
 }
 
-static void pocket_format_list_entry(
-    const PocketD20App* app,
-    uint8_t index,
-    char* output,
-    size_t size) {
+static void
+    pocket_format_list_entry(const PocketD20App* app, uint8_t index, char* output, size_t size) {
     const PocketCharacter* character = &app->data.character;
     switch(app->list_kind) {
     case PocketListClasses: {
@@ -2311,12 +2584,7 @@ static void pocket_format_list_entry(
     case PocketListItems: {
         const PocketItem* item = &character->items[index];
         snprintf(
-            output,
-            size,
-            "%c %dx %.31s",
-            item->equipped ? '*' : ' ',
-            item->quantity,
-            item->name);
+            output, size, "%c %dx %.31s", item->equipped ? '*' : ' ', item->quantity, item->name);
         break;
     }
     case PocketListLanguages:
@@ -2424,12 +2692,7 @@ static void pocket_begin_text(
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, header);
     text_input_set_result_callback(
-        app->text_input,
-        pocket_text_done,
-        app,
-        app->edit_buffer,
-        sizeof(app->edit_buffer),
-        false);
+        app->text_input, pocket_text_done, app, app->edit_buffer, sizeof(app->edit_buffer), false);
     view_dispatcher_switch_to_view(app->dispatcher, PocketViewTextInput);
 }
 
@@ -2453,8 +2716,12 @@ static void pocket_number_done(void* context, int32_t number) {
     PocketCharacter* character = &app->data.character;
     switch(app->number_context) {
     case PocketNumberCurrency: {
-        int32_t* values[] = {&character->currency_cp, &character->currency_sp,
-            &character->currency_ep, &character->currency_gp, &character->currency_pp};
+        int32_t* values[] = {
+            &character->currency_cp,
+            &character->currency_sp,
+            &character->currency_ep,
+            &character->currency_gp,
+            &character->currency_pp};
         if(app->number_index < 5U) *values[app->number_index] = number;
         break;
     }
@@ -2463,22 +2730,52 @@ static void pocket_number_done(void* context, int32_t number) {
         break;
     case PocketNumberVitals:
         switch(app->number_index) {
-        case 0U: character->hp_current = (int16_t)number; break;
-        case 1U: character->hp_max = (int16_t)number; break;
-        case 2U: character->hp_temporary = (int16_t)number; break;
-        case 3U: character->armor_class = (int16_t)number; break;
-        case 4U: character->speed = (int16_t)number; break;
+        case 0U:
+            character->hp_current = (int16_t)number;
+            break;
+        case 1U:
+            character->hp_max = (int16_t)number;
+            break;
+        case 2U:
+            character->hp_temporary = (int16_t)number;
+            break;
+        case 3U:
+            character->armor_class = (int16_t)number;
+            break;
+        case 4U:
+            character->speed = (int16_t)number;
+            break;
         case 5U:
-        case 6U: character->initiative_misc = (int8_t)number; break;
-        case 7U: character->exhaustion = (uint8_t)number; break;
-        case 8U: character->death_successes = (uint8_t)number; break;
-        case 9U: character->death_failures = (uint8_t)number; break;
-        case 10U: character->hit_die = pocket_nearest_die(number, true); break;
-        case 11U: character->hit_dice_current = (uint8_t)number; break;
-        case 12U: character->hit_dice_max = (uint8_t)number; break;
-        case 13U: character->skill_misc[11U] = (int8_t)number; break;
-        case 14U: character->skill_misc[6U] = (int8_t)number; break;
-        case 15U: character->skill_misc[8U] = (int8_t)number; break;
+        case 6U:
+            character->initiative_misc = (int8_t)number;
+            break;
+        case 7U:
+            character->exhaustion = (uint8_t)number;
+            break;
+        case 8U:
+            character->death_successes = (uint8_t)number;
+            break;
+        case 9U:
+            character->death_failures = (uint8_t)number;
+            break;
+        case 10U:
+            character->hit_die = pocket_nearest_die(number, true);
+            break;
+        case 11U:
+            character->hit_dice_current = (uint8_t)number;
+            break;
+        case 12U:
+            character->hit_dice_max = (uint8_t)number;
+            break;
+        case 13U:
+            character->skill_misc[11U] = (int8_t)number;
+            break;
+        case 14U:
+            character->skill_misc[6U] = (int8_t)number;
+            break;
+        case 15U:
+            character->skill_misc[8U] = (int8_t)number;
+            break;
         }
         if(character->hp_current > character->hp_max) character->hp_current = character->hp_max;
         if(character->hit_dice_current > character->hit_dice_max)
@@ -2504,7 +2801,7 @@ static void pocket_number_done(void* context, int32_t number) {
         else if(app->number_index >= 7U && app->number_index <= 15U) {
             uint8_t level = app->number_index - 6U;
             uint8_t* slots = app->number_aux ? character->spell_slots_max :
-                                              character->spell_slots_current;
+                                               character->spell_slots_current;
             slots[level] = (uint8_t)number;
             if(character->spell_slots_current[level] > character->spell_slots_max[level])
                 character->spell_slots_current[level] = character->spell_slots_max[level];
@@ -2515,18 +2812,42 @@ static void pocket_number_done(void* context, int32_t number) {
         if(app->list_kind == PocketListClasses) {
             PocketClassLevel* level = &character->classes[app->record_index];
             switch(app->number_index) {
-            case 2U: level->level = (uint8_t)number; break;
-            case 3U: level->hit_die = pocket_nearest_die(number, true); break;
-            case 4U: level->hit_dice_current = (uint8_t)number; break;
-            case 5U: level->hit_dice_max = (uint8_t)number; break;
-            case 8U: level->cantrip_limit = (uint8_t)number; break;
-            case 9U: level->prepared_limit = (uint8_t)number; break;
-            case 10U: level->spellbook_size = (uint16_t)number; break;
-            case 11U: level->pact_slot_level = (uint8_t)number; break;
-            case 12U: level->pact_slots_current = (uint8_t)number; break;
-            case 13U: level->pact_slots_max = (uint8_t)number; break;
-            case 15U: level->spell_points_current = (uint16_t)number; break;
-            case 16U: level->spell_points_max = (uint16_t)number; break;
+            case 2U:
+                level->level = (uint8_t)number;
+                break;
+            case 3U:
+                level->hit_die = pocket_nearest_die(number, true);
+                break;
+            case 4U:
+                level->hit_dice_current = (uint8_t)number;
+                break;
+            case 5U:
+                level->hit_dice_max = (uint8_t)number;
+                break;
+            case 8U:
+                level->cantrip_limit = (uint8_t)number;
+                break;
+            case 9U:
+                level->prepared_limit = (uint8_t)number;
+                break;
+            case 10U:
+                level->spellbook_size = (uint16_t)number;
+                break;
+            case 11U:
+                level->pact_slot_level = (uint8_t)number;
+                break;
+            case 12U:
+                level->pact_slots_current = (uint8_t)number;
+                break;
+            case 13U:
+                level->pact_slots_max = (uint8_t)number;
+                break;
+            case 15U:
+                level->spell_points_current = (uint16_t)number;
+                break;
+            case 16U:
+                level->spell_points_max = (uint16_t)number;
+                break;
             }
             if(level->hit_dice_current > level->hit_dice_max)
                 level->hit_dice_current = level->hit_dice_max;
@@ -2547,29 +2868,62 @@ static void pocket_number_done(void* context, int32_t number) {
                     character->spell_free_casts_max[app->record_index];
         } else if(app->list_kind == PocketListFeatures) {
             PocketFeature* feature = &character->features[app->record_index];
-            if(app->number_index == 3U) feature->class_level_gained = (uint8_t)number;
-            else if(app->number_index == 4U) feature->uses_current = (int16_t)number;
-            else if(app->number_index == 5U) feature->uses_max = (int16_t)number;
+            if(app->number_index == 3U)
+                feature->class_level_gained = (uint8_t)number;
+            else if(app->number_index == 4U)
+                feature->uses_current = (int16_t)number;
+            else if(app->number_index == 5U)
+                feature->uses_max = (int16_t)number;
             if(feature->uses_current > feature->uses_max)
                 feature->uses_current = feature->uses_max;
         } else if(app->list_kind == PocketListItems) {
             PocketItem* item = &character->items[app->record_index];
             switch(app->number_index) {
-            case 2U: item->quantity = (int16_t)number; break;
-            case 3U: item->weight_tenths = (int16_t)number; break;
-            case 9U: item->magic_bonus = (int8_t)number; break;
-            case 10U: item->damage_dice = (uint8_t)number; break;
-            case 11U: item->damage_die = pocket_nearest_die(number, true); break;
-            case 13U: item->versatile_die = pocket_nearest_die(number, true); break;
-            case 23U: item->extra_dice = (uint8_t)number; break;
-            case 24U: item->extra_die = pocket_nearest_die(number, true); break;
-            case 25U: item->ammo_current = (int16_t)number; break;
-            case 26U: item->ammo_max = (int16_t)number; break;
-            case 29U: item->charges_current = (int16_t)number; break;
-            case 30U: item->charges_max = (int16_t)number; break;
-            case 31U: item->armor_base = (uint8_t)number; break;
-            case 32U: item->armor_dex_cap = (int8_t)number; break;
-            case 33U: item->shield_bonus = (uint8_t)number; break;
+            case 2U:
+                item->quantity = (int16_t)number;
+                break;
+            case 3U:
+                item->weight_tenths = (int16_t)number;
+                break;
+            case 9U:
+                item->magic_bonus = (int8_t)number;
+                break;
+            case 10U:
+                item->damage_dice = (uint8_t)number;
+                break;
+            case 11U:
+                item->damage_die = pocket_nearest_die(number, true);
+                break;
+            case 13U:
+                item->versatile_die = pocket_nearest_die(number, true);
+                break;
+            case 23U:
+                item->extra_dice = (uint8_t)number;
+                break;
+            case 24U:
+                item->extra_die = pocket_nearest_die(number, true);
+                break;
+            case 25U:
+                item->ammo_current = (int16_t)number;
+                break;
+            case 26U:
+                item->ammo_max = (int16_t)number;
+                break;
+            case 29U:
+                item->charges_current = (int16_t)number;
+                break;
+            case 30U:
+                item->charges_max = (int16_t)number;
+                break;
+            case 31U:
+                item->armor_base = (uint8_t)number;
+                break;
+            case 32U:
+                item->armor_dex_cap = (int8_t)number;
+                break;
+            case 33U:
+                item->shield_bonus = (uint8_t)number;
+                break;
             }
             if(item->ammo_current > item->ammo_max) item->ammo_current = item->ammo_max;
             if(item->charges_current > item->charges_max)
@@ -2587,24 +2941,34 @@ static void pocket_number_done(void* context, int32_t number) {
         }
         break;
     case PocketNumberDice:
-        if(app->number_index == 0U) app->dice_count = (uint8_t)number;
-        else if(app->number_index == 1U) app->dice_sides = pocket_nearest_die(number, false);
-        else if(app->number_index == 2U) app->dice_modifier = (int16_t)number;
+        if(app->number_index == 0U)
+            app->dice_count = (uint8_t)number;
+        else if(app->number_index == 1U)
+            app->dice_sides = pocket_nearest_die(number, false);
+        else if(app->number_index == 2U)
+            app->dice_modifier = (int16_t)number;
         app->roll_mode = PocketRollNormal;
         app->dice_roll_value_count = 0U;
         break;
     case PocketNumberCombat:
-        if(app->number_index == 3U) character->hp_current = (int16_t)number;
-        else if(app->number_index == 4U) character->hp_temporary = (int16_t)number;
-        else if(app->number_index == 17U) character->death_successes = (uint8_t)number;
-        else if(app->number_index == 18U) character->death_failures = (uint8_t)number;
-        else if(app->number_index == 19U) character->exhaustion = (uint8_t)number;
+        if(app->number_index == 3U)
+            character->hp_current = (int16_t)number;
+        else if(app->number_index == 4U)
+            character->hp_temporary = (int16_t)number;
+        else if(app->number_index == 17U)
+            character->death_successes = (uint8_t)number;
+        else if(app->number_index == 18U)
+            character->death_failures = (uint8_t)number;
+        else if(app->number_index == 19U)
+            character->exhaustion = (uint8_t)number;
         break;
     case PocketNumberInitiative:
         if(app->record_index < app->data.initiative.count) {
             PocketInitiativeEntry* entry = &app->data.initiative.entries[app->record_index];
             if(app->number_index == 1U)
                 entry->initiative_total = (int16_t)number;
+            else if(app->number_index == 6U)
+                entry->initiative_total = (int16_t)number + entry->initiative_modifier;
             else if(app->number_index == 2U)
                 entry->initiative_modifier = (int8_t)number;
             else if(app->number_index == 3U)
@@ -2655,28 +3019,16 @@ static void pocket_begin_number(
     app->input_module_active = 1U;
     number_input_set_header_text(app->number_input, header);
     number_input_set_result_callback(
-        app->number_input,
-        pocket_number_done,
-        app,
-        value,
-        minimum,
-        maximum);
+        app->number_input, pocket_number_done, app, value, minimum, maximum);
     view_dispatcher_switch_to_view(app->dispatcher, PocketViewNumberInput);
 }
 
 static void pocket_draw_home(Canvas* canvas, PocketD20App* app) {
     char title[48];
-    snprintf(
-        title,
-        sizeof(title),
-        "D&D v" FAP_VERSION " - %.27s",
-        app->data.character.name);
+    snprintf(title, sizeof(title), "D&D v" FAP_VERSION " - %.27s", app->data.character.name);
     pocket_draw_header(canvas, title, app->status);
     pocket_draw_menu_rows(
-        canvas,
-        app,
-        pocket_home_items,
-        sizeof(pocket_home_items) / sizeof(pocket_home_items[0]));
+        canvas, app, pocket_home_items, sizeof(pocket_home_items) / sizeof(pocket_home_items[0]));
 }
 
 static void pocket_draw_profiles(Canvas* canvas, PocketD20App* app) {
@@ -2718,7 +3070,8 @@ static void pocket_draw_character(Canvas* canvas, PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
     char rows[12][48];
     const char* row_ptrs[12];
-    for(uint8_t i = 0U; i < 12U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 12U; ++i)
+        row_ptrs[i] = rows[i];
 
     snprintf(rows[0], sizeof(rows[0]), "Name: %.31s", character->name);
     snprintf(rows[1], sizeof(rows[1]), "Player: %.31s", character->player);
@@ -2749,7 +3102,8 @@ static void pocket_draw_vitals(Canvas* canvas, PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
     char rows[16][40];
     const char* row_ptrs[16];
-    for(uint8_t i = 0U; i < 16U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 16U; ++i)
+        row_ptrs[i] = rows[i];
 
     snprintf(rows[0], sizeof(rows[0]), "Current HP: %d", character->hp_current);
     snprintf(rows[1], sizeof(rows[1]), "Maximum HP: %d", character->hp_max);
@@ -2765,10 +3119,7 @@ static void pocket_draw_vitals(Canvas* canvas, PocketD20App* app) {
     else
         snprintf(rows[4], sizeof(rows[4]), "Speed: %d ft", character->speed);
     snprintf(
-        rows[5],
-        sizeof(rows[5]),
-        "Initiative: %+d",
-        pocket_d20_initiative_modifier(character));
+        rows[5], sizeof(rows[5]), "Initiative: %+d", pocket_d20_initiative_modifier(character));
     snprintf(rows[6], sizeof(rows[6]), "Initiative misc: %+d", character->initiative_misc);
     snprintf(rows[7], sizeof(rows[7]), "Exhaustion: %u", character->exhaustion);
     snprintf(rows[8], sizeof(rows[8]), "Death saves: %u/%u", character->death_successes, 3U);
@@ -2871,7 +3222,8 @@ static __attribute__((unused)) void pocket_draw_builder(Canvas* canvas, PocketD2
     const PocketCharacter* c = &app->data.character;
     char rows[11][48];
     const char* row_ptrs[11];
-    for(uint8_t i = 0U; i < 11U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 11U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Species: %.31s", c->species);
     snprintf(rows[1], sizeof(rows[1]), "Background: %.31s", c->background);
     snprintf(rows[2], sizeof(rows[2]), "Origin feat: %.31s", c->origin_feat);
@@ -2902,14 +3254,10 @@ static void pocket_draw_grant_review(Canvas* canvas, PocketD20App* app) {
         } else if(row_index <= c->grant_count) {
             const PocketGrant* grant = &c->grants[row_index - 1U];
             char mark = grant->status == PocketGrantApplied ? 'A' :
-                        grant->status == PocketGrantSkipped ? 'S' : '?';
+                        grant->status == PocketGrantSkipped ? 'S' :
+                                                              '?';
             snprintf(
-                row,
-                sizeof(row),
-                "%c %.28s: %.28s",
-                mark,
-                grant->option_name,
-                grant->grant_value);
+                row, sizeof(row), "%c %.28s: %.28s", mark, grant->option_name, grant->grant_value);
         } else {
             pocket_copy(row, sizeof(row), "+ Add Custom Grant");
         }
@@ -2920,8 +3268,8 @@ static void pocket_draw_grant_review(Canvas* canvas, PocketD20App* app) {
 static void pocket_draw_grant_edit(Canvas* canvas, PocketD20App* app) {
     if(app->record_index >= app->data.character.grant_count) return;
     const PocketGrant* grant = &app->data.character.grants[app->record_index];
-    char stable_id[48], source[48], source_type[32], option[48], prerequisites[48],
-        class_name[40], level[24], payload[48], status[24];
+    char stable_id[48], source[48], source_type[32], option[48], prerequisites[48], class_name[40],
+        level[24], payload[48], status[24];
     static const char* const sources[] = {
         "Species", "Background", "Feat", "Class Feature", "Subclass", "Item"};
     snprintf(stable_id, sizeof(stable_id), "Stable ID: %.36s", grant->stable_id);
@@ -2929,24 +3277,47 @@ static void pocket_draw_grant_edit(Canvas* canvas, PocketD20App* app) {
     snprintf(source_type, sizeof(source_type), "Option type: %s", sources[grant->source_type]);
     snprintf(option, sizeof(option), "Option: %.38s", grant->option_name);
     snprintf(prerequisites, sizeof(prerequisites), "Requires: %.36s", grant->prerequisites);
-    snprintf(class_name, sizeof(class_name), "Class: %s",
-             grant->class_index < app->data.character.class_count ?
-                 app->data.character.classes[grant->class_index].name : "General");
+    snprintf(
+        class_name,
+        sizeof(class_name),
+        "Class: %s",
+        grant->class_index < app->data.character.class_count ?
+            app->data.character.classes[grant->class_index].name :
+            "General");
     snprintf(level, sizeof(level), "Gained level: %u", grant->level_gained);
     snprintf(payload, sizeof(payload), "Payload: %.37s", grant->grant_value);
-    snprintf(status, sizeof(status), "Status: %s",
-             grant->status == PocketGrantApplied ? "Applied" :
-             grant->status == PocketGrantSkipped ? "Skipped" : "Pending");
-    const char* rows[] = {stable_id, source, source_type, option, prerequisites, class_name,
-                          level, payload, status, "Delete Grant"};
+    snprintf(
+        status,
+        sizeof(status),
+        "Status: %s",
+        grant->status == PocketGrantApplied ? "Applied" :
+        grant->status == PocketGrantSkipped ? "Skipped" :
+                                              "Pending");
+    const char* rows[] = {
+        stable_id,
+        source,
+        source_type,
+        option,
+        prerequisites,
+        class_name,
+        level,
+        payload,
+        status,
+        "Delete Grant"};
     pocket_draw_header(canvas, "Structured Grant Editor", app->status);
     pocket_draw_menu_rows(canvas, app, rows, 10U);
 }
 
-static __attribute__((unused)) void pocket_draw_catalog_diagnostics(Canvas* canvas, PocketD20App* app) {
+static __attribute__((unused)) void
+    pocket_draw_catalog_diagnostics(Canvas* canvas, PocketD20App* app) {
     char rows[5][48];
     const char* ptrs[5] = {rows[0], rows[1], rows[2], rows[3], rows[4]};
-    snprintf(rows[0], sizeof(rows[0]), "Catalog files: %u/%u", app->diagnostics_catalogs, PocketCatalogCount);
+    snprintf(
+        rows[0],
+        sizeof(rows[0]),
+        "Catalog files: %u/%u",
+        app->diagnostics_catalogs,
+        PocketCatalogCount);
     snprintf(rows[1], sizeof(rows[1]), "Metadata records: %u", app->diagnostics_records);
     snprintf(rows[2], sizeof(rows[2]), "Invalid records: %u", app->diagnostics_invalid);
     snprintf(rows[3], sizeof(rows[3]), "Duplicate IDs: %u", app->diagnostics_duplicates);
@@ -2959,17 +3330,40 @@ static void pocket_draw_spell_filters(Canvas* canvas, PocketD20App* app) {
     const PocketCharacter* c = &app->data.character;
     char rows[6][48];
     const char* ptrs[6] = {rows[0], rows[1], rows[2], rows[3], rows[4], rows[5]};
-    snprintf(rows[0], sizeof(rows[0]), "Level: %s", app->spell_filter_level < 0 ? "Any" :
-        app->spell_filter_level == 0 ? "Cantrip" : "1-9 selected");
-    snprintf(rows[1], sizeof(rows[1]), "Class: %s", app->spell_filter_class < c->class_count ?
-        c->classes[app->spell_filter_class].name : "Current spell");
+    snprintf(
+        rows[0],
+        sizeof(rows[0]),
+        "Level: %s",
+        app->spell_filter_level < 0  ? "Any" :
+        app->spell_filter_level == 0 ? "Cantrip" :
+                                       "1-9 selected");
+    snprintf(
+        rows[1],
+        sizeof(rows[1]),
+        "Class: %s",
+        app->spell_filter_class < c->class_count ? c->classes[app->spell_filter_class].name :
+                                                   "Current spell");
     snprintf(rows[2], sizeof(rows[2]), "Ritual: %s", app->spell_filter_ritual ? "Only" : "Any");
-    snprintf(rows[3], sizeof(rows[3]), "School: %s", pocket_spell_school_names[app->spell_filter_school]);
-    snprintf(rows[4], sizeof(rows[4]), "Source: %s", app->spell_filter_source == 1U ? "Core" :
-        app->spell_filter_source == 2U ? "Add-on" : "Any");
-    snprintf(rows[5], sizeof(rows[5]), "Status: %s", app->spell_filter_prepared == 1U ? "Prepared" :
+    snprintf(
+        rows[3],
+        sizeof(rows[3]),
+        "School: %s",
+        pocket_spell_school_names[app->spell_filter_school]);
+    snprintf(
+        rows[4],
+        sizeof(rows[4]),
+        "Source: %s",
+        app->spell_filter_source == 1U ? "Core" :
+        app->spell_filter_source == 2U ? "Add-on" :
+                                         "Any");
+    snprintf(
+        rows[5],
+        sizeof(rows[5]),
+        "Status: %s",
+        app->spell_filter_prepared == 1U ? "Prepared" :
         app->spell_filter_prepared == 2U ? "Known" :
-        app->spell_filter_prepared == 3U ? "Always" : "Any");
+        app->spell_filter_prepared == 3U ? "Always" :
+                                           "Any");
     pocket_draw_header(canvas, "Spell Filters: <>", app->status);
     pocket_draw_menu_rows(canvas, app, ptrs, 6U);
 }
@@ -2978,12 +3372,29 @@ static void pocket_draw_resources(Canvas* canvas, PocketD20App* app) {
     const PocketCharacter* c = &app->data.character;
     char rows[9][48];
     const char* ptrs[9];
-    for(uint8_t i = 0U; i < 9U; ++i) ptrs[i] = rows[i];
-    snprintf(rows[0], sizeof(rows[0]), "Carried: %d.%d lb", pocket_d20_carried_weight_tenths(c) / 10, abs(pocket_d20_carried_weight_tenths(c) % 10));
-    snprintf(rows[1], sizeof(rows[1]), "Equipped: %d.%d lb", pocket_d20_equipped_weight_tenths(c) / 10, abs(pocket_d20_equipped_weight_tenths(c) % 10));
+    for(uint8_t i = 0U; i < 9U; ++i)
+        ptrs[i] = rows[i];
+    snprintf(
+        rows[0],
+        sizeof(rows[0]),
+        "Carried: %d.%d lb",
+        pocket_d20_carried_weight_tenths(c) / 10,
+        abs(pocket_d20_carried_weight_tenths(c) % 10));
+    snprintf(
+        rows[1],
+        sizeof(rows[1]),
+        "Equipped: %d.%d lb",
+        pocket_d20_equipped_weight_tenths(c) / 10,
+        abs(pocket_d20_equipped_weight_tenths(c) % 10));
     snprintf(rows[2], sizeof(rows[2]), "Capacity: %d lb", pocket_d20_carrying_capacity(c));
-    snprintf(rows[3], sizeof(rows[3]), "Encumbrance: %s", c->encumbrance_mode ? "Variant" : "Standard");
-    snprintf(rows[4], sizeof(rows[4]), "Attuned: %u/3%s", pocket_d20_attuned_count(c), pocket_d20_attuned_count(c) > 3U ? " !" : "");
+    snprintf(
+        rows[3], sizeof(rows[3]), "Encumbrance: %s", c->encumbrance_mode ? "Variant" : "Standard");
+    snprintf(
+        rows[4],
+        sizeof(rows[4]),
+        "Attuned: %u/3%s",
+        pocket_d20_attuned_count(c),
+        pocket_d20_attuned_count(c) > 3U ? " !" : "");
     snprintf(rows[5], sizeof(rows[5]), "Formula AC: %d", pocket_d20_calculated_armor_class(c));
     snprintf(rows[6], sizeof(rows[6]), "Apply armor/shield AC");
     snprintf(rows[7], sizeof(rows[7]), "Normalize coin values");
@@ -2996,7 +3407,8 @@ static __attribute__((unused)) void pocket_draw_combat_sheet(Canvas* canvas, Poc
     const PocketCharacter* c = &app->data.character;
     char rows[11][48];
     const char* ptrs[11];
-    for(uint8_t i = 0U; i < 11U; ++i) ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 11U; ++i)
+        ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Conditions: %.32s", c->conditions);
     snprintf(
         rows[1],
@@ -3034,17 +3446,17 @@ static void pocket_draw_attack_templates(Canvas* canvas, PocketD20App* app) {
                 attack->damage_dice,
                 attack->damage_die,
                 attack->attack_misc);
-        } else break;
+        } else
+            break;
         pocket_draw_row(canvas, visible, index == app->selection, row);
     }
 }
 
 static void pocket_draw_attack_template_edit(Canvas* canvas, PocketD20App* app) {
     if(app->record_index >= app->data.character.attack_template_count) return;
-    const PocketAttackTemplate* attack =
-        &app->data.character.attack_templates[app->record_index];
-    char type[32], ability[32], save[32], attack_misc[24], dc[24], damage_dice[24],
-        damage_die[24], rider_dice[24], rider_die[24], recharge[32];
+    const PocketAttackTemplate* attack = &app->data.character.attack_templates[app->record_index];
+    char type[32], ability[32], save[32], attack_misc[24], dc[24], damage_dice[24], damage_die[24],
+        rider_dice[24], rider_die[24], recharge[32];
     snprintf(type, sizeof(type), "Type: %s", pocket_attack_template_type_names[attack->type]);
     snprintf(ability, sizeof(ability), "Ability: %s", pocket_d20_ability_names[attack->ability]);
     snprintf(save, sizeof(save), "Save: %s", pocket_d20_ability_names[attack->save_ability]);
@@ -3055,18 +3467,32 @@ static void pocket_draw_attack_template_edit(Canvas* canvas, PocketD20App* app) 
     snprintf(rider_dice, sizeof(rider_dice), "Rider dice: %u", attack->rider_dice);
     snprintf(rider_die, sizeof(rider_die), "Rider die: d%u", attack->rider_die);
     snprintf(recharge, sizeof(recharge), "Recharge: %s", pocket_recharge_names[attack->recharge]);
-    const char* rows[] = {attack->name, type, ability, save, attack_misc, dc, damage_dice,
-        damage_die, attack->damage_type, attack->mastery, rider_dice, rider_die,
-        attack->rider_type, recharge, "Delete Template"};
+    const char* rows[] = {
+        attack->name,
+        type,
+        ability,
+        save,
+        attack_misc,
+        dc,
+        damage_dice,
+        damage_die,
+        attack->damage_type,
+        attack->mastery,
+        rider_dice,
+        rider_die,
+        attack->rider_type,
+        recharge,
+        "Delete Template"};
     pocket_draw_header(canvas, "Attack Template Editor", app->status);
     pocket_draw_menu_rows(canvas, app, rows, 15U);
 }
 
 static void pocket_draw_magic(Canvas* canvas, PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
-    char rows[17][48];
-    const char* row_ptrs[17];
-    for(uint8_t i = 0U; i < 17U; ++i) row_ptrs[i] = rows[i];
+    char rows[16][48];
+    const char* row_ptrs[16];
+    for(uint8_t i = 0U; i < 16U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Spells (%u) / hold: filters", character->spell_count);
     snprintf(
         rows[1],
@@ -3080,21 +3506,10 @@ static void pocket_draw_magic(Canvas* canvas, PocketD20App* app) {
         pocket_d20_proficiency_bonus(character),
         pocket_d20_spell_attack_modifier(character),
         pocket_d20_spell_save_dc(character));
+    snprintf(rows[3], sizeof(rows[3]), "Spell attack misc: %+d", character->spell_attack_misc);
+    snprintf(rows[4], sizeof(rows[4]), "Spell save misc: %+d", character->spell_save_misc);
     snprintf(
-        rows[3],
-        sizeof(rows[3]),
-        "Spell attack misc: %+d",
-        character->spell_attack_misc);
-    snprintf(
-        rows[4],
-        sizeof(rows[4]),
-        "Spell save misc: %+d",
-        character->spell_save_misc);
-    snprintf(
-        rows[5],
-        sizeof(rows[5]),
-        "Edit slots: %s",
-        app->edit_slot_max ? "Maximum" : "Current");
+        rows[5], sizeof(rows[5]), "Edit slots: %s", app->edit_slot_max ? "Maximum" : "Current");
     uint8_t wizard_level = pocket_wizard_level(character);
     if(app->arcane_recovery_active)
         snprintf(
@@ -3119,19 +3534,17 @@ static void pocket_draw_magic(Canvas* canvas, PocketD20App* app) {
             character->spell_slots_current[level],
             character->spell_slots_max[level]);
     }
-    snprintf(rows[16], sizeof(rows[16]), "Back to Main Menu");
     pocket_draw_header(
-        canvas,
-        app->arcane_recovery_active ? "Magic: Arcane Recovery" : "Magic",
-        app->status);
-    pocket_draw_menu_rows(canvas, app, row_ptrs, 17U);
+        canvas, app->arcane_recovery_active ? "Magic: Arcane Recovery" : "Magic", app->status);
+    pocket_draw_menu_rows(canvas, app, row_ptrs, 16U);
 }
 
 static void pocket_draw_currency(Canvas* canvas, PocketD20App* app) {
     const PocketCharacter* character = &app->data.character;
     char rows[5][40];
     const char* row_ptrs[5];
-    for(uint8_t i = 0U; i < 5U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 5U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Copper (CP): %ld", (long)character->currency_cp);
     snprintf(rows[1], sizeof(rows[1]), "Silver (SP): %ld", (long)character->currency_sp);
     snprintf(rows[2], sizeof(rows[2]), "Electrum (EP): %ld", (long)character->currency_ep);
@@ -3144,12 +3557,7 @@ static void pocket_draw_currency(Canvas* canvas, PocketD20App* app) {
 static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
     char page[24];
     uint16_t page_number = app->catalog_page_start / pocket_catalog_page_limit(app) + 1U;
-    snprintf(
-        page,
-        sizeof(page),
-        "Page %u%s <>",
-        page_number,
-        app->catalog_has_more ? "+" : "");
+    snprintf(page, sizeof(page), "Page %u%s <>", page_number, app->catalog_has_more ? "+" : "");
     pocket_draw_header(canvas, pocket_catalog_title(app), app->status[0] ? app->status : page);
     if(app->catalog_count == 0U) {
         pocket_draw_row(
@@ -3171,8 +3579,9 @@ static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
                 "L%u %.31s",
                 app->catalog_levels[index],
                 app->catalog_entries[index]);
-        else if(app->catalog_kind == PocketCatalogItems &&
-                app->catalog_item_categories[index] != PocketItemCategoryOther)
+        else if(
+            app->catalog_kind == PocketCatalogItems &&
+            app->catalog_item_categories[index] != PocketItemCategoryOther)
             snprintf(
                 row,
                 sizeof(row),
@@ -3182,11 +3591,7 @@ static void pocket_draw_catalog(Canvas* canvas, PocketD20App* app) {
                 app->catalog_entries[index]);
         else
             pocket_copy(row, sizeof(row), app->catalog_entries[index]);
-        pocket_draw_row(
-            canvas,
-            visible,
-            index == app->selection,
-            row);
+        pocket_draw_row(canvas, visible, index == app->selection, row);
     }
 }
 
@@ -3206,23 +3611,30 @@ static void pocket_draw_record_list(Canvas* canvas, PocketD20App* app) {
     }
 }
 
-static void pocket_format_record_detail(
-    const PocketD20App* app,
-    uint8_t field,
-    char* output,
-    size_t size) {
+static void
+    pocket_format_record_detail(const PocketD20App* app, uint8_t field, char* output, size_t size) {
     const PocketCharacter* character = &app->data.character;
     uint8_t index = app->record_index;
     switch(app->list_kind) {
     case PocketListClasses: {
         const PocketClassLevel* class_level = &character->classes[index];
-        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", class_level->name);
+        if(field == 0U)
+            pocket_format_labeled_text(output, size, "Name: ", class_level->name);
         else if(field == 1U)
             pocket_format_labeled_text(output, size, "Subclass: ", class_level->subclass);
-        else if(field == 2U) snprintf(output, size, "Class level: %u", class_level->level);
-        else if(field == 3U) snprintf(output, size, "Hit Point Die: d%u", class_level->hit_die);
-        else if(field == 4U) snprintf(output, size, "Class Hit Dice: %u/%u", class_level->hit_dice_current, class_level->hit_dice_max);
-        else if(field == 5U) snprintf(output, size, "Class Hit Dice max: %u", class_level->hit_dice_max);
+        else if(field == 2U)
+            snprintf(output, size, "Class level: %u", class_level->level);
+        else if(field == 3U)
+            snprintf(output, size, "Hit Point Die: d%u", class_level->hit_die);
+        else if(field == 4U)
+            snprintf(
+                output,
+                size,
+                "Class Hit Dice: %u/%u",
+                class_level->hit_dice_current,
+                class_level->hit_dice_max);
+        else if(field == 5U)
+            snprintf(output, size, "Class Hit Dice max: %u", class_level->hit_dice_max);
         else if(field == 6U)
             pocket_format_labeled_text(
                 output,
@@ -3235,22 +3647,49 @@ static void pocket_format_record_detail(
                 size,
                 "Casting ability: ",
                 pocket_d20_ability_names[class_level->spellcasting_ability]);
-        else if(field == 8U) snprintf(output, size, "Cantrip limit: %u", class_level->cantrip_limit);
-        else if(field == 9U) snprintf(output, size, "Prepared %u/%u", pocket_d20_class_prepared_count(character, index), class_level->prepared_limit);
-        else if(field == 10U) snprintf(output, size, "Spellbook size: %u", class_level->spellbook_size);
-        else if(field == 11U) snprintf(output, size, "Pact slot level: %u", class_level->pact_slot_level);
-        else if(field == 12U) snprintf(output, size, "Pact slots: %u/%u", class_level->pact_slots_current, class_level->pact_slots_max);
-        else if(field == 13U) snprintf(output, size, "Pact slots max: %u", class_level->pact_slots_max);
-        else if(field == 14U) snprintf(output, size, "Mystic Arcanum: 0x%X", class_level->mystic_arcanum_mask);
-        else if(field == 15U) snprintf(output, size, "Spell points: %u/%u", class_level->spell_points_current, class_level->spell_points_max);
-        else if(field == 16U) snprintf(output, size, "Spell points max: %u", class_level->spell_points_max);
-        else snprintf(output, size, "Delete class");
+        else if(field == 8U)
+            snprintf(output, size, "Cantrip limit: %u", class_level->cantrip_limit);
+        else if(field == 9U)
+            snprintf(
+                output,
+                size,
+                "Prepared %u/%u",
+                pocket_d20_class_prepared_count(character, index),
+                class_level->prepared_limit);
+        else if(field == 10U)
+            snprintf(output, size, "Spellbook size: %u", class_level->spellbook_size);
+        else if(field == 11U)
+            snprintf(output, size, "Pact slot level: %u", class_level->pact_slot_level);
+        else if(field == 12U)
+            snprintf(
+                output,
+                size,
+                "Pact slots: %u/%u",
+                class_level->pact_slots_current,
+                class_level->pact_slots_max);
+        else if(field == 13U)
+            snprintf(output, size, "Pact slots max: %u", class_level->pact_slots_max);
+        else if(field == 14U)
+            snprintf(output, size, "Mystic Arcanum: 0x%X", class_level->mystic_arcanum_mask);
+        else if(field == 15U)
+            snprintf(
+                output,
+                size,
+                "Spell points: %u/%u",
+                class_level->spell_points_current,
+                class_level->spell_points_max);
+        else if(field == 16U)
+            snprintf(output, size, "Spell points max: %u", class_level->spell_points_max);
+        else
+            snprintf(output, size, "Delete class");
         break;
     }
     case PocketListSpells: {
         const PocketSpell* spell = &character->spells[index];
-        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", spell->name);
-        else if(field == 1U) pocket_format_labeled_text(output, size, "Notes: ", spell->detail);
+        if(field == 0U)
+            pocket_format_labeled_text(output, size, "Name: ", spell->name);
+        else if(field == 1U)
+            pocket_format_labeled_text(output, size, "Notes: ", spell->detail);
         else if(field == 2U)
             pocket_format_labeled_text(
                 output,
@@ -3259,7 +3698,8 @@ static void pocket_format_record_detail(
                 spell->class_index < character->class_count ?
                     character->classes[spell->class_index].name :
                     "Primary");
-        else if(field == 3U) snprintf(output, size, "Level: %u", spell->level);
+        else if(field == 3U)
+            snprintf(output, size, "Level: %u", spell->level);
         else if(field == 4U)
             snprintf(output, size, "Known: %s", character->spell_known[index] ? "Yes" : "No");
         else if(field == 5U)
@@ -3270,7 +3710,8 @@ static void pocket_format_record_detail(
                 size,
                 "Always prepared: %s",
                 character->spell_always_prepared[index] ? "Yes" : "No");
-        else if(field == 7U) snprintf(output, size, "Ritual: %s", spell->ritual ? "Yes" : "No");
+        else if(field == 7U)
+            snprintf(output, size, "Ritual: %s", spell->ritual ? "Yes" : "No");
         else if(field == 8U)
             snprintf(
                 output,
@@ -3279,17 +3720,13 @@ static void pocket_format_record_detail(
                 character->spell_free_casts_current[index],
                 character->spell_free_casts_max[index]);
         else if(field == 9U)
-            snprintf(
-                output,
-                size,
-                "Free casts max: %u",
-                character->spell_free_casts_max[index]);
+            snprintf(output, size, "Free casts max: %u", character->spell_free_casts_max[index]);
         else if(field == 10U)
             pocket_copy(
                 output,
                 size,
                 character->spell_free_casts_current[index] ? "Use one free cast" :
-                                                               "No free casts left");
+                                                             "No free casts left");
         else if(field == 11U)
             pocket_format_labeled_text(output, size, "Stable ID: ", spell->stable_id);
         else if(field == 12U)
@@ -3298,7 +3735,8 @@ static void pocket_format_record_detail(
             pocket_format_labeled_text(output, size, "School: ", spell->school);
         else if(field == 14U)
             pocket_format_labeled_text(output, size, "Grant source: ", spell->grant_name);
-        else if(field == 15U) snprintf(output, size, "Grant type: %u", spell->grant_source);
+        else if(field == 15U)
+            snprintf(output, size, "Grant type: %u", spell->grant_source);
         else
             snprintf(output, size, "Delete spell");
         break;
@@ -3308,7 +3746,8 @@ static void pocket_format_record_detail(
         const char* class_name = feature->class_index < character->class_count ?
                                      character->classes[feature->class_index].name :
                                      "General";
-        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", feature->name);
+        if(field == 0U)
+            pocket_format_labeled_text(output, size, "Name: ", feature->name);
         else if(field == 1U)
             pocket_format_labeled_text(output, size, "Notes: ", feature->detail);
         else if(field == 2U)
@@ -3317,14 +3756,24 @@ static void pocket_format_record_detail(
             snprintf(output, size, "Gained at class L%u", feature->class_level_gained);
         else if(field == 4U)
             snprintf(output, size, "Uses: %d/%d", feature->uses_current, feature->uses_max);
-        else if(field == 5U) snprintf(output, size, "Maximum uses: %d", feature->uses_max);
+        else if(field == 5U)
+            snprintf(output, size, "Maximum uses: %d", feature->uses_max);
         else if(field == 6U)
             snprintf(output, size, "Recharge: %s", pocket_recharge_names[feature->recharge]);
         else if(field == 7U)
-            snprintf(output, size, "Resource formula: %s", pocket_resource_formula_names[feature->resource_formula]);
+            snprintf(
+                output,
+                size,
+                "Resource formula: %s",
+                pocket_resource_formula_names[feature->resource_formula]);
         else if(field == 8U)
-            snprintf(output, size, "Resource ability: %s", pocket_d20_ability_names[feature->resource_ability]);
-        else snprintf(output, size, "Delete feature");
+            snprintf(
+                output,
+                size,
+                "Resource ability: %s",
+                pocket_d20_ability_names[feature->resource_ability]);
+        else
+            snprintf(output, size, "Delete feature");
         break;
     }
     case PocketListItems: {
@@ -3340,7 +3789,12 @@ static void pocket_format_record_detail(
             snprintf(output, size, "Quantity: %d", item->quantity);
             break;
         case 3:
-            snprintf(output, size, "Weight: %d.%d lb", item->weight_tenths / 10, abs(item->weight_tenths % 10));
+            snprintf(
+                output,
+                size,
+                "Weight: %d.%d lb",
+                item->weight_tenths / 10,
+                abs(item->weight_tenths % 10));
             break;
         case 4:
             snprintf(output, size, "Equipped: %s", item->equipped ? "Yes" : "No");
@@ -3352,7 +3806,11 @@ static void pocket_format_record_detail(
             snprintf(output, size, "Weapon: %s", item->is_weapon ? "Yes" : "No");
             break;
         case 7:
-            snprintf(output, size, "Attack ability: %s", pocket_attack_ability_names[item->attack_ability]);
+            snprintf(
+                output,
+                size,
+                "Attack ability: %s",
+                pocket_attack_ability_names[item->attack_ability]);
             break;
         case 8:
             snprintf(output, size, "Proficient: %s", item->proficient ? "Yes" : "No");
@@ -3379,22 +3837,46 @@ static void pocket_format_record_detail(
             snprintf(output, size, "Type: %s", pocket_d20_damage_names[item->damage_type]);
             break;
         case 16:
-            snprintf(output, size, "Finesse: %s", (item->weapon_properties & PocketWeaponFinesse) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Finesse: %s",
+                (item->weapon_properties & PocketWeaponFinesse) ? "Yes" : "No");
             break;
         case 17:
-            snprintf(output, size, "Ranged: %s", (item->weapon_properties & PocketWeaponRanged) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Ranged: %s",
+                (item->weapon_properties & PocketWeaponRanged) ? "Yes" : "No");
             break;
         case 18:
-            snprintf(output, size, "Light: %s", (item->weapon_properties & PocketWeaponLight) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Light: %s",
+                (item->weapon_properties & PocketWeaponLight) ? "Yes" : "No");
             break;
         case 19:
-            snprintf(output, size, "Heavy: %s", (item->weapon_properties & PocketWeaponHeavy) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Heavy: %s",
+                (item->weapon_properties & PocketWeaponHeavy) ? "Yes" : "No");
             break;
         case 20:
-            snprintf(output, size, "Thrown: %s", (item->weapon_properties & PocketWeaponThrown) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Thrown: %s",
+                (item->weapon_properties & PocketWeaponThrown) ? "Yes" : "No");
             break;
         case 21:
-            snprintf(output, size, "Ammunition: %s", (item->weapon_properties & PocketWeaponAmmunition) ? "Yes" : "No");
+            snprintf(
+                output,
+                size,
+                "Ammunition: %s",
+                (item->weapon_properties & PocketWeaponAmmunition) ? "Yes" : "No");
             break;
         case 22:
             snprintf(output, size, "Add ability dmg: %s", item->add_ability_damage ? "Yes" : "No");
@@ -3421,7 +3903,11 @@ static void pocket_format_record_detail(
                 item->use_versatile ? item->versatile_die : item->damage_die);
             break;
         case 28:
-            snprintf(output, size, "Container: %s", item->container_index < 0 ? "Carried" : "Inside item");
+            snprintf(
+                output,
+                size,
+                "Container: %s",
+                item->container_index < 0 ? "Carried" : "Inside item");
             break;
         case 29:
             snprintf(output, size, "Charges: %d/%d", item->charges_current, item->charges_max);
@@ -3450,7 +3936,8 @@ static void pocket_format_record_detail(
     case PocketListLanguages:
         if(field == 0U)
             pocket_format_labeled_text(output, size, "Language: ", character->languages[index]);
-        else snprintf(output, size, "Delete language");
+        else
+            snprintf(output, size, "Delete language");
         break;
     case PocketListJournal: {
         const PocketJournalEntry* entry = &character->journal[index];
@@ -3459,15 +3946,13 @@ static void pocket_format_record_detail(
                                      "Primary";
         if(field == 0U)
             pocket_format_labeled_text(
-                output,
-                size,
-                "Category: ",
-                pocket_d20_journal_category_names[entry->category]);
+                output, size, "Category: ", pocket_d20_journal_category_names[entry->category]);
         else if(field == 1U)
             pocket_format_labeled_text(output, size, "Title: ", entry->title);
         else if(field == 2U)
             pocket_format_labeled_text(output, size, "Body: ", entry->body);
-        else if(field == 3U) snprintf(output, size, "Complete: %s", entry->completed ? "Yes" : "No");
+        else if(field == 3U)
+            snprintf(output, size, "Complete: %s", entry->completed ? "Yes" : "No");
         else if(field == 4U)
             pocket_format_labeled_text(output, size, "Level class: ", class_name);
         else if(field == 5U)
@@ -3475,18 +3960,26 @@ static void pocket_format_record_detail(
                 output,
                 size,
                 entry->level_granted ? "Level already applied" : "Apply milestone level");
-        else if(field == 6U) snprintf(output, size, "Create inventory item");
-        else snprintf(output, size, "Delete journal entry");
+        else if(field == 6U)
+            snprintf(output, size, "Create inventory item");
+        else
+            snprintf(output, size, "Delete journal entry");
         break;
     }
     case PocketListParty: {
         const PocketPartyMember* member = &app->data.party[index];
-        if(field == 0U) pocket_format_labeled_text(output, size, "Name: ", member->name);
-        else if(field == 1U) snprintf(output, size, "Initiative mod: %+d", member->initiative_modifier);
-        else if(field == 2U) snprintf(output, size, "Armor Class: %d", member->armor_class);
-        else if(field == 3U) snprintf(output, size, "Current HP: %d", member->hp_current);
-        else if(field == 4U) snprintf(output, size, "Maximum HP: %d", member->hp_max);
-        else snprintf(output, size, "Delete party member");
+        if(field == 0U)
+            pocket_format_labeled_text(output, size, "Name: ", member->name);
+        else if(field == 1U)
+            snprintf(output, size, "Initiative mod: %+d", member->initiative_modifier);
+        else if(field == 2U)
+            snprintf(output, size, "Armor Class: %d", member->armor_class);
+        else if(field == 3U)
+            snprintf(output, size, "Current HP: %d", member->hp_current);
+        else if(field == 4U)
+            snprintf(output, size, "Maximum HP: %d", member->hp_max);
+        else
+            snprintf(output, size, "Delete party member");
         break;
     }
     }
@@ -3508,7 +4001,8 @@ static void pocket_draw_combat(Canvas* canvas, PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
     char rows[20][48];
     const char* row_ptrs[20];
-    for(uint8_t i = 0U; i < 20U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 20U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Weapon Attacks");
     snprintf(rows[1], sizeof(rows[1]), "Attack Templates (%u)", character->attack_template_count);
     snprintf(rows[2], sizeof(rows[2]), "Initiative Tracker");
@@ -3530,7 +4024,11 @@ static void pocket_draw_combat(Canvas* canvas, PocketD20App* app) {
         sizeof(rows[9]),
         "Concentration: %.31s",
         character->concentration[0] ? character->concentration : "None");
-    snprintf(rows[10], sizeof(rows[10]), "Reaction: %s", character->reaction_available ? "Ready" : "Used");
+    snprintf(
+        rows[10],
+        sizeof(rows[10]),
+        "Reaction: %s",
+        character->reaction_available ? "Ready" : "Used");
     snprintf(rows[11], sizeof(rows[11]), "Temp effects: %.30s", character->temporary_effects);
     snprintf(rows[12], sizeof(rows[12]), "Resist: %.35s", character->resistances);
     snprintf(rows[13], sizeof(rows[13]), "Immune: %.35s", character->immunities);
@@ -3547,7 +4045,8 @@ static void pocket_draw_combat(Canvas* canvas, PocketD20App* app) {
 static void pocket_draw_dice(Canvas* canvas, PocketD20App* app) {
     char rows[5][48];
     const char* row_ptrs[5];
-    for(uint8_t i = 0U; i < 5U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 5U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Dice count: %u", app->dice_count);
     snprintf(rows[1], sizeof(rows[1]), "Die: d%u", app->dice_sides);
     snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", app->dice_modifier);
@@ -3614,11 +4113,10 @@ static void pocket_draw_dice_result(Canvas* canvas, PocketD20App* app) {
         snprintf(rows[3], sizeof(rows[3]), "Modifier: %+d", app->dice_modifier);
         snprintf(rows[4], sizeof(rows[4]), "Total: %d (OK reroll)", app->dice_result);
     } else if(app->dice_second) {
-        uint8_t chosen = app->roll_mode == PocketRollAdvantage ?
-                             (app->dice_first > app->dice_second ? app->dice_first :
-                                                                   app->dice_second) :
-                             (app->dice_first < app->dice_second ? app->dice_first :
-                                                                   app->dice_second);
+        uint8_t chosen =
+            app->roll_mode == PocketRollAdvantage ?
+                (app->dice_first > app->dice_second ? app->dice_first : app->dice_second) :
+                (app->dice_first < app->dice_second ? app->dice_first : app->dice_second);
         snprintf(
             title,
             sizeof(title),
@@ -3773,10 +4271,7 @@ static void pocket_draw_attack_result(Canvas* canvas, PocketD20App* app) {
             pocket_draw_row(canvas, 4U, false, row);
         } else {
             snprintf(
-                row,
-                sizeof(row),
-                "%s damage",
-                app->damage_roll.critical ? "Critical" : "Normal");
+                row, sizeof(row), "%s damage", app->damage_roll.critical ? "Critical" : "Normal");
             pocket_draw_row(canvas, 0U, false, row);
             snprintf(row, sizeof(row), "Weapon dice: %d", app->damage_roll.weapon_total);
             pocket_draw_row(canvas, 1U, false, row);
@@ -3791,33 +4286,32 @@ static void pocket_draw_attack_result(Canvas* canvas, PocketD20App* app) {
 }
 
 static void pocket_draw_initiative_menu(Canvas* canvas, PocketD20App* app) {
-    char rows[6][48];
-    const char* row_ptrs[6];
-    for(uint8_t i = 0U; i < 6U; ++i) row_ptrs[i] = rows[i];
+    char rows[5][48];
+    const char* row_ptrs[5];
+    for(uint8_t i = 0U; i < 5U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Start New Combat");
     snprintf(
-        rows[1],
-        sizeof(rows[1]),
-        "Resume Combat%s",
-        app->data.initiative.active ? "" : " (none)");
+        rows[1], sizeof(rows[1]), "Resume Combat%s", app->data.initiative.active ? "" : " (none)");
     snprintf(rows[2], sizeof(rows[2]), "Party Roster (%u)", app->data.party_count);
     snprintf(rows[3], sizeof(rows[3]), "Edit Current Order");
     snprintf(rows[4], sizeof(rows[4]), "End Current Combat");
-    snprintf(rows[5], sizeof(rows[5]), "Undo last change (%u)", app->data.encounter_history_count);
     pocket_draw_header(canvas, "Initiative", app->status);
-    pocket_draw_menu_rows(canvas, app, row_ptrs, 6U);
+    pocket_draw_menu_rows(canvas, app, row_ptrs, 5U);
 }
 
 static void pocket_draw_initiative_setup(Canvas* canvas, PocketD20App* app) {
     PocketInitiativeState* initiative = &app->data.initiative;
-    pocket_draw_header(canvas, "Set Initiative: <> / hold OK", app->status);
-    uint16_t count = initiative->count + 2U;
+    pocket_draw_header(canvas, "Set Initiative: OK roll / hold OK enter", app->status);
+    uint16_t count = initiative->count + 3U;
     for(uint8_t visible = 0U; visible < 5U; ++visible) {
         uint16_t index = app->scroll + visible;
         if(index >= count) break;
         char row[48];
-        if(index < initiative->count) {
-            PocketInitiativeEntry* entry = &initiative->entries[index];
+        if(index == 0U) {
+            snprintf(row, sizeof(row), "Roll for All");
+        } else if(index <= initiative->count) {
+            PocketInitiativeEntry* entry = &initiative->entries[index - 1U];
             snprintf(
                 row,
                 sizeof(row),
@@ -3826,7 +4320,7 @@ static void pocket_draw_initiative_setup(Canvas* canvas, PocketD20App* app) {
                 entry->initiative_total,
                 entry->hp_current,
                 entry->armor_class);
-        } else if(index == initiative->count) {
+        } else if(index == initiative->count + 1U) {
             snprintf(row, sizeof(row), "+ Temporary participant");
         } else {
             snprintf(row, sizeof(row), "Begin Combat");
@@ -3865,7 +4359,8 @@ static void pocket_draw_initiative_edit(Canvas* canvas, PocketD20App* app) {
     const PocketInitiativeEntry* entry = &app->data.initiative.entries[app->record_index];
     char rows[8][48];
     const char* row_ptrs[8];
-    for(uint8_t i = 0U; i < 8U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 8U; ++i)
+        row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Name: %.23s", entry->name);
     snprintf(rows[1], sizeof(rows[1]), "Initiative roll: %d", entry->initiative_total);
     snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", entry->initiative_modifier);
@@ -4174,31 +4669,23 @@ static void pocket_draw_animated_die(
 
 static void pocket_draw_dice_animation(Canvas* canvas, PocketD20App* app) {
     char title[40];
-    snprintf(
-        title,
-        sizeof(title),
-        "Rolling %ud%u...",
-        app->dice_anim_count,
-        app->dice_anim_sides);
+    snprintf(title, sizeof(title), "Rolling %ud%u...", app->dice_anim_count, app->dice_anim_sides);
     pocket_draw_header(canvas, title, NULL);
     uint8_t visible_dice = app->dice_anim_count > 1U ? 3U : 1U;
     for(uint8_t i = 0U; i < visible_dice; ++i) {
         int32_t x = visible_dice == 1U ? 64 : 22 + (i * 42);
-        uint8_t face =
-            (uint8_t)(((app->dice_anim_frame * 7U) + (i * 5U) + app->dice_anim_sides) %
-                      app->dice_anim_sides) +
-            1U;
+        uint8_t face = (uint8_t)(((app->dice_anim_frame * 7U) + (i * 5U) + app->dice_anim_sides) %
+                                 app->dice_anim_sides) +
+                       1U;
         pocket_draw_animated_die(canvas, x, 34, app->dice_anim_frame + i, face);
     }
     canvas_draw_frame(canvas, 14, 55, 100, 5);
-    uint8_t progress = (uint8_t)(((app->dice_anim_frame + 1U) * 98U) /
-                                 POCKET_D20_DICE_ANIMATION_FRAMES);
+    uint8_t progress =
+        (uint8_t)(((app->dice_anim_frame + 1U) * 98U) / POCKET_D20_DICE_ANIMATION_FRAMES);
     canvas_draw_box(canvas, 15, 56, progress, 3);
 }
 
-static void pocket_draw_adventure_sprite(
-    Canvas* canvas,
-    const PocketAdventureScene* scene) {
+static void pocket_draw_adventure_sprite(Canvas* canvas, const PocketAdventureScene* scene) {
     canvas_draw_frame(canvas, 2, 13, 27, 27);
     if(strcmp(scene->sprite, "dolphin") == 0) {
         canvas_draw_line(canvas, 6, 28, 13, 22);
@@ -4227,7 +4714,7 @@ static void pocket_draw_adventure_sprite(
 
 static void pocket_draw_campaigns(Canvas* canvas, PocketD20App* app) {
     pocket_draw_header(canvas, "Campaign Packs", app->status);
-    uint16_t rows = app->campaign_count + 1U;
+    uint16_t rows = app->campaign_count + 2U;
     for(uint8_t visible = 0U; visible < 5U; ++visible) {
         uint16_t index = app->scroll + visible;
         if(index >= rows) break;
@@ -4235,20 +4722,35 @@ static void pocket_draw_campaigns(Canvas* canvas, PocketD20App* app) {
         if(index < app->campaign_count) {
             PocketCampaignSummary campaign;
             if(!pocket_campaign_at(app->storage, index, &campaign)) continue;
-            snprintf(row, sizeof(row), "%c %s",
-                     !strcmp(campaign.id, app->data.character.adventure_campaign) ? '*' : ' ',
-                     campaign.name);
-        } else {
+            snprintf(
+                row,
+                sizeof(row),
+                "%c %s",
+                !strcmp(campaign.id, app->data.character.adventure_campaign) ? '*' : ' ',
+                campaign.name);
+        } else if(index == app->campaign_count) {
             snprintf(row, sizeof(row), "Campaign Diagnostics");
+        } else {
+            snprintf(row, sizeof(row), "Installed Pack Controls");
         }
         pocket_draw_row(canvas, visible, index == app->selection, row);
     }
 }
 
+static void pocket_draw_campaign_packs(Canvas* canvas, PocketD20App* app) {
+    pocket_draw_header(canvas, "Installed Campaign Packs", app->status);
+    uint16_t rows = app->campaign_pack_count + 1U;
+    for(uint8_t visible = 0U; visible < 5U; ++visible) {
+        uint16_t index = app->scroll + visible;
+        if(index >= rows) break;
+        pocket_draw_row(canvas, visible, index == app->selection, app->campaign_pack_rows[index]);
+    }
+}
+
 static void pocket_draw_campaign_diagnostics(Canvas* canvas, PocketD20App* app) {
     PocketCampaignDiagnostics* d = &app->campaign_diagnostics;
-    char records[32], incompatible[32], files[32], campaigns[32], scenes[32], entry[32],
-        links[32], problem[48], detail[48];
+    char records[32], incompatible[32], files[32], campaigns[32], scenes[32], entry[32], links[32],
+        problem[48], detail[48];
     snprintf(records, sizeof(records), "Manifests: %u", d->records);
     snprintf(incompatible, sizeof(incompatible), "Incompatible: %u", d->incompatible);
     snprintf(files, sizeof(files), "Missing files: %u", d->missing_scene_files);
@@ -4258,8 +4760,17 @@ static void pocket_draw_campaign_diagnostics(Canvas* canvas, PocketD20App* app) 
     snprintf(links, sizeof(links), "Broken links: %u", d->broken_links);
     snprintf(problem, sizeof(problem), "ID: %s", d->problem_id[0] ? d->problem_id : "none");
     snprintf(detail, sizeof(detail), "Issue: %.39s", d->problem[0] ? d->problem : "none");
-    const char* rows[] = {records, incompatible, files, campaigns, scenes, entry, links,
-                          problem, detail, "OK: rescan"};
+    const char* rows[] = {
+        records,
+        incompatible,
+        files,
+        campaigns,
+        scenes,
+        entry,
+        links,
+        problem,
+        detail,
+        "OK: rescan"};
     pocket_draw_header(canvas, "Campaign Diagnostics", app->status);
     pocket_draw_menu_rows(canvas, app, rows, 10U);
 }
@@ -4397,6 +4908,9 @@ static void pocket_draw_callback(Canvas* canvas, void* model) {
     case PocketScreenCampaignDiagnostics:
         pocket_draw_campaign_diagnostics(canvas, app);
         break;
+    case PocketScreenCampaignPacks:
+        pocket_draw_campaign_packs(canvas, app);
+        break;
     case PocketScreenAdventure:
         pocket_draw_adventure(canvas, app);
         break;
@@ -4405,10 +4919,7 @@ static void pocket_draw_callback(Canvas* canvas, void* model) {
     }
 }
 
-static void pocket_open_list(
-    PocketD20App* app,
-    PocketListKind kind,
-    PocketScreen return_screen) {
+static void pocket_open_list(PocketD20App* app, PocketListKind kind, PocketScreen return_screen) {
     pocket_release_text_input(app);
     pocket_release_number_input(app);
     app->list_kind = kind;
@@ -4467,8 +4978,7 @@ static bool pocket_add_record(PocketD20App* app) {
             sizeof(character->features[app->record_index].name),
             "New Feature");
         character->features[app->record_index].class_index = 0U;
-        character->features[app->record_index].class_level_gained =
-            character->classes[0].level;
+        character->features[app->record_index].class_level_gained = character->classes[0].level;
         break;
     case PocketListItems: {
         if(character->item_count >= POCKET_D20_MAX_ITEMS ||
@@ -4491,10 +5001,7 @@ static bool pocket_add_record(PocketD20App* app) {
         if(character->language_count >= POCKET_D20_MAX_LANGUAGES) return false;
         app->record_index = character->language_count++;
         memset(character->languages[app->record_index], 0, POCKET_D20_SHORT_LEN);
-        pocket_copy(
-            character->languages[app->record_index],
-            POCKET_D20_SHORT_LEN,
-            "New Language");
+        pocket_copy(character->languages[app->record_index], POCKET_D20_SHORT_LEN, "New Language");
         break;
     case PocketListJournal:
         if(character->journal_count >= POCKET_D20_MAX_JOURNAL ||
@@ -4663,13 +5170,18 @@ static void pocket_text_done(void* context) {
         pocket_copy(character->origin_feat, sizeof(character->origin_feat), app->edit_buffer);
         break;
     case PocketEditToolProficiencies:
-        pocket_copy(character->tool_proficiencies, sizeof(character->tool_proficiencies), app->edit_buffer);
+        pocket_copy(
+            character->tool_proficiencies,
+            sizeof(character->tool_proficiencies),
+            app->edit_buffer);
         break;
     case PocketEditArmorTraining:
-        pocket_copy(character->armor_training, sizeof(character->armor_training), app->edit_buffer);
+        pocket_copy(
+            character->armor_training, sizeof(character->armor_training), app->edit_buffer);
         break;
     case PocketEditWeaponTraining:
-        pocket_copy(character->weapon_training, sizeof(character->weapon_training), app->edit_buffer);
+        pocket_copy(
+            character->weapon_training, sizeof(character->weapon_training), app->edit_buffer);
         break;
     case PocketEditSenses:
         pocket_copy(character->senses, sizeof(character->senses), app->edit_buffer);
@@ -4681,7 +5193,8 @@ static void pocket_text_done(void* context) {
         pocket_copy(character->concentration, sizeof(character->concentration), app->edit_buffer);
         break;
     case PocketEditTemporaryEffects:
-        pocket_copy(character->temporary_effects, sizeof(character->temporary_effects), app->edit_buffer);
+        pocket_copy(
+            character->temporary_effects, sizeof(character->temporary_effects), app->edit_buffer);
         break;
     case PocketEditResistances:
         pocket_copy(character->resistances, sizeof(character->resistances), app->edit_buffer);
@@ -4690,10 +5203,12 @@ static void pocket_text_done(void* context) {
         pocket_copy(character->immunities, sizeof(character->immunities), app->edit_buffer);
         break;
     case PocketEditVulnerabilities:
-        pocket_copy(character->vulnerabilities, sizeof(character->vulnerabilities), app->edit_buffer);
+        pocket_copy(
+            character->vulnerabilities, sizeof(character->vulnerabilities), app->edit_buffer);
         break;
     case PocketEditMovementModes:
-        pocket_copy(character->movement_modes, sizeof(character->movement_modes), app->edit_buffer);
+        pocket_copy(
+            character->movement_modes, sizeof(character->movement_modes), app->edit_buffer);
         break;
     case PocketEditClassName:
         pocket_copy(
@@ -4720,56 +5235,91 @@ static void pocket_text_done(void* context) {
             app->edit_buffer);
         break;
     case PocketEditSpellStableId:
-        pocket_copy(character->spells[index].stable_id, sizeof(character->spells[index].stable_id), app->edit_buffer);
+        pocket_copy(
+            character->spells[index].stable_id,
+            sizeof(character->spells[index].stable_id),
+            app->edit_buffer);
         break;
     case PocketEditSpellSource:
-        pocket_copy(character->spells[index].source, sizeof(character->spells[index].source), app->edit_buffer);
+        pocket_copy(
+            character->spells[index].source,
+            sizeof(character->spells[index].source),
+            app->edit_buffer);
         break;
     case PocketEditSpellSchool:
-        pocket_copy(character->spells[index].school, sizeof(character->spells[index].school), app->edit_buffer);
+        pocket_copy(
+            character->spells[index].school,
+            sizeof(character->spells[index].school),
+            app->edit_buffer);
         break;
     case PocketEditSpellGrantName:
-        pocket_copy(character->spells[index].grant_name, sizeof(character->spells[index].grant_name), app->edit_buffer);
+        pocket_copy(
+            character->spells[index].grant_name,
+            sizeof(character->spells[index].grant_name),
+            app->edit_buffer);
         break;
     case PocketEditGrantStableId:
-        if(index < character->grant_count) pocket_copy(character->grants[index].stable_id,
-            sizeof(character->grants[index].stable_id), app->edit_buffer);
+        if(index < character->grant_count)
+            pocket_copy(
+                character->grants[index].stable_id,
+                sizeof(character->grants[index].stable_id),
+                app->edit_buffer);
         break;
     case PocketEditGrantSource:
-        if(index < character->grant_count) pocket_copy(character->grants[index].source,
-            sizeof(character->grants[index].source), app->edit_buffer);
+        if(index < character->grant_count)
+            pocket_copy(
+                character->grants[index].source,
+                sizeof(character->grants[index].source),
+                app->edit_buffer);
         break;
     case PocketEditGrantOption:
-        if(index < character->grant_count) pocket_copy(character->grants[index].option_name,
-            sizeof(character->grants[index].option_name), app->edit_buffer);
+        if(index < character->grant_count)
+            pocket_copy(
+                character->grants[index].option_name,
+                sizeof(character->grants[index].option_name),
+                app->edit_buffer);
         break;
     case PocketEditGrantPrerequisites:
-        if(index < character->grant_count) pocket_copy(character->grants[index].prerequisites,
-            sizeof(character->grants[index].prerequisites), app->edit_buffer);
+        if(index < character->grant_count)
+            pocket_copy(
+                character->grants[index].prerequisites,
+                sizeof(character->grants[index].prerequisites),
+                app->edit_buffer);
         break;
     case PocketEditGrantValue:
-        if(index < character->grant_count) pocket_copy(character->grants[index].grant_value,
-            sizeof(character->grants[index].grant_value), app->edit_buffer);
+        if(index < character->grant_count)
+            pocket_copy(
+                character->grants[index].grant_value,
+                sizeof(character->grants[index].grant_value),
+                app->edit_buffer);
         break;
     case PocketEditAttackName:
-        if(index < character->attack_template_count) pocket_copy(
-            character->attack_templates[index].name,
-            sizeof(character->attack_templates[index].name), app->edit_buffer);
+        if(index < character->attack_template_count)
+            pocket_copy(
+                character->attack_templates[index].name,
+                sizeof(character->attack_templates[index].name),
+                app->edit_buffer);
         break;
     case PocketEditAttackMastery:
-        if(index < character->attack_template_count) pocket_copy(
-            character->attack_templates[index].mastery,
-            sizeof(character->attack_templates[index].mastery), app->edit_buffer);
+        if(index < character->attack_template_count)
+            pocket_copy(
+                character->attack_templates[index].mastery,
+                sizeof(character->attack_templates[index].mastery),
+                app->edit_buffer);
         break;
     case PocketEditAttackDamageType:
-        if(index < character->attack_template_count) pocket_copy(
-            character->attack_templates[index].damage_type,
-            sizeof(character->attack_templates[index].damage_type), app->edit_buffer);
+        if(index < character->attack_template_count)
+            pocket_copy(
+                character->attack_templates[index].damage_type,
+                sizeof(character->attack_templates[index].damage_type),
+                app->edit_buffer);
         break;
     case PocketEditAttackRiderType:
-        if(index < character->attack_template_count) pocket_copy(
-            character->attack_templates[index].rider_type,
-            sizeof(character->attack_templates[index].rider_type), app->edit_buffer);
+        if(index < character->attack_template_count)
+            pocket_copy(
+                character->attack_templates[index].rider_type,
+                sizeof(character->attack_templates[index].rider_type),
+                app->edit_buffer);
         break;
     case PocketEditFeatureName:
         pocket_copy(
@@ -4785,9 +5335,7 @@ static void pocket_text_done(void* context) {
         break;
     case PocketEditItemName:
         pocket_copy(
-            character->items[index].name,
-            sizeof(character->items[index].name),
-            app->edit_buffer);
+            character->items[index].name, sizeof(character->items[index].name), app->edit_buffer);
         break;
     case PocketEditItemDetail:
         pocket_copy(
@@ -4796,7 +5344,10 @@ static void pocket_text_done(void* context) {
             app->edit_buffer);
         break;
     case PocketEditItemAmmoGroup:
-        pocket_copy(character->items[index].ammunition_group, sizeof(character->items[index].ammunition_group), app->edit_buffer);
+        pocket_copy(
+            character->items[index].ammunition_group,
+            sizeof(character->items[index].ammunition_group),
+            app->edit_buffer);
         break;
     case PocketEditLanguageName:
         pocket_copy(character->languages[index], POCKET_D20_SHORT_LEN, app->edit_buffer);
@@ -4815,9 +5366,7 @@ static void pocket_text_done(void* context) {
         break;
     case PocketEditPartyName:
         pocket_copy(
-            app->data.party[index].name,
-            sizeof(app->data.party[index].name),
-            app->edit_buffer);
+            app->data.party[index].name, sizeof(app->data.party[index].name), app->edit_buffer);
         break;
     case PocketEditTemporaryInitiativeName:
         pocket_copy(
@@ -4902,7 +5451,7 @@ static bool pocket_is_move_event(const InputEvent* event) {
 static void pocket_handle_back(PocketD20App* app) {
     switch(app->screen) {
     case PocketScreenHome:
-        pocket_save(app, false);
+        pocket_flush_save(app, false);
         view_dispatcher_stop(app->dispatcher);
         break;
     case PocketScreenRecordList:
@@ -4968,6 +5517,7 @@ static void pocket_handle_back(PocketD20App* app) {
         pocket_enter_screen(app, PocketScreenHome);
         break;
     case PocketScreenCampaignDiagnostics:
+    case PocketScreenCampaignPacks:
         pocket_enter_screen(app, PocketScreenCampaigns);
         break;
     default:
@@ -4977,8 +5527,12 @@ static void pocket_handle_back(PocketD20App* app) {
 }
 
 static void pocket_handle_long_back(PocketD20App* app) {
+    if(app->screen == PocketScreenInitiativeCombat) {
+        pocket_enter_screen(app, PocketScreenInitiativeMenu);
+        return;
+    }
     if(app->screen == PocketScreenHome) {
-        pocket_save(app, false);
+        pocket_flush_save(app, false);
         view_dispatcher_stop(app->dispatcher);
         return;
     }
@@ -5003,17 +5557,16 @@ static void pocket_handle_profiles(PocketD20App* app, const InputEvent* event) {
             pocket_create_profile(app);
         else
             pocket_switch_profile(app, pocket_profile_id_at(app, app->selection));
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection < profile_count) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        app->selection < profile_count) {
         app->profile_action_id = pocket_profile_id_at(app, app->selection);
         pocket_enter_screen(app, PocketScreenProfileActions);
     }
 }
 
 static void pocket_profile_actions_to_list(PocketD20App* app) {
-    app->screen = PocketScreenProfiles;
-    app->selection = 0U;
-    app->scroll = 0U;
+    pocket_enter_screen(app, PocketScreenProfiles);
 }
 
 static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* event) {
@@ -5031,14 +5584,12 @@ static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* e
                 pocket_set_status(app, "Switch before rename");
             } else {
                 pocket_begin_text(
-                    app,
-                    PocketEditCharacterName,
-                    "Character name",
-                    app->data.character.name);
+                    app, PocketEditCharacterName, "Character name", app->data.character.name);
             }
         } else if(app->selection == 2U) {
             uint32_t destination = pocket_d20_profiles_next_id(&app->profiles);
             bool duplicated =
+                (profile != app->profiles.active_profile || pocket_flush_save(app, false)) &&
                 !(destination == UINT32_MAX && pocket_profile_exists(app, UINT32_MAX)) &&
                 pocket_d20_storage_duplicate_profile(app->storage, profile, destination) &&
                 pocket_d20_profiles_refresh(app->storage, &app->profiles) &&
@@ -5047,17 +5598,16 @@ static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* e
             pocket_set_status(app, duplicated ? "Character duplicated" : "Duplicate failed");
         } else if(app->selection == 3U) {
             bool exported =
-                (profile != app->profiles.active_profile || pocket_save(app, false)) &&
+                (profile != app->profiles.active_profile || pocket_flush_save(app, false)) &&
                 pocket_d20_storage_export_profile(app->storage, profile);
             pocket_set_status(app, exported ? "Export written" : "Export failed");
         } else if(app->selection == 4U) {
             uint32_t previous = app->profiles.active_profile;
             uint32_t destination = pocket_d20_profiles_next_id(&app->profiles);
-            bool imported = (!app->active_profile_loaded || pocket_save(app, false)) &&
-                            !(destination == UINT32_MAX &&
-                              pocket_profile_exists(app, UINT32_MAX)) &&
-                            pocket_d20_storage_import_first(
-                                app->storage, destination, &app->data);
+            bool imported =
+                (!app->active_profile_loaded || pocket_flush_save(app, false)) &&
+                !(destination == UINT32_MAX && pocket_profile_exists(app, UINT32_MAX)) &&
+                pocket_d20_storage_import_first(app->storage, destination, &app->data);
             if(imported) {
                 app->active_profile_loaded = 1U;
                 app->profiles.active_profile = destination;
@@ -5088,17 +5638,18 @@ static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* e
             pocket_delete_profile(app, profile);
             pocket_profile_actions_to_list(app);
         } else if(app->selection == 7U) {
-            bool verified = pocket_d20_storage_verify_profile(app->storage, profile);
-            pocket_set_status(app, verified ? "Checksum verified" : "Save damaged/incompatible");
-        } else if(profile != app->profiles.active_profile) {
+            bool verified =
+                (profile != app->profiles.active_profile || pocket_flush_save(app, false)) &&
+                pocket_d20_storage_verify_profile(app->storage, profile);
+            pocket_set_status(app, verified ? "Profile readable" : "Save damaged/incompatible");
+        } else if(app->selection == 8U && profile != app->profiles.active_profile) {
             pocket_set_status(app, "Switch before restore");
-        } else {
-            bool restored = pocket_d20_storage_restore_backup(
-                app->storage, profile, &app->data);
+        } else if(app->selection == 8U) {
+            bool restored = pocket_d20_storage_restore_backup(app->storage, profile, &app->data);
             if(!restored) {
                 bool recovered = false;
-                app->active_profile_loaded = pocket_d20_storage_load_profile(
-                    app->storage, profile, &app->data, &recovered);
+                app->active_profile_loaded =
+                    pocket_d20_storage_load_profile(app->storage, profile, &app->data, &recovered);
             } else {
                 app->active_profile_loaded = 1U;
             }
@@ -5106,6 +5657,17 @@ static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* e
             pocket_d20_profiles_save(app->storage, &app->profiles);
             app->saved_fingerprint = pocket_data_fingerprint(&app->data);
             pocket_set_status(app, restored ? "Backup restored" : "No valid backup");
+        } else if(profile != app->profiles.active_profile) {
+            pocket_set_status(app, "Switch before rollback");
+        } else {
+            bool rolled_back =
+                pocket_d20_storage_rollback_migration(app->storage, profile, &app->data);
+            app->active_profile_loaded = rolled_back ? 1U : app->active_profile_loaded;
+            pocket_d20_profiles_refresh(app->storage, &app->profiles);
+            pocket_d20_profiles_save(app->storage, &app->profiles);
+            app->saved_fingerprint = pocket_data_fingerprint(&app->data);
+            pocket_set_status(
+                app, rolled_back ? "Migration rolled back" : "No migration snapshot");
         }
     }
 }
@@ -5180,13 +5742,10 @@ static void pocket_handle_home(PocketD20App* app, const InputEvent* event) {
                 pocket_set_status(app, "Retry save before switching");
                 break;
             }
-            pocket_save(app, false);
+            pocket_flush_save(app, false);
             Loader* loader = furi_record_open(RECORD_LOADER);
             loader_enqueue_launch(
-                loader,
-                "/ext/apps/Games/dolphin_bestiary.fap",
-                NULL,
-                LoaderDeferredLaunchFlagGui);
+                loader, "/ext/apps/Games/dolphin_bestiary.fap", NULL, LoaderDeferredLaunchFlagGui);
             furi_record_close(RECORD_LOADER);
             view_dispatcher_stop(app->dispatcher);
             break;
@@ -5201,8 +5760,9 @@ static void pocket_handle_character(PocketD20App* app, const InputEvent* event) 
         pocket_menu_move(app, 12U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 12U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 7U) {
             int64_t value = (int64_t)character->experience + (delta * 100);
@@ -5217,8 +5777,7 @@ static void pocket_handle_character(PocketD20App* app, const InputEvent* event) 
             character->inspiration = !character->inspiration;
             pocket_save(app, false);
         }
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection == 7U) {
+    } else if(event->type == InputTypeLong && event->key == InputKeyOk && app->selection == 7U) {
         pocket_begin_number(
             app,
             PocketNumberCharacter,
@@ -5228,12 +5787,14 @@ static void pocket_handle_character(PocketD20App* app, const InputEvent* event) 
             (int32_t)character->experience,
             0,
             1000000);
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              (app->selection == 2U || app->selection == 3U || app->selection == 4U)) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        (app->selection == 2U || app->selection == 3U || app->selection == 4U)) {
         if(app->selection == 2U)
             pocket_begin_text(app, PocketEditSpecies, "Custom species", character->species);
         else if(app->selection == 3U)
-            pocket_begin_text(app, PocketEditBackground, "Custom background", character->background);
+            pocket_begin_text(
+                app, PocketEditBackground, "Custom background", character->background);
         else
             pocket_begin_text(app, PocketEditAlignment, "Custom alignment", character->alignment);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
@@ -5249,17 +5810,11 @@ static void pocket_handle_character(PocketD20App* app, const InputEvent* event) 
             break;
         case 3:
             pocket_open_catalog(
-                app,
-                PocketCatalogBackgrounds,
-                PocketEditBackground,
-                character->background);
+                app, PocketCatalogBackgrounds, PocketEditBackground, character->background);
             break;
         case 4:
             pocket_open_catalog(
-                app,
-                PocketCatalogAlignments,
-                PocketEditAlignment,
-                character->alignment);
+                app, PocketCatalogAlignments, PocketEditAlignment, character->alignment);
             break;
         case 5:
             pocket_open_list(app, PocketListClasses, PocketScreenCharacter);
@@ -5298,8 +5853,9 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, 16U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 16U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
         switch(app->selection) {
         case 0:
@@ -5307,7 +5863,8 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
             break;
         case 1:
             character->hp_max = pocket_clamp_i16(character->hp_max + delta, 1, 999);
-            if(character->hp_current > character->hp_max) character->hp_current = character->hp_max;
+            if(character->hp_current > character->hp_max)
+                character->hp_current = character->hp_max;
             break;
         case 2:
             character->hp_temporary = pocket_clamp_i16(character->hp_temporary + delta, 0, 999);
@@ -5327,12 +5884,10 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
             character->exhaustion = pocket_clamp_u8(character->exhaustion + delta, 6U);
             break;
         case 8:
-            character->death_successes =
-                pocket_clamp_u8(character->death_successes + delta, 3U);
+            character->death_successes = pocket_clamp_u8(character->death_successes + delta, 3U);
             break;
         case 9:
-            character->death_failures =
-                pocket_clamp_u8(character->death_failures + delta, 3U);
+            character->death_failures = pocket_clamp_u8(character->death_failures + delta, 3U);
             break;
         case 10:
             character->hit_die = pocket_cycle_die(character->hit_die, delta, true);
@@ -5347,16 +5902,16 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
                 character->hit_dice_current = character->hit_dice_max;
             break;
         case 13:
-            character->skill_misc[11U] = (int8_t)pocket_clamp_i16(
-                character->skill_misc[11U] + delta, -20, 20);
+            character->skill_misc[11U] =
+                (int8_t)pocket_clamp_i16(character->skill_misc[11U] + delta, -20, 20);
             break;
         case 14:
-            character->skill_misc[6U] = (int8_t)pocket_clamp_i16(
-                character->skill_misc[6U] + delta, -20, 20);
+            character->skill_misc[6U] =
+                (int8_t)pocket_clamp_i16(character->skill_misc[6U] + delta, -20, 20);
             break;
         case 15:
-            character->skill_misc[8U] = (int8_t)pocket_clamp_i16(
-                character->skill_misc[8U] + delta, -20, 20);
+            character->skill_misc[8U] =
+                (int8_t)pocket_clamp_i16(character->skill_misc[8U] + delta, -20, 20);
             break;
         default:
             return;
@@ -5368,11 +5923,29 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
         int32_t minimum = 0;
         int32_t maximum = 999;
         switch(app->selection) {
-        case 0U: header = "Current HP"; value = character->hp_current; break;
-        case 1U: header = "Maximum HP"; value = character->hp_max; minimum = 1; break;
-        case 2U: header = "Temporary HP"; value = character->hp_temporary; break;
-        case 3U: header = "Armor Class"; value = character->armor_class; maximum = 99; break;
-        case 4U: header = "Speed in feet"; value = character->speed; maximum = 255; break;
+        case 0U:
+            header = "Current HP";
+            value = character->hp_current;
+            break;
+        case 1U:
+            header = "Maximum HP";
+            value = character->hp_max;
+            minimum = 1;
+            break;
+        case 2U:
+            header = "Temporary HP";
+            value = character->hp_temporary;
+            break;
+        case 3U:
+            header = "Armor Class";
+            value = character->armor_class;
+            maximum = 99;
+            break;
+        case 4U:
+            header = "Speed in feet";
+            value = character->speed;
+            maximum = 255;
+            break;
         case 5U:
         case 6U:
             header = "Initiative misc";
@@ -5380,16 +5953,37 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
             minimum = -20;
             maximum = 20;
             break;
-        case 7U: header = "Exhaustion"; value = character->exhaustion; maximum = 6; break;
-        case 8U: header = "Death successes"; value = character->death_successes; maximum = 3; break;
-        case 9U: header = "Death failures"; value = character->death_failures; maximum = 3; break;
-        case 10U: header = "Hit Point Die"; value = character->hit_die; minimum = 4; maximum = 12; break;
+        case 7U:
+            header = "Exhaustion";
+            value = character->exhaustion;
+            maximum = 6;
+            break;
+        case 8U:
+            header = "Death successes";
+            value = character->death_successes;
+            maximum = 3;
+            break;
+        case 9U:
+            header = "Death failures";
+            value = character->death_failures;
+            maximum = 3;
+            break;
+        case 10U:
+            header = "Hit Point Die";
+            value = character->hit_die;
+            minimum = 4;
+            maximum = 12;
+            break;
         case 11U:
             header = "Hit Dice current";
             value = character->hit_dice_current;
             maximum = character->hit_dice_max;
             break;
-        case 12U: header = "Hit Dice maximum"; value = character->hit_dice_max; maximum = 20; break;
+        case 12U:
+            header = "Hit Dice maximum";
+            value = character->hit_dice_max;
+            maximum = 20;
+            break;
         case 13U:
             header = "Perception misc";
             value = character->skill_misc[11U];
@@ -5410,8 +6004,7 @@ static void pocket_handle_vitals(PocketD20App* app, const InputEvent* event) {
             break;
         }
         pocket_begin_number(
-            app, PocketNumberVitals, (uint8_t)app->selection, 0U,
-            header, value, minimum, maximum);
+            app, PocketNumberVitals, (uint8_t)app->selection, 0U, header, value, minimum, maximum);
     }
 }
 
@@ -5421,20 +6014,22 @@ static void pocket_handle_abilities(PocketD20App* app, const InputEvent* event) 
         pocket_menu_move(app, POCKET_D20_ABILITY_COUNT, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, POCKET_D20_ABILITY_COUNT, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         uint8_t index = app->selection;
         if(app->edit_modifier_mode) {
-            character->saving_throw_misc[index] = (int8_t)pocket_clamp_i16(
-                character->saving_throw_misc[index] + delta, -20, 20);
+            character->saving_throw_misc[index] =
+                (int8_t)pocket_clamp_i16(character->saving_throw_misc[index] + delta, -20, 20);
         } else {
-            character->ability_scores[index] = (int8_t)pocket_clamp_i16(
-                character->ability_scores[index] + delta, 1, 30);
+            character->ability_scores[index] =
+                (int8_t)pocket_clamp_i16(character->ability_scores[index] + delta, 1, 30);
         }
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong &&
-              (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    } else if(
+        event->type == InputTypeLong &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         app->edit_modifier_mode = !app->edit_modifier_mode;
         pocket_set_status(app, app->edit_modifier_mode ? "Editing save misc" : "Editing scores");
     } else if(event->type == InputTypeLong && event->key == InputKeyOk) {
@@ -5463,13 +6058,14 @@ static void pocket_handle_skills(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, POCKET_D20_SKILL_COUNT, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, POCKET_D20_SKILL_COUNT, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         uint8_t index = pocket_skill_display_order[app->selection];
         if(app->edit_modifier_mode) {
-            character->skill_misc[index] = (int8_t)pocket_clamp_i16(
-                character->skill_misc[index] + delta, -20, 20);
+            character->skill_misc[index] =
+                (int8_t)pocket_clamp_i16(character->skill_misc[index] + delta, -20, 20);
         } else {
             int16_t proficiency = character->skill_proficiency[index] + delta;
             if(proficiency < 0) proficiency = PocketProficiencyExpertise;
@@ -5477,10 +6073,12 @@ static void pocket_handle_skills(PocketD20App* app, const InputEvent* event) {
             character->skill_proficiency[index] = (uint8_t)proficiency;
         }
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong &&
-              (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    } else if(
+        event->type == InputTypeLong &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         app->edit_modifier_mode = !app->edit_modifier_mode;
-        pocket_set_status(app, app->edit_modifier_mode ? "Editing skill misc" : "Editing proficiency");
+        pocket_set_status(
+            app, app->edit_modifier_mode ? "Editing skill misc" : "Editing proficiency");
     } else if(event->type == InputTypeLong && event->key == InputKeyOk) {
         uint8_t index = pocket_skill_display_order[app->selection];
         app->edit_modifier_mode = 1U;
@@ -5495,21 +6093,21 @@ static void pocket_handle_skills(PocketD20App* app, const InputEvent* event) {
             20);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         uint8_t index = pocket_skill_display_order[app->selection];
-        character->skill_proficiency[index] =
-            (character->skill_proficiency[index] + 1U) % 3U;
+        character->skill_proficiency[index] = (character->skill_proficiency[index] + 1U) % 3U;
         pocket_save(app, false);
     }
 }
 
-static __attribute__((unused)) void pocket_handle_builder(PocketD20App* app, const InputEvent* event) {
+static __attribute__((unused)) void
+    pocket_handle_builder(PocketD20App* app, const InputEvent* event) {
     PocketCharacter* c = &app->data.character;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, 11U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 11U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight) &&
-            app->selection == 6U) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight) && app->selection == 6U) {
         int16_t next = c->size + (event->key == InputKeyRight ? 1 : -1);
         if(next < 0) next = PocketSizeCount - 1U;
         if(next >= PocketSizeCount) next = 0;
@@ -5526,19 +6124,22 @@ static __attribute__((unused)) void pocket_handle_builder(PocketD20App* app, con
             pocket_open_catalog(app, PocketCatalogSpecies, PocketEditSpecies, c->species);
             break;
         case 1:
-            pocket_open_catalog(app, PocketCatalogBackgrounds, PocketEditBackground, c->background);
+            pocket_open_catalog(
+                app, PocketCatalogBackgrounds, PocketEditBackground, c->background);
             break;
         case 2:
             pocket_begin_text(app, PocketEditOriginFeat, "Origin feat", c->origin_feat);
             break;
         case 3:
-            pocket_begin_text(app, PocketEditToolProficiencies, "Tool proficiencies", c->tool_proficiencies);
+            pocket_begin_text(
+                app, PocketEditToolProficiencies, "Tool proficiencies", c->tool_proficiencies);
             break;
         case 4:
             pocket_begin_text(app, PocketEditArmorTraining, "Armor training", c->armor_training);
             break;
         case 5:
-            pocket_begin_text(app, PocketEditWeaponTraining, "Weapon training", c->weapon_training);
+            pocket_begin_text(
+                app, PocketEditWeaponTraining, "Weapon training", c->weapon_training);
             break;
         case 6:
             c->size = (c->size + 1U) % PocketSizeCount;
@@ -5555,7 +6156,8 @@ static __attribute__((unused)) void pocket_handle_builder(PocketD20App* app, con
         case 10:
             pocket_run_catalog_diagnostics(app);
             pocket_enter_screen(app, PocketScreenCatalogDiagnostics);
-            pocket_set_status(app, app->diagnostics_invalid ? "Validation failed" : "Catalogs valid");
+            pocket_set_status(
+                app, app->diagnostics_invalid ? "Validation failed" : "Catalogs valid");
             break;
         }
     }
@@ -5568,19 +6170,22 @@ static void pocket_handle_grant_review(PocketD20App* app, const InputEvent* even
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
-    else if(event->type == InputTypeLong && event->key == InputKeyLeft &&
-            app->selection && app->selection <= c->grant_count) {
+    else if(
+        event->type == InputTypeLong && event->key == InputKeyLeft && app->selection &&
+        app->selection <= c->grant_count) {
         PocketGrant* grant = &c->grants[app->selection - 1U];
         if(grant->status == PocketGrantPending) grant->status = PocketGrantSkipped;
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection && app->selection <= c->grant_count) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk && app->selection &&
+        app->selection <= c->grant_count) {
         app->record_index = app->selection - 1U;
         pocket_enter_screen(app, PocketScreenGrantEdit);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection == 0U) {
             for(uint8_t i = 0U; i < c->grant_count; ++i)
-                if(c->grants[i].status == PocketGrantPending) pocket_apply_grant(app, &c->grants[i]);
+                if(c->grants[i].status == PocketGrantPending)
+                    pocket_apply_grant(app, &c->grants[i]);
             pocket_set_status(app, "Pending grants applied");
         } else if(app->selection <= c->grant_count) {
             PocketGrant* grant = &c->grants[app->selection - 1U];
@@ -5588,18 +6193,21 @@ static void pocket_handle_grant_review(PocketD20App* app, const InputEvent* even
                 pocket_apply_grant(app, grant);
             else if(grant->status == PocketGrantSkipped)
                 grant->status = PocketGrantPending;
-        } else if(c->grant_count < POCKET_D20_MAX_GRANTS &&
-                  pocket_d20_data_reserve_grants(c, c->grant_count + 1U)) {
+        } else if(
+            c->grant_count < POCKET_D20_MAX_GRANTS &&
+            pocket_d20_data_reserve_grants(c, c->grant_count + 1U)) {
             app->record_index = c->grant_count++;
             PocketGrant* grant = &c->grants[app->record_index];
             memset(grant, 0, sizeof(*grant));
-            snprintf(grant->stable_id, sizeof(grant->stable_id), "custom_grant_%u",
-                     app->record_index + 1U);
+            snprintf(
+                grant->stable_id,
+                sizeof(grant->stable_id),
+                "custom_grant_%u",
+                app->record_index + 1U);
             pocket_copy(grant->source, sizeof(grant->source), "Custom");
             pocket_copy(grant->option_name, sizeof(grant->option_name), "Custom Grant");
             pocket_copy(grant->prerequisites, sizeof(grant->prerequisites), "None");
-            pocket_copy(grant->grant_value, sizeof(grant->grant_value),
-                        "feature=Custom Feature");
+            pocket_copy(grant->grant_value, sizeof(grant->grant_value), "feature=Custom Feature");
             grant->source_type = PocketGrantFeat;
             grant->status = PocketGrantPending;
             pocket_save(app, false);
@@ -5617,8 +6225,9 @@ static void pocket_handle_grant_edit(PocketD20App* app, const InputEvent* event)
         pocket_menu_move(app, 10U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 10U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 2U) {
             int16_t value = grant->source_type + delta;
@@ -5626,7 +6235,8 @@ static void pocket_handle_grant_edit(PocketD20App* app, const InputEvent* event)
             if(value >= PocketGrantSourceCount) value = 0;
             grant->source_type = (uint8_t)value;
         } else if(app->selection == 5U) {
-            if(!c->class_count) grant->class_index = 0U;
+            if(!c->class_count)
+                grant->class_index = 0U;
             else {
                 int16_t value = grant->class_index + delta;
                 if(value < 0) value = c->class_count - 1U;
@@ -5634,29 +6244,33 @@ static void pocket_handle_grant_edit(PocketD20App* app, const InputEvent* event)
                 grant->class_index = (uint8_t)value;
             }
         } else if(app->selection == 6U)
-            grant->level_gained = (uint8_t)pocket_clamp_i16(
-                grant->level_gained + delta, 0, 20);
+            grant->level_gained = (uint8_t)pocket_clamp_i16(grant->level_gained + delta, 0, 20);
         else if(app->selection == 8U) {
             int16_t value = grant->status + delta;
             if(value < 0) value = PocketGrantSkipped;
             if(value > PocketGrantSkipped) value = PocketGrantPending;
             grant->status = (uint8_t)value;
-        } else return;
+        } else
+            return;
         pocket_save(app, false);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
-        if(app->selection == 0U) pocket_begin_text(app, PocketEditGrantStableId,
-            "Stable grant ID", grant->stable_id);
-        else if(app->selection == 1U) pocket_begin_text(app, PocketEditGrantSource,
-            "Source label", grant->source);
-        else if(app->selection == 3U) pocket_begin_text(app, PocketEditGrantOption,
-            "Option name", grant->option_name);
-        else if(app->selection == 4U) pocket_begin_text(app, PocketEditGrantPrerequisites,
-            "Prerequisites", grant->prerequisites);
-        else if(app->selection == 7U) pocket_begin_text(app, PocketEditGrantValue,
-            "Grant payload key=value", grant->grant_value);
+        if(app->selection == 0U)
+            pocket_begin_text(app, PocketEditGrantStableId, "Stable grant ID", grant->stable_id);
+        else if(app->selection == 1U)
+            pocket_begin_text(app, PocketEditGrantSource, "Source label", grant->source);
+        else if(app->selection == 3U)
+            pocket_begin_text(app, PocketEditGrantOption, "Option name", grant->option_name);
+        else if(app->selection == 4U)
+            pocket_begin_text(
+                app, PocketEditGrantPrerequisites, "Prerequisites", grant->prerequisites);
+        else if(app->selection == 7U)
+            pocket_begin_text(
+                app, PocketEditGrantValue, "Grant payload key=value", grant->grant_value);
         else if(app->selection == 9U) {
-            memmove(&c->grants[app->record_index], &c->grants[app->record_index + 1U],
-                    (c->grant_count - app->record_index - 1U) * sizeof(PocketGrant));
+            memmove(
+                &c->grants[app->record_index],
+                &c->grants[app->record_index + 1U],
+                (c->grant_count - app->record_index - 1U) * sizeof(PocketGrant));
             --c->grant_count;
             pocket_save(app, false);
             pocket_enter_screen(app, PocketScreenGrantReview);
@@ -5664,7 +6278,8 @@ static void pocket_handle_grant_edit(PocketD20App* app, const InputEvent* event)
     }
 }
 
-static __attribute__((unused)) void pocket_handle_catalog_diagnostics(PocketD20App* app, const InputEvent* event) {
+static __attribute__((unused)) void
+    pocket_handle_catalog_diagnostics(PocketD20App* app, const InputEvent* event) {
     if(event->type == InputTypeShort && event->key == InputKeyOk) {
         pocket_run_catalog_diagnostics(app);
         pocket_set_status(app, app->diagnostics_invalid ? "Validation failed" : "Catalogs valid");
@@ -5677,8 +6292,9 @@ static void pocket_handle_spell_filters(PocketD20App* app, const InputEvent* eve
         pocket_menu_move(app, 6U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 6U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 0U) {
             int16_t next = app->spell_filter_level + delta;
@@ -5718,13 +6334,15 @@ static void pocket_handle_resources(PocketD20App* app, const InputEvent* event) 
         pocket_menu_move(app, 9U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 9U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 3U)
             c->encumbrance_mode = !c->encumbrance_mode;
         else if(app->selection == 8U)
-            c->carrying_capacity_override = pocket_clamp_i16(c->carrying_capacity_override + delta, 0, 999);
+            c->carrying_capacity_override =
+                pocket_clamp_i16(c->carrying_capacity_override + delta, 0, 999);
         else
             return;
         pocket_save(app, false);
@@ -5744,7 +6362,8 @@ static void pocket_handle_resources(PocketD20App* app, const InputEvent* event) 
     }
 }
 
-static __attribute__((unused)) void pocket_handle_combat_sheet(PocketD20App* app, const InputEvent* event) {
+static __attribute__((unused)) void
+    pocket_handle_combat_sheet(PocketD20App* app, const InputEvent* event) {
     PocketCharacter* c = &app->data.character;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, 11U, -1);
@@ -5752,17 +6371,42 @@ static __attribute__((unused)) void pocket_handle_combat_sheet(PocketD20App* app
         pocket_menu_move(app, 11U, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         switch(app->selection) {
-        case 0: pocket_begin_text(app, PocketEditConditions, "Conditions", c->conditions); break;
-        case 1: pocket_begin_text(app, PocketEditConcentration, "Concentration", c->concentration); break;
-        case 2: c->reaction_available = !c->reaction_available; pocket_save(app, false); break;
-        case 3: pocket_begin_text(app, PocketEditTemporaryEffects, "Temporary effects", c->temporary_effects); break;
-        case 4: pocket_begin_text(app, PocketEditResistances, "Resistances", c->resistances); break;
-        case 5: pocket_begin_text(app, PocketEditImmunities, "Immunities", c->immunities); break;
-        case 6: pocket_begin_text(app, PocketEditVulnerabilities, "Vulnerabilities", c->vulnerabilities); break;
-        case 7: pocket_begin_text(app, PocketEditSenses, "Senses", c->senses); break;
-        case 8: pocket_begin_text(app, PocketEditMovementModes, "Movement modes", c->movement_modes); break;
-        case 9: pocket_enter_screen(app, PocketScreenAttackTemplates); break;
-        case 10: pocket_enter_screen(app, PocketScreenInitiativeMenu); break;
+        case 0:
+            pocket_begin_text(app, PocketEditConditions, "Conditions", c->conditions);
+            break;
+        case 1:
+            pocket_begin_text(app, PocketEditConcentration, "Concentration", c->concentration);
+            break;
+        case 2:
+            c->reaction_available = !c->reaction_available;
+            pocket_save(app, false);
+            break;
+        case 3:
+            pocket_begin_text(
+                app, PocketEditTemporaryEffects, "Temporary effects", c->temporary_effects);
+            break;
+        case 4:
+            pocket_begin_text(app, PocketEditResistances, "Resistances", c->resistances);
+            break;
+        case 5:
+            pocket_begin_text(app, PocketEditImmunities, "Immunities", c->immunities);
+            break;
+        case 6:
+            pocket_begin_text(
+                app, PocketEditVulnerabilities, "Vulnerabilities", c->vulnerabilities);
+            break;
+        case 7:
+            pocket_begin_text(app, PocketEditSenses, "Senses", c->senses);
+            break;
+        case 8:
+            pocket_begin_text(app, PocketEditMovementModes, "Movement modes", c->movement_modes);
+            break;
+        case 9:
+            pocket_enter_screen(app, PocketScreenAttackTemplates);
+            break;
+        case 10:
+            pocket_enter_screen(app, PocketScreenInitiativeMenu);
+            break;
         }
     }
 }
@@ -5774,19 +6418,21 @@ static void pocket_handle_attack_templates(PocketD20App* app, const InputEvent* 
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
-    else if(pocket_is_move_event(event) &&
-            app->selection < c->attack_template_count &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) && app->selection < c->attack_template_count &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         PocketAttackTemplate* attack = &c->attack_templates[app->selection];
         attack->attack_misc = (int8_t)pocket_clamp_i16(
             attack->attack_misc + (event->key == InputKeyRight ? 1 : -1), -20, 20);
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection < c->attack_template_count) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        app->selection < c->attack_template_count) {
         app->record_index = app->selection;
         pocket_enter_screen(app, PocketScreenAttackTemplateEdit);
-    } else if(event->type == InputTypeShort && event->key == InputKeyOk &&
-              app->selection == c->attack_template_count) {
+    } else if(
+        event->type == InputTypeShort && event->key == InputKeyOk &&
+        app->selection == c->attack_template_count) {
         if(c->attack_template_count >= POCKET_D20_MAX_ATTACK_TEMPLATES) {
             pocket_set_status(app, "Template limit reached");
             return;
@@ -5806,8 +6452,9 @@ static void pocket_handle_attack_templates(PocketD20App* app, const InputEvent* 
         attack->rider_die = 6U;
         pocket_save(app, false);
         pocket_enter_screen(app, PocketScreenAttackTemplateEdit);
-    } else if(event->type == InputTypeShort && event->key == InputKeyOk &&
-              app->selection < c->attack_template_count) {
+    } else if(
+        event->type == InputTypeShort && event->key == InputKeyOk &&
+        app->selection < c->attack_template_count) {
         PocketAttackTemplate* attack = &c->attack_templates[app->selection];
         app->dice_count = attack->damage_dice ? attack->damage_dice : 1U;
         app->dice_sides = attack->damage_die >= 2U ? attack->damage_die : 1U;
@@ -5825,8 +6472,9 @@ static void pocket_handle_attack_template_edit(PocketD20App* app, const InputEve
         pocket_menu_move(app, 15U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 15U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 1U) {
             int16_t value = attack->type + delta;
@@ -5856,22 +6504,24 @@ static void pocket_handle_attack_template_edit(PocketD20App* app, const InputEve
             if(value < 0) value = PocketRechargeCount - 1U;
             if(value >= PocketRechargeCount) value = 0;
             attack->recharge = (uint8_t)value;
-        } else return;
+        } else
+            return;
         pocket_save(app, false);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
-        if(app->selection == 0U) pocket_begin_text(app, PocketEditAttackName,
-            "Attack template name", attack->name);
-        else if(app->selection == 8U) pocket_begin_text(app, PocketEditAttackDamageType,
-            "Damage type", attack->damage_type);
-        else if(app->selection == 9U) pocket_begin_text(app, PocketEditAttackMastery,
-            "Mastery property", attack->mastery);
-        else if(app->selection == 12U) pocket_begin_text(app, PocketEditAttackRiderType,
-            "Rider type", attack->rider_type);
+        if(app->selection == 0U)
+            pocket_begin_text(app, PocketEditAttackName, "Attack template name", attack->name);
+        else if(app->selection == 8U)
+            pocket_begin_text(app, PocketEditAttackDamageType, "Damage type", attack->damage_type);
+        else if(app->selection == 9U)
+            pocket_begin_text(app, PocketEditAttackMastery, "Mastery property", attack->mastery);
+        else if(app->selection == 12U)
+            pocket_begin_text(app, PocketEditAttackRiderType, "Rider type", attack->rider_type);
         else if(app->selection == 14U) {
-            memmove(&c->attack_templates[app->record_index],
-                    &c->attack_templates[app->record_index + 1U],
-                    (c->attack_template_count - app->record_index - 1U) *
-                        sizeof(PocketAttackTemplate));
+            memmove(
+                &c->attack_templates[app->record_index],
+                &c->attack_templates[app->record_index + 1U],
+                (c->attack_template_count - app->record_index - 1U) *
+                    sizeof(PocketAttackTemplate));
             --c->attack_template_count;
             pocket_save(app, false);
             pocket_enter_screen(app, PocketScreenAttackTemplates);
@@ -5879,8 +6529,26 @@ static void pocket_handle_attack_template_edit(PocketD20App* app, const InputEve
     }
 }
 
+static void pocket_cache_campaign_pack_rows(PocketD20App* app) {
+    app->campaign_pack_count = pocket_pack_count(app->storage, PocketPackCampaign);
+    for(uint16_t index = 0U; index < app->campaign_pack_count && index < 16U; ++index) {
+        PocketPackSummary pack;
+        if(pocket_pack_at(app->storage, PocketPackCampaign, index, &pack))
+            snprintf(
+                app->campaign_pack_rows[index],
+                sizeof(app->campaign_pack_rows[index]),
+                "[%c] %s",
+                pack.enabled ? 'x' : ' ',
+                pack.name);
+    }
+    snprintf(
+        app->campaign_pack_rows[app->campaign_pack_count],
+        sizeof(app->campaign_pack_rows[app->campaign_pack_count]),
+        "Install Inbox Pack");
+}
+
 static void pocket_handle_campaigns(PocketD20App* app, const InputEvent* event) {
-    uint16_t count = app->campaign_count + 1U;
+    uint16_t count = app->campaign_count + 2U;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
@@ -5889,6 +6557,11 @@ static void pocket_handle_campaigns(PocketD20App* app, const InputEvent* event) 
         if(app->selection == app->campaign_count) {
             pocket_campaign_diagnose(app->storage, &app->campaign_diagnostics);
             pocket_enter_screen(app, PocketScreenCampaignDiagnostics);
+            return;
+        }
+        if(app->selection == app->campaign_count + 1U) {
+            pocket_cache_campaign_pack_rows(app);
+            pocket_enter_screen(app, PocketScreenCampaignPacks);
             return;
         }
         PocketCampaignSummary next;
@@ -5916,6 +6589,34 @@ static void pocket_handle_campaigns(PocketD20App* app, const InputEvent* event) 
     }
 }
 
+static void pocket_handle_campaign_packs(PocketD20App* app, const InputEvent* event) {
+    uint16_t count = app->campaign_pack_count + 1U;
+    if(pocket_is_move_event(event) && event->key == InputKeyUp)
+        pocket_menu_move(app, count, -1);
+    else if(pocket_is_move_event(event) && event->key == InputKeyDown)
+        pocket_menu_move(app, count, 1);
+    else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        bool changed = false;
+        if(app->selection == app->campaign_pack_count) {
+            changed = pocket_pack_install_inbox(
+                app->storage, PocketPackCampaign, app->status, sizeof(app->status));
+        } else {
+            PocketPackSummary pack;
+            if(pocket_pack_at(app->storage, PocketPackCampaign, app->selection, &pack)) {
+                changed = pocket_pack_set_enabled(
+                    app->storage, PocketPackCampaign, pack.id, !pack.enabled);
+                pocket_set_status(app, changed ? "Pack state updated" : "Pack update failed");
+            }
+        }
+        if(changed) {
+            pocket_campaign_cache_reset();
+            app->campaign_count = pocket_campaign_count(app->storage);
+            pocket_cache_campaign_pack_rows(app);
+            app->campaign_active_valid = 0U;
+        }
+    }
+}
+
 static void pocket_handle_campaign_diagnostics(PocketD20App* app, const InputEvent* event) {
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, 10U, -1);
@@ -5923,13 +6624,16 @@ static void pocket_handle_campaign_diagnostics(PocketD20App* app, const InputEve
         pocket_menu_move(app, 10U, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         pocket_campaign_diagnose(app->storage, &app->campaign_diagnostics);
-        pocket_set_status(app,
+        pocket_set_status(
+            app,
             app->campaign_diagnostics.incompatible ||
-            app->campaign_diagnostics.missing_scene_files ||
-            app->campaign_diagnostics.duplicate_campaign_ids ||
-            app->campaign_diagnostics.duplicate_scene_ids ||
-            app->campaign_diagnostics.missing_entry_scenes ||
-            app->campaign_diagnostics.broken_links ? "Pack needs attention" : "Campaign packs OK");
+                    app->campaign_diagnostics.missing_scene_files ||
+                    app->campaign_diagnostics.duplicate_campaign_ids ||
+                    app->campaign_diagnostics.duplicate_scene_ids ||
+                    app->campaign_diagnostics.missing_entry_scenes ||
+                    app->campaign_diagnostics.broken_links ?
+                "Pack needs attention" :
+                "Campaign packs OK");
     }
 }
 
@@ -5986,15 +6690,14 @@ static void pocket_handle_adventure(PocketD20App* app, const InputEvent* event) 
         bool passed = true;
         if(choice.skill >= 0 && (uint8_t)choice.skill < POCKET_D20_SKILL_COUNT) {
             natural = (uint8_t)pocket_d20_roll_dice(1U, 20U);
-            modifier = pocket_d20_skill_modifier(
-                &app->data.character, (uint8_t)choice.skill);
+            modifier = pocket_d20_skill_modifier(&app->data.character, (uint8_t)choice.skill);
             app->adventure_last_natural = natural;
             app->adventure_last_total = (int16_t)natural + modifier;
             passed = app->adventure_last_total >= choice.dc;
         }
-        bool first_reward = choice.quest_flag >= 32U ||
-                            !(app->data.character.adventure_quest_flags &
-                              (1UL << choice.quest_flag));
+        bool first_reward =
+            choice.quest_flag >= 32U ||
+            !(app->data.character.adventure_quest_flags & (1UL << choice.quest_flag));
         if(passed && first_reward) {
             pocket_adventure_reward_item(&app->data.character, choice.reward_item);
             pocket_adventure_reward_milestone(&app->data.character, choice.milestone);
@@ -6045,11 +6748,12 @@ static void pocket_handle_adventure(PocketD20App* app, const InputEvent* event) 
 static void pocket_handle_magic(PocketD20App* app, const InputEvent* event) {
     PocketCharacter* character = &app->data.character;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
-        pocket_menu_move(app, 17U, -1);
+        pocket_menu_move(app, 16U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
-        pocket_menu_move(app, 17U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+        pocket_menu_move(app, 16U, 1);
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->arcane_recovery_active) {
             if(app->selection < 7U || app->selection > 11U) {
@@ -6063,8 +6767,7 @@ static void pocket_handle_magic(PocketD20App* app, const InputEvent* event) {
                     pocket_set_status(app, "Not enough recovery");
                     return;
                 }
-                if(character->spell_slots_current[level] >=
-                   character->spell_slots_max[level]) {
+                if(character->spell_slots_current[level] >= character->spell_slots_max[level]) {
                     pocket_set_status(app, "That slot level is full");
                     return;
                 }
@@ -6090,18 +6793,18 @@ static void pocket_handle_magic(PocketD20App* app, const InputEvent* event) {
             if(ability > PocketAbilityCharisma) ability = PocketAbilityStrength;
             character->spellcasting_ability = (uint8_t)ability;
         } else if(app->selection == 3U) {
-            character->spell_attack_misc = (int8_t)pocket_clamp_i16(
-                character->spell_attack_misc + delta, -20, 20);
+            character->spell_attack_misc =
+                (int8_t)pocket_clamp_i16(character->spell_attack_misc + delta, -20, 20);
         } else if(app->selection == 4U) {
-            character->spell_save_misc = (int8_t)pocket_clamp_i16(
-                character->spell_save_misc + delta, -20, 20);
+            character->spell_save_misc =
+                (int8_t)pocket_clamp_i16(character->spell_save_misc + delta, -20, 20);
         } else if(app->selection == 5U) {
             app->edit_slot_max = !app->edit_slot_max;
             return;
         } else if(app->selection >= 7U && app->selection <= 15U) {
             uint8_t level = app->selection - 6U;
             uint8_t* slots = app->edit_slot_max ? character->spell_slots_max :
-                                                   character->spell_slots_current;
+                                                  character->spell_slots_current;
             slots[level] = pocket_clamp_u8(slots[level] + delta, 20U);
             if(character->spell_slots_current[level] > character->spell_slots_max[level])
                 character->spell_slots_current[level] = character->spell_slots_max[level];
@@ -6133,7 +6836,7 @@ static void pocket_handle_magic(PocketD20App* app, const InputEvent* event) {
         } else if(app->selection >= 7U && app->selection <= 15U) {
             uint8_t level = app->selection - 6U;
             uint8_t value = app->edit_slot_max ? character->spell_slots_max[level] :
-                                                character->spell_slots_current[level];
+                                                 character->spell_slots_current[level];
             pocket_begin_number(
                 app,
                 PocketNumberMagic,
@@ -6153,17 +6856,12 @@ static void pocket_handle_magic(PocketD20App* app, const InputEvent* event) {
             if(app->arcane_recovery_active) {
                 app->arcane_recovery_active = 0U;
                 pocket_set_status(
-                    app,
-                    app->arcane_recovery_spent ? "Arcane Recovery used" :
-                                                 "Recovery skipped");
+                    app, app->arcane_recovery_spent ? "Arcane Recovery used" : "Recovery skipped");
             } else if(character->arcane_recovery_used) {
                 pocket_set_status(app, "Recovery already used");
             } else {
                 pocket_set_status(app, "Finish a Short Rest first");
             }
-        } else if(app->selection == 16U) {
-            app->arcane_recovery_active = 0U;
-            pocket_enter_screen(app, PocketScreenHome);
         }
     }
 }
@@ -6181,10 +6879,10 @@ static void pocket_handle_currency(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, 5U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 5U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
-        int64_t next = *values[app->selection] +
-                       (event->key == InputKeyRight ? 1 : -1);
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+        int64_t next = *values[app->selection] + (event->key == InputKeyRight ? 1 : -1);
         if(next < 0) next = 0;
         if(next > 999999999L) next = 999999999L;
         *values[app->selection] = (int32_t)next;
@@ -6239,8 +6937,8 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
         } else if(field == 3U) {
             class_level->hit_die = pocket_cycle_die(class_level->hit_die, delta, true);
         } else if(field == 4U) {
-            class_level->hit_dice_current = pocket_clamp_u8(
-                class_level->hit_dice_current + delta, class_level->hit_dice_max);
+            class_level->hit_dice_current =
+                pocket_clamp_u8(class_level->hit_dice_current + delta, class_level->hit_dice_max);
         } else if(field == 5U) {
             class_level->hit_dice_max = pocket_clamp_u8(class_level->hit_dice_max + delta, 20U);
             if(class_level->hit_dice_current > class_level->hit_dice_max)
@@ -6258,11 +6956,14 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
         } else if(field == 8U) {
             class_level->cantrip_limit = pocket_clamp_u8(class_level->cantrip_limit + delta, 30U);
         } else if(field == 9U) {
-            class_level->prepared_limit = pocket_clamp_u8(class_level->prepared_limit + delta, 50U);
+            class_level->prepared_limit =
+                pocket_clamp_u8(class_level->prepared_limit + delta, 50U);
         } else if(field == 10U) {
-            class_level->spellbook_size = (uint16_t)pocket_clamp_i16(class_level->spellbook_size + delta, 0, 999);
+            class_level->spellbook_size =
+                (uint16_t)pocket_clamp_i16(class_level->spellbook_size + delta, 0, 999);
         } else if(field == 11U) {
-            class_level->pact_slot_level = pocket_clamp_u8(class_level->pact_slot_level + delta, 5U);
+            class_level->pact_slot_level =
+                pocket_clamp_u8(class_level->pact_slot_level + delta, 5U);
         } else if(field == 12U) {
             class_level->pact_slots_current = pocket_clamp_u8(
                 class_level->pact_slots_current + delta, class_level->pact_slots_max);
@@ -6277,8 +6978,8 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
             class_level->spell_points_current = (uint16_t)pocket_clamp_i16(
                 class_level->spell_points_current + delta, 0, class_level->spell_points_max);
         } else if(field == 16U) {
-            class_level->spell_points_max = (uint16_t)pocket_clamp_i16(
-                class_level->spell_points_max + delta, 0, 999);
+            class_level->spell_points_max =
+                (uint16_t)pocket_clamp_i16(class_level->spell_points_max + delta, 0, 999);
             if(class_level->spell_points_current > class_level->spell_points_max)
                 class_level->spell_points_current = class_level->spell_points_max;
         } else {
@@ -6305,10 +7006,8 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
             spell->prepared = !spell->prepared;
             if(spell->prepared) character->spell_known[index] = 1U;
         } else if(field == 6U) {
-            character->spell_always_prepared[index] =
-                !character->spell_always_prepared[index];
-            if(character->spell_always_prepared[index])
-                character->spell_known[index] = 1U;
+            character->spell_always_prepared[index] = !character->spell_always_prepared[index];
+            if(character->spell_always_prepared[index]) character->spell_known[index] = 1U;
         } else if(field == 7U) {
             spell->ritual = !spell->ritual;
         } else if(field == 8U) {
@@ -6316,10 +7015,9 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
                 character->spell_free_casts_current[index] + delta,
                 character->spell_free_casts_max[index]);
         } else if(field == 9U) {
-            character->spell_free_casts_max[index] = pocket_clamp_u8(
-                character->spell_free_casts_max[index] + delta, 20U);
-            if(character->spell_free_casts_current[index] >
-               character->spell_free_casts_max[index])
+            character->spell_free_casts_max[index] =
+                pocket_clamp_u8(character->spell_free_casts_max[index] + delta, 20U);
+            if(character->spell_free_casts_current[index] > character->spell_free_casts_max[index])
                 character->spell_free_casts_current[index] =
                     character->spell_free_casts_max[index];
         } else if(field == 15U) {
@@ -6348,11 +7046,7 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
                 pocket_clamp_i16(feature->uses_current + delta, 0, feature->uses_max);
             if(app->data.initiative.active && feature->uses_current != before)
                 pocket_history_push(
-                    app,
-                    PocketHistoryFeatureResource,
-                    index,
-                    before,
-                    feature->uses_current);
+                    app, PocketHistoryFeatureResource, index, before, feature->uses_current);
         } else if(field == 5U) {
             feature->uses_max = pocket_clamp_i16(feature->uses_max + delta, 0, 99);
             if(feature->uses_current > feature->uses_max)
@@ -6424,9 +7118,7 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
             break;
         case 13:
             item->versatile_die = pocket_cycle_die(
-                item->versatile_die ? item->versatile_die : item->damage_die,
-                delta,
-                true);
+                item->versatile_die ? item->versatile_die : item->damage_die, delta, true);
             break;
         case 14:
             item->use_versatile = !item->use_versatile;
@@ -6478,11 +7170,13 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
             if(item->container_index == (int8_t)index) item->container_index = -1;
             break;
         case 29:
-            item->charges_current = pocket_clamp_i16(item->charges_current + delta, 0, item->charges_max);
+            item->charges_current =
+                pocket_clamp_i16(item->charges_current + delta, 0, item->charges_max);
             break;
         case 30:
             item->charges_max = pocket_clamp_i16(item->charges_max + delta, 0, 999);
-            if(item->charges_current > item->charges_max) item->charges_current = item->charges_max;
+            if(item->charges_current > item->charges_max)
+                item->charges_current = item->charges_max;
             break;
         case 31:
             item->armor_base = pocket_clamp_u8(item->armor_base + delta, 30U);
@@ -6522,14 +7216,14 @@ static void pocket_adjust_record(PocketD20App* app, int8_t delta) {
             app->data.party[index].initiative_modifier = (int8_t)pocket_clamp_i16(
                 app->data.party[index].initiative_modifier + delta, -50, 50);
         } else if(field == 2U) {
-            app->data.party[index].armor_class = pocket_clamp_i16(
-                app->data.party[index].armor_class + delta, 0, 99);
+            app->data.party[index].armor_class =
+                pocket_clamp_i16(app->data.party[index].armor_class + delta, 0, 99);
         } else if(field == 3U) {
-            app->data.party[index].hp_current = pocket_clamp_i16(
-                app->data.party[index].hp_current + delta, -999, 999);
+            app->data.party[index].hp_current =
+                pocket_clamp_i16(app->data.party[index].hp_current + delta, -999, 999);
         } else if(field == 4U) {
-            app->data.party[index].hp_max = pocket_clamp_i16(
-                app->data.party[index].hp_max + delta, 0, 999);
+            app->data.party[index].hp_max =
+                pocket_clamp_i16(app->data.party[index].hp_max + delta, 0, 999);
         } else {
             return;
         }
@@ -6603,10 +7297,7 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListClasses:
         if(field == 0U)
             pocket_open_catalog(
-                app,
-                PocketCatalogClasses,
-                PocketEditClassName,
-                character->classes[index].name);
+                app, PocketCatalogClasses, PocketEditClassName, character->classes[index].name);
         else if(field == 1U)
             pocket_open_catalog(
                 app,
@@ -6621,12 +7312,10 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListSpells:
         if(field == 0U)
             pocket_open_catalog(
-                app,
-                PocketCatalogSpells,
-                PocketEditSpellName,
-                character->spells[index].name);
+                app, PocketCatalogSpells, PocketEditSpellName, character->spells[index].name);
         else if(field == 1U)
-            pocket_begin_text(app, PocketEditSpellDetail, "Spell notes", character->spells[index].detail);
+            pocket_begin_text(
+                app, PocketEditSpellDetail, "Spell notes", character->spells[index].detail);
         else if(field < 10U)
             pocket_adjust_record(app, 1);
         else if(field == 10U) {
@@ -6638,13 +7327,20 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
                 pocket_set_status(app, "No free casts left");
             }
         } else if(field == 11U)
-            pocket_begin_text(app, PocketEditSpellStableId, "Stable ID", character->spells[index].stable_id);
+            pocket_begin_text(
+                app, PocketEditSpellStableId, "Stable ID", character->spells[index].stable_id);
         else if(field == 12U)
-            pocket_begin_text(app, PocketEditSpellSource, "Spell source", character->spells[index].source);
+            pocket_begin_text(
+                app, PocketEditSpellSource, "Spell source", character->spells[index].source);
         else if(field == 13U)
-            pocket_begin_text(app, PocketEditSpellSchool, "Spell school", character->spells[index].school);
+            pocket_begin_text(
+                app, PocketEditSpellSchool, "Spell school", character->spells[index].school);
         else if(field == 14U)
-            pocket_begin_text(app, PocketEditSpellGrantName, "Grant source name", character->spells[index].grant_name);
+            pocket_begin_text(
+                app,
+                PocketEditSpellGrantName,
+                "Grant source name",
+                character->spells[index].grant_name);
         else if(field == 15U)
             pocket_adjust_record(app, 1);
         else {
@@ -6654,12 +7350,10 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListFeatures:
         if(field == 0U)
             pocket_open_catalog(
-                app,
-                PocketCatalogFeats,
-                PocketEditFeatureName,
-                character->features[index].name);
+                app, PocketCatalogFeats, PocketEditFeatureName, character->features[index].name);
         else if(field == 1U)
-            pocket_begin_text(app, PocketEditFeatureDetail, "Feature notes", character->features[index].detail);
+            pocket_begin_text(
+                app, PocketEditFeatureDetail, "Feature notes", character->features[index].detail);
         else if(field < 9U)
             pocket_adjust_record(app, 1);
         else
@@ -6668,12 +7362,10 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListItems:
         if(field == 0U)
             pocket_open_catalog(
-                app,
-                PocketCatalogItems,
-                PocketEditItemName,
-                character->items[index].name);
+                app, PocketCatalogItems, PocketEditItemName, character->items[index].name);
         else if(field == 1U)
-            pocket_begin_text(app, PocketEditItemDetail, "Item notes", character->items[index].detail);
+            pocket_begin_text(
+                app, PocketEditItemDetail, "Item notes", character->items[index].detail);
         else if((field >= 2U && field <= 26U) || (field >= 28U && field <= 33U))
             pocket_adjust_record(app, 1);
         else if(field == 34U)
@@ -6688,10 +7380,7 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListLanguages:
         if(field == 0U)
             pocket_begin_text(
-                app,
-                PocketEditLanguageName,
-                "Language",
-                character->languages[index]);
+                app, PocketEditLanguageName, "Language", character->languages[index]);
         else
             pocket_delete_record(app);
         break;
@@ -6700,16 +7389,10 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
             pocket_adjust_record(app, 1);
         else if(field == 1U)
             pocket_begin_text(
-                app,
-                PocketEditJournalTitle,
-                "Journal title",
-                character->journal[index].title);
+                app, PocketEditJournalTitle, "Journal title", character->journal[index].title);
         else if(field == 2U)
             pocket_begin_text(
-                app,
-                PocketEditJournalBody,
-                "Journal note",
-                character->journal[index].body);
+                app, PocketEditJournalBody, "Journal note", character->journal[index].body);
         else if(field == 5U)
             pocket_apply_milestone_level(app);
         else if(field == 6U)
@@ -6720,10 +7403,7 @@ static void pocket_handle_record_detail_ok(PocketD20App* app) {
     case PocketListParty:
         if(field == 0U)
             pocket_begin_text(
-                app,
-                PocketEditPartyName,
-                "Party member",
-                app->data.party[index].name);
+                app, PocketEditPartyName, "Party member", app->data.party[index].name);
         else if(field >= 1U && field <= 4U)
             pocket_adjust_record(app, 1);
         else
@@ -6750,18 +7430,62 @@ static bool pocket_begin_record_number(PocketD20App* app) {
             if(maximum < 1) maximum = 1;
             minimum = 1;
             break;
-        case 3U: header = "Hit Point Die"; value = level->hit_die; minimum = 4; maximum = 12; break;
-        case 4U: header = "Hit Dice current"; value = level->hit_dice_current; maximum = level->hit_dice_max; break;
-        case 5U: header = "Hit Dice maximum"; value = level->hit_dice_max; maximum = 20; break;
-        case 8U: header = "Cantrip limit"; value = level->cantrip_limit; maximum = 30; break;
-        case 9U: header = "Prepared limit"; value = level->prepared_limit; maximum = 50; break;
-        case 10U: header = "Spellbook size"; value = level->spellbook_size; break;
-        case 11U: header = "Pact slot level"; value = level->pact_slot_level; maximum = 5; break;
-        case 12U: header = "Pact slots current"; value = level->pact_slots_current; maximum = level->pact_slots_max; break;
-        case 13U: header = "Pact slots maximum"; value = level->pact_slots_max; maximum = 8; break;
-        case 15U: header = "Spell points current"; value = level->spell_points_current; maximum = level->spell_points_max; break;
-        case 16U: header = "Spell points maximum"; value = level->spell_points_max; break;
-        default: return false;
+        case 3U:
+            header = "Hit Point Die";
+            value = level->hit_die;
+            minimum = 4;
+            maximum = 12;
+            break;
+        case 4U:
+            header = "Hit Dice current";
+            value = level->hit_dice_current;
+            maximum = level->hit_dice_max;
+            break;
+        case 5U:
+            header = "Hit Dice maximum";
+            value = level->hit_dice_max;
+            maximum = 20;
+            break;
+        case 8U:
+            header = "Cantrip limit";
+            value = level->cantrip_limit;
+            maximum = 30;
+            break;
+        case 9U:
+            header = "Prepared limit";
+            value = level->prepared_limit;
+            maximum = 50;
+            break;
+        case 10U:
+            header = "Spellbook size";
+            value = level->spellbook_size;
+            break;
+        case 11U:
+            header = "Pact slot level";
+            value = level->pact_slot_level;
+            maximum = 5;
+            break;
+        case 12U:
+            header = "Pact slots current";
+            value = level->pact_slots_current;
+            maximum = level->pact_slots_max;
+            break;
+        case 13U:
+            header = "Pact slots maximum";
+            value = level->pact_slots_max;
+            maximum = 8;
+            break;
+        case 15U:
+            header = "Spell points current";
+            value = level->spell_points_current;
+            maximum = level->spell_points_max;
+            break;
+        case 16U:
+            header = "Spell points maximum";
+            value = level->spell_points_max;
+            break;
+        default:
+            return false;
         }
     } else if(app->list_kind == PocketListSpells) {
         if(field == 3U) {
@@ -6799,22 +7523,85 @@ static bool pocket_begin_record_number(PocketD20App* app) {
     } else if(app->list_kind == PocketListItems) {
         PocketItem* item = &character->items[index];
         switch(field) {
-        case 2U: header = "Item quantity"; value = item->quantity; break;
-        case 3U: header = "Weight in tenths lb"; value = item->weight_tenths; maximum = 9999; break;
-        case 9U: header = "Magic bonus"; value = item->magic_bonus; minimum = -10; maximum = 10; break;
-        case 10U: header = "Damage dice count"; value = item->damage_dice; maximum = 20; break;
-        case 11U: header = "Damage die sides"; value = item->damage_die; minimum = 4; maximum = 12; break;
-        case 13U: header = "Versatile die sides"; value = item->versatile_die; minimum = 4; maximum = 12; break;
-        case 23U: header = "Extra dice count"; value = item->extra_dice; maximum = 20; break;
-        case 24U: header = "Extra die sides"; value = item->extra_die; minimum = 4; maximum = 12; break;
-        case 25U: header = "Ammo current"; value = item->ammo_current; maximum = item->ammo_max; break;
-        case 26U: header = "Ammo maximum"; value = item->ammo_max; break;
-        case 29U: header = "Charges current"; value = item->charges_current; maximum = item->charges_max; break;
-        case 30U: header = "Charges maximum"; value = item->charges_max; break;
-        case 31U: header = "Armor base"; value = item->armor_base; maximum = 30; break;
-        case 32U: header = "Armor DEX cap"; value = item->armor_dex_cap; minimum = -1; maximum = 9; break;
-        case 33U: header = "Shield bonus"; value = item->shield_bonus; maximum = 10; break;
-        default: return false;
+        case 2U:
+            header = "Item quantity";
+            value = item->quantity;
+            break;
+        case 3U:
+            header = "Weight in tenths lb";
+            value = item->weight_tenths;
+            maximum = 9999;
+            break;
+        case 9U:
+            header = "Magic bonus";
+            value = item->magic_bonus;
+            minimum = -10;
+            maximum = 10;
+            break;
+        case 10U:
+            header = "Damage dice count";
+            value = item->damage_dice;
+            maximum = 20;
+            break;
+        case 11U:
+            header = "Damage die sides";
+            value = item->damage_die;
+            minimum = 4;
+            maximum = 12;
+            break;
+        case 13U:
+            header = "Versatile die sides";
+            value = item->versatile_die;
+            minimum = 4;
+            maximum = 12;
+            break;
+        case 23U:
+            header = "Extra dice count";
+            value = item->extra_dice;
+            maximum = 20;
+            break;
+        case 24U:
+            header = "Extra die sides";
+            value = item->extra_die;
+            minimum = 4;
+            maximum = 12;
+            break;
+        case 25U:
+            header = "Ammo current";
+            value = item->ammo_current;
+            maximum = item->ammo_max;
+            break;
+        case 26U:
+            header = "Ammo maximum";
+            value = item->ammo_max;
+            break;
+        case 29U:
+            header = "Charges current";
+            value = item->charges_current;
+            maximum = item->charges_max;
+            break;
+        case 30U:
+            header = "Charges maximum";
+            value = item->charges_max;
+            break;
+        case 31U:
+            header = "Armor base";
+            value = item->armor_base;
+            maximum = 30;
+            break;
+        case 32U:
+            header = "Armor DEX cap";
+            value = item->armor_dex_cap;
+            minimum = -1;
+            maximum = 9;
+            break;
+        case 33U:
+            header = "Shield bonus";
+            value = item->shield_bonus;
+            maximum = 10;
+            break;
+        default:
+            return false;
         }
     } else if(app->list_kind == PocketListParty) {
         PocketPartyMember* member = &app->data.party[index];
@@ -6842,8 +7629,7 @@ static bool pocket_begin_record_number(PocketD20App* app) {
     } else {
         return false;
     }
-    pocket_begin_number(
-        app, PocketNumberRecord, field, 0U, header, value, minimum, maximum);
+    pocket_begin_number(app, PocketNumberRecord, field, 0U, header, value, minimum, maximum);
     return true;
 }
 
@@ -6857,14 +7643,12 @@ static void pocket_handle_record_detail_custom_name(PocketD20App* app) {
         pocket_begin_text(
             app, PocketEditSubclass, "Custom subclass", character->classes[index].subclass);
     else if(app->list_kind == PocketListSpells && app->selection == 0U)
-        pocket_begin_text(
-            app, PocketEditSpellName, "Custom spell", character->spells[index].name);
+        pocket_begin_text(app, PocketEditSpellName, "Custom spell", character->spells[index].name);
     else if(app->list_kind == PocketListFeatures && app->selection == 0U)
         pocket_begin_text(
             app, PocketEditFeatureName, "Custom feat/perk", character->features[index].name);
     else if(app->list_kind == PocketListItems && app->selection == 0U)
-        pocket_begin_text(
-            app, PocketEditItemName, "Custom item", character->items[index].name);
+        pocket_begin_text(app, PocketEditItemName, "Custom item", character->items[index].name);
 }
 
 static void pocket_handle_record_detail(PocketD20App* app, const InputEvent* event) {
@@ -6873,13 +7657,11 @@ static void pocket_handle_record_detail(PocketD20App* app, const InputEvent* eve
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight))
+    else if(pocket_is_move_event(event) && (event->key == InputKeyLeft || event->key == InputKeyRight))
         pocket_adjust_record(app, event->key == InputKeyRight ? 1 : -1);
     else if(event->type == InputTypeLong && event->key == InputKeyOk) {
         if(!pocket_begin_record_number(app)) pocket_handle_record_detail_custom_name(app);
-    }
-    else if(event->type == InputTypeShort && event->key == InputKeyOk)
+    } else if(event->type == InputTypeShort && event->key == InputKeyOk)
         pocket_handle_record_detail_ok(app);
 }
 
@@ -6898,7 +7680,8 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
     uint8_t grant_source = PocketGrantSourceCount;
     switch(app->catalog_target) {
     case PocketEditClassName:
-        pocket_copy(character->classes[index].name, sizeof(character->classes[index].name), selected);
+        pocket_copy(
+            character->classes[index].name, sizeof(character->classes[index].name), selected);
         pocket_configure_class_defaults(&character->classes[index]);
         grant_source = PocketGrantClassFeature;
         break;
@@ -6914,7 +7697,8 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
         grant_source = PocketGrantSpecies;
         break;
     case PocketEditSpellName:
-        pocket_copy(character->spells[index].name, sizeof(character->spells[index].name), selected);
+        pocket_copy(
+            character->spells[index].name, sizeof(character->spells[index].name), selected);
         if(selected_has_metadata) character->spells[index].level = selected_level;
         if(selected_has_metadata) {
             snprintf(
@@ -6937,13 +7721,13 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
         }
         break;
     case PocketEditFeatureName:
-        pocket_copy(character->features[index].name, sizeof(character->features[index].name), selected);
+        pocket_copy(
+            character->features[index].name, sizeof(character->features[index].name), selected);
         grant_source = PocketGrantFeat;
         break;
     case PocketEditItemName:
         pocket_copy(character->items[index].name, sizeof(character->items[index].name), selected);
-        pocket_apply_equipment_preset(
-            &character->items[index], selected, selected_item_category);
+        pocket_apply_equipment_preset(&character->items[index], selected, selected_item_category);
         grant_source = PocketGrantItem;
         break;
     case PocketEditBackground:
@@ -6958,7 +7742,8 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
     }
     pocket_catalog_release(app);
     uint8_t staged = grant_source < PocketGrantSourceCount ?
-                         pocket_stage_grants(app, grant_source, selected) : 0U;
+                         pocket_stage_grants(app, grant_source, selected) :
+                         0U;
     pocket_save(app, false);
     PocketScreen destination = app->return_screen;
     if(staged) {
@@ -6967,9 +7752,7 @@ static void pocket_apply_catalog_selection(PocketD20App* app) {
         snprintf(app->status, sizeof(app->status), "%u grants to review", staged);
         return;
     }
-    pocket_enter_screen(
-        app,
-        destination);
+    pocket_enter_screen(app, destination);
     app->selection = app->catalog_return_selection;
     if(app->selection >= 5U) app->scroll = app->selection - 4U;
     pocket_set_status(app, "Catalog choice saved");
@@ -6980,8 +7763,9 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, app->catalog_count, -1);
     else if(app->catalog_count && pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, app->catalog_count, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         uint16_t next_start = app->catalog_page_start;
         uint16_t page_limit = pocket_catalog_page_limit(app);
         if(event->key == InputKeyRight && app->catalog_has_more)
@@ -6994,9 +7778,10 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
             app->scroll = 0U;
             pocket_catalog_load_page(app);
         }
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-            (app->catalog_kind == PocketCatalogSpells ||
-             app->catalog_kind == PocketCatalogSubclasses)) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        (app->catalog_kind == PocketCatalogSpells ||
+         app->catalog_kind == PocketCatalogSubclasses)) {
         app->catalog_show_all = !app->catalog_show_all;
         app->catalog_page_start = 0U;
         app->selection = 0U;
@@ -7004,8 +7789,9 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
         pocket_catalog_load_page(app);
         pocket_set_status(
             app,
-            app->catalog_show_all ? "Showing all" :
-            app->catalog_kind == PocketCatalogSpells ? "Class + level filter" : "Class filter");
+            app->catalog_show_all                    ? "Showing all" :
+            app->catalog_kind == PocketCatalogSpells ? "Class + level filter" :
+                                                       "Class filter");
     } else if(event->type == InputTypeShort && event->key == InputKeyOk)
         pocket_apply_catalog_selection(app);
 }
@@ -7016,8 +7802,9 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, 20U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 20U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 3U)
             character->hp_current = pocket_clamp_i16(character->hp_current + delta, 0, 999);
@@ -7029,8 +7816,7 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
             if(class_index >= character->class_count) class_index = 0;
             app->hit_die_class_index = (uint8_t)class_index;
             return;
-        }
-        else if(app->selection == 10U)
+        } else if(app->selection == 10U)
             character->reaction_available = !character->reaction_available;
         else if(app->selection == 17U)
             character->death_successes = pocket_clamp_u8(character->death_successes + delta, 3U);
@@ -7041,29 +7827,23 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
         else
             return;
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              (app->selection == 3U || app->selection == 4U ||
-               (app->selection >= 17U && app->selection <= 19U))) {
-        const char* header = app->selection == 3U ? "Current HP" :
-                             app->selection == 4U ? "Temporary HP" :
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        (app->selection == 3U || app->selection == 4U ||
+         (app->selection >= 17U && app->selection <= 19U))) {
+        const char* header = app->selection == 3U  ? "Current HP" :
+                             app->selection == 4U  ? "Temporary HP" :
                              app->selection == 17U ? "Death successes" :
-                             app->selection == 18U ? "Death failures" : "Exhaustion";
-        int32_t value = app->selection == 3U ? character->hp_current :
-                        app->selection == 4U ? character->hp_temporary :
+                             app->selection == 18U ? "Death failures" :
+                                                     "Exhaustion";
+        int32_t value = app->selection == 3U  ? character->hp_current :
+                        app->selection == 4U  ? character->hp_temporary :
                         app->selection == 17U ? character->death_successes :
                         app->selection == 18U ? character->death_failures :
                                                 character->exhaustion;
-        int32_t maximum = app->selection <= 4U ? 999 :
-                          app->selection <= 18U ? 3 : 6;
+        int32_t maximum = app->selection <= 4U ? 999 : app->selection <= 18U ? 3 : 6;
         pocket_begin_number(
-            app,
-            PocketNumberCombat,
-            (uint8_t)app->selection,
-            0U,
-            header,
-            value,
-            0,
-            maximum);
+            app, PocketNumberCombat, (uint8_t)app->selection, 0U, header, value, 0, maximum);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         switch(app->selection) {
         case 0:
@@ -7104,8 +7884,8 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
                 pocket_set_status(app, "No Hit Dice left");
             } else {
                 uint8_t roll = 0U;
-                int16_t healed = pocket_d20_spend_class_hit_die(
-                    character, app->hit_die_class_index, &roll);
+                int16_t healed =
+                    pocket_d20_spend_class_hit_die(character, app->hit_die_class_index, &roll);
                 int8_t constitution = pocket_d20_ability_modifier(
                     character->ability_scores[PocketAbilityConstitution]);
                 pocket_save(app, false);
@@ -7134,14 +7914,16 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
             pocket_begin_text(app, PocketEditConditions, "Conditions", character->conditions);
             break;
         case 9:
-            pocket_begin_text(app, PocketEditConcentration, "Concentration", character->concentration);
+            pocket_begin_text(
+                app, PocketEditConcentration, "Concentration", character->concentration);
             break;
         case 10:
             character->reaction_available = !character->reaction_available;
             pocket_save(app, false);
             break;
         case 11:
-            pocket_begin_text(app, PocketEditTemporaryEffects, "Temporary effects", character->temporary_effects);
+            pocket_begin_text(
+                app, PocketEditTemporaryEffects, "Temporary effects", character->temporary_effects);
             break;
         case 12:
             pocket_begin_text(app, PocketEditResistances, "Resistances", character->resistances);
@@ -7150,13 +7932,15 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
             pocket_begin_text(app, PocketEditImmunities, "Immunities", character->immunities);
             break;
         case 14:
-            pocket_begin_text(app, PocketEditVulnerabilities, "Vulnerabilities", character->vulnerabilities);
+            pocket_begin_text(
+                app, PocketEditVulnerabilities, "Vulnerabilities", character->vulnerabilities);
             break;
         case 15:
             pocket_begin_text(app, PocketEditSenses, "Senses", character->senses);
             break;
         case 16:
-            pocket_begin_text(app, PocketEditMovementModes, "Movement modes", character->movement_modes);
+            pocket_begin_text(
+                app, PocketEditMovementModes, "Movement modes", character->movement_modes);
             break;
         case 17:
             character->death_successes = pocket_clamp_u8(character->death_successes + 1, 3U);
@@ -7181,8 +7965,7 @@ static void pocket_roll_generic(PocketD20App* app) {
     app->dice_roll_value_count = 0U;
     app->dice_roll_sum = 0U;
     memset(app->dice_roll_values, 0, sizeof(app->dice_roll_values));
-    if(app->roll_mode == PocketRollGuidance && app->dice_count == 1U &&
-       app->dice_sides == 20U) {
+    if(app->roll_mode == PocketRollGuidance && app->dice_count == 1U && app->dice_sides == 20U) {
         app->dice_first = (uint8_t)pocket_d20_roll_dice(1U, 20U);
         app->dice_guidance = (uint8_t)pocket_d20_roll_dice(1U, 4U);
         app->dice_roll_values[0] = app->dice_first;
@@ -7190,32 +7973,29 @@ static void pocket_roll_generic(PocketD20App* app) {
         app->dice_roll_value_count = 2U;
         app->dice_roll_sum = app->dice_first + app->dice_guidance;
         app->dice_result = (int16_t)app->dice_roll_sum + app->dice_modifier;
-    } else if((app->roll_mode == PocketRollAdvantage ||
-               app->roll_mode == PocketRollDisadvantage) &&
-              app->dice_count == 1U && app->dice_sides == 20U) {
+    } else if(
+        (app->roll_mode == PocketRollAdvantage || app->roll_mode == PocketRollDisadvantage) &&
+        app->dice_count == 1U && app->dice_sides == 20U) {
         app->dice_first = (uint8_t)pocket_d20_roll_dice(1U, 20U);
         app->dice_second = (uint8_t)pocket_d20_roll_dice(1U, 20U);
         app->dice_roll_values[0] = app->dice_first;
         app->dice_roll_values[1] = app->dice_second;
         app->dice_roll_value_count = 2U;
         app->dice_roll_sum = app->dice_first + app->dice_second;
-        uint8_t chosen = app->roll_mode == PocketRollAdvantage ?
-                             (app->dice_first > app->dice_second ? app->dice_first : app->dice_second) :
-                             (app->dice_first < app->dice_second ? app->dice_first : app->dice_second);
+        uint8_t chosen =
+            app->roll_mode == PocketRollAdvantage ?
+                (app->dice_first > app->dice_second ? app->dice_first : app->dice_second) :
+                (app->dice_first < app->dice_second ? app->dice_first : app->dice_second);
         app->dice_result = chosen + app->dice_modifier;
     } else {
         app->dice_roll_value_count = app->dice_count;
         app->dice_roll_sum = pocket_d20_roll_dice_values(
-            app->dice_count,
-            app->dice_sides,
-            app->dice_roll_values,
-            sizeof(app->dice_roll_values));
+            app->dice_count, app->dice_sides, app->dice_roll_values, sizeof(app->dice_roll_values));
         if(app->dice_count == 1U) app->dice_first = app->dice_roll_values[0];
         app->dice_result = (int16_t)app->dice_roll_sum + app->dice_modifier;
     }
     pocket_enter_screen(app, PocketScreenDiceResult);
-    pocket_start_dice_animation(
-        app, app->dice_roll_value_count, app->dice_sides);
+    pocket_start_dice_animation(app, app->dice_roll_value_count, app->dice_sides);
 }
 
 static void pocket_handle_dice(PocketD20App* app, const InputEvent* event) {
@@ -7223,8 +8003,9 @@ static void pocket_handle_dice(PocketD20App* app, const InputEvent* event) {
         pocket_menu_move(app, 5U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, 5U, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 0U) {
             app->dice_count = (uint8_t)pocket_clamp_i16(app->dice_count + delta, 1, 20);
@@ -7250,25 +8031,17 @@ static void pocket_handle_dice(PocketD20App* app, const InputEvent* event) {
         app->dice_second = 0U;
         app->dice_guidance = 0U;
         app->dice_roll_value_count = 0U;
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection <= 2U) {
+    } else if(event->type == InputTypeLong && event->key == InputKeyOk && app->selection <= 2U) {
         const char* header = app->selection == 0U ? "Dice count" :
-                             app->selection == 1U ? "Die sides" : "Roll modifier";
+                             app->selection == 1U ? "Die sides" :
+                                                    "Roll modifier";
         int32_t value = app->selection == 0U ? app->dice_count :
-                        app->selection == 1U ? app->dice_sides : app->dice_modifier;
-        int32_t minimum = app->selection == 0U ? 1 :
-                          app->selection == 1U ? 2 : -99;
-        int32_t maximum = app->selection == 0U ? 20 :
-                          app->selection == 1U ? 100 : 99;
+                        app->selection == 1U ? app->dice_sides :
+                                               app->dice_modifier;
+        int32_t minimum = app->selection == 0U ? 1 : app->selection == 1U ? 2 : -99;
+        int32_t maximum = app->selection == 0U ? 20 : app->selection == 1U ? 100 : 99;
         pocket_begin_number(
-            app,
-            PocketNumberDice,
-            (uint8_t)app->selection,
-            0U,
-            header,
-            value,
-            minimum,
-            maximum);
+            app, PocketNumberDice, (uint8_t)app->selection, 0U, header, value, minimum, maximum);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection == 4U) pocket_roll_generic(app);
     }
@@ -7303,8 +8076,9 @@ static void pocket_handle_attack_list(PocketD20App* app, const InputEvent* event
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
-    else if(pocket_is_move_event(event) &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t mode = app->roll_mode + (event->key == InputKeyRight ? 1 : -1);
         if(mode < 0) mode = PocketRollDisadvantage;
         if(mode > PocketRollDisadvantage) mode = PocketRollNormal;
@@ -7318,36 +8092,31 @@ static void pocket_handle_attack_result(PocketD20App* app, const InputEvent* eve
     const PocketItem* item = &app->data.character.items[app->attack_item_index];
     if(app->attack_phase == 0U) {
         if(event->type == InputTypeShort && event->key == InputKeyOk) {
-            app->damage_roll = pocket_d20_roll_damage(
-                &app->data.character,
-                item,
-                app->attack_roll.critical);
+            app->damage_roll =
+                pocket_d20_roll_damage(&app->data.character, item, app->attack_roll.critical);
             app->attack_phase = 1U;
             app->damage_roll_page = 0U;
-            uint8_t count =
-                app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
+            uint8_t count = app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
             if(count)
                 pocket_start_dice_animation(
                     app,
                     count,
                     item->use_versatile && item->versatile_die >= 2U ? item->versatile_die :
-                                                                        item->damage_die);
+                                                                       item->damage_die);
         } else if(event->type == InputTypeShort && event->key == InputKeyRight) {
             app->damage_roll = pocket_d20_roll_damage(&app->data.character, item, true);
             app->attack_phase = 1U;
             app->damage_roll_page = 0U;
-            uint8_t count =
-                app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
+            uint8_t count = app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
             if(count)
                 pocket_start_dice_animation(
                     app,
                     count,
                     item->use_versatile && item->versatile_die >= 2U ? item->versatile_die :
-                                                                        item->damage_die);
+                                                                       item->damage_die);
         } else if(event->type == InputTypeShort && event->key == InputKeyUp) {
             app->attack_roll = pocket_d20_roll_attack(&app->data.character, item, app->roll_mode);
-            pocket_start_dice_animation(
-                app, app->attack_roll.second_die ? 2U : 1U, 20U);
+            pocket_start_dice_animation(app, app->attack_roll.second_die ? 2U : 1U, 20U);
         }
     } else {
         uint8_t roll_count =
@@ -7358,23 +8127,19 @@ static void pocket_handle_attack_result(PocketD20App* app, const InputEvent* eve
                 app->damage_roll_page = page_count - 1U;
             else
                 --app->damage_roll_page;
-        } else if(event->type == InputTypeShort && event->key == InputKeyDown &&
-                  page_count > 1U) {
+        } else if(event->type == InputTypeShort && event->key == InputKeyDown && page_count > 1U) {
             app->damage_roll_page = (app->damage_roll_page + 1U) % page_count;
         } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
-            app->damage_roll = pocket_d20_roll_damage(
-                &app->data.character,
-                item,
-                app->damage_roll.critical);
+            app->damage_roll =
+                pocket_d20_roll_damage(&app->data.character, item, app->damage_roll.critical);
             app->damage_roll_page = 0U;
-            roll_count =
-                app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
+            roll_count = app->damage_roll.weapon_roll_count + app->damage_roll.extra_roll_count;
             if(roll_count)
                 pocket_start_dice_animation(
                     app,
                     roll_count,
                     item->use_versatile && item->versatile_die >= 2U ? item->versatile_die :
-                                                                        item->damage_die);
+                                                                       item->damage_die);
         }
     }
 }
@@ -7402,25 +8167,6 @@ static void pocket_history_push(
     history->value_after = after;
 }
 
-static bool pocket_history_undo(PocketD20App* app) {
-    if(!app->data.encounter_history_count) return false;
-    PocketEncounterHistory* history =
-        &app->data.encounter_history[--app->data.encounter_history_count];
-    app->data.initiative.round = history->round;
-    app->data.initiative.current_turn = history->current_turn;
-    if(history->kind == PocketHistoryParticipantHp &&
-       history->target < app->data.initiative.count) {
-        PocketInitiativeEntry* entry = &app->data.initiative.entries[history->target];
-        entry->hp_current = history->value_before;
-        if(entry->is_player_character) app->data.character.hp_current = history->value_before;
-    } else if(history->kind == PocketHistoryFeatureResource &&
-              history->target < app->data.character.feature_count) {
-        app->data.character.features[history->target].uses_current = history->value_before;
-    }
-    pocket_save(app, false);
-    return true;
-}
-
 static void pocket_recover_features(PocketCharacter* character, uint8_t cadence) {
     for(uint8_t i = 0U; i < character->feature_count; ++i) {
         PocketFeature* feature = &character->features[i];
@@ -7429,23 +8175,23 @@ static void pocket_recover_features(PocketCharacter* character, uint8_t cadence)
     }
 }
 
-static void pocket_start_new_initiative(PocketD20App* app) {
+static void pocket_seed_party_initiative(PocketD20App* app) {
+    if(!app) return;
     PocketInitiativeState* initiative = &app->data.initiative;
     memset(initiative, 0, sizeof(*initiative));
     initiative->round = 1U;
     PocketInitiativeEntry* character_entry = &initiative->entries[initiative->count++];
-    pocket_copy(
-        character_entry->name,
-        sizeof(character_entry->name),
-        app->data.character.name);
+    pocket_copy(character_entry->name, sizeof(character_entry->name), app->data.character.name);
     character_entry->initiative_modifier = pocket_d20_initiative_modifier(&app->data.character);
     character_entry->is_player_character = 1U;
     character_entry->hp_current = app->data.character.hp_current;
     character_entry->hp_max = app->data.character.hp_max;
     character_entry->armor_class = app->data.character.armor_class;
-    pocket_copy(character_entry->conditions, sizeof(character_entry->conditions), app->data.character.conditions);
-    for(uint8_t i = 0U;
-        i < app->data.party_count && initiative->count < POCKET_D20_MAX_INITIATIVE;
+    pocket_copy(
+        character_entry->conditions,
+        sizeof(character_entry->conditions),
+        app->data.character.conditions);
+    for(uint8_t i = 0U; i < app->data.party_count && initiative->count < POCKET_D20_MAX_INITIATIVE;
         ++i) {
         PocketInitiativeEntry* entry = &initiative->entries[initiative->count++];
         pocket_copy(entry->name, sizeof(entry->name), app->data.party[i].name);
@@ -7454,6 +8200,10 @@ static void pocket_start_new_initiative(PocketD20App* app) {
         entry->hp_max = app->data.party[i].hp_max;
         entry->armor_class = app->data.party[i].armor_class;
     }
+}
+
+static void pocket_start_new_initiative(PocketD20App* app) {
+    pocket_seed_party_initiative(app);
     app->data.encounter_history_count = 0U;
     pocket_recover_features(&app->data.character, PocketRechargeEncounter);
     pocket_save(app, false);
@@ -7476,9 +8226,9 @@ static void pocket_sort_initiative(PocketInitiativeState* initiative) {
 static void pocket_handle_initiative_menu(PocketD20App* app, const InputEvent* event) {
     PocketInitiativeState* initiative = &app->data.initiative;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
-        pocket_menu_move(app, 6U, -1);
+        pocket_menu_move(app, 5U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
-        pocket_menu_move(app, 6U, 1);
+        pocket_menu_move(app, 5U, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection == 0U)
             pocket_start_new_initiative(app);
@@ -7500,41 +8250,50 @@ static void pocket_handle_initiative_menu(PocketD20App* app, const InputEvent* e
             app->data.encounter_history_count = 0U;
             pocket_save(app, false);
             pocket_set_status(app, "Combat ended");
-        } else {
-            pocket_set_status(app, pocket_history_undo(app) ? "Change undone" : "Nothing to undo");
         }
     }
 }
 
 static void pocket_handle_initiative_setup(PocketD20App* app, const InputEvent* event) {
     PocketInitiativeState* initiative = &app->data.initiative;
-    uint16_t count = initiative->count + 2U;
+    uint16_t count = initiative->count + 3U;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
-    else if(pocket_is_move_event(event) &&
-            app->selection < initiative->count &&
-            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    else if(
+        pocket_is_move_event(event) && app->selection > 0U &&
+        app->selection <= initiative->count &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
-        PocketInitiativeEntry* entry = &initiative->entries[app->selection];
+        PocketInitiativeEntry* entry = &initiative->entries[app->selection - 1U];
         entry->initiative_total = pocket_clamp_i16(entry->initiative_total + delta, -20, 99);
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-              app->selection < initiative->count) {
-        PocketInitiativeEntry* entry = &initiative->entries[app->selection];
-        entry->initiative_total =
-            (int16_t)pocket_d20_roll_dice(1U, 20U) + entry->initiative_modifier;
-        pocket_save(app, false);
-        pocket_start_dice_animation(app, 1U, 20U);
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyOk && app->selection > 0U &&
+        app->selection <= initiative->count) {
+        app->record_index = (uint8_t)(app->selection - 1U);
+        PocketInitiativeEntry* entry = &initiative->entries[app->record_index];
+        int32_t raw_roll = entry->initiative_total - entry->initiative_modifier;
+        if(raw_roll < 1 || raw_roll > 20) raw_roll = 10;
+        pocket_begin_number(
+            app, PocketNumberInitiative, 6U, 0U, "Initiative d20 roll", raw_roll, 1, 20);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
-        if(app->selection < initiative->count) {
-            PocketInitiativeEntry* entry = &initiative->entries[app->selection];
+        if(app->selection == 0U) {
+            for(uint8_t i = 0U; i < initiative->count; ++i) {
+                PocketInitiativeEntry* entry = &initiative->entries[i];
+                entry->initiative_total =
+                    (int16_t)pocket_d20_roll_dice(1U, 20U) + entry->initiative_modifier;
+            }
+            pocket_save(app, false);
+            pocket_set_status(app, "Rolled initiative for all");
+        } else if(app->selection <= initiative->count) {
+            PocketInitiativeEntry* entry = &initiative->entries[app->selection - 1U];
             entry->initiative_total =
                 (int16_t)pocket_d20_roll_dice(1U, 20U) + entry->initiative_modifier;
             pocket_save(app, false);
             pocket_start_dice_animation(app, 1U, 20U);
-        } else if(app->selection == initiative->count) {
+        } else if(app->selection == initiative->count + 1U) {
             if(initiative->count >= POCKET_D20_MAX_INITIATIVE) {
                 pocket_set_status(app, "Initiative list full");
             } else {
@@ -7546,10 +8305,7 @@ static void pocket_handle_initiative_setup(PocketD20App* app, const InputEvent* 
                 entry->hp_max = 1;
                 entry->armor_class = 10;
                 pocket_begin_text(
-                    app,
-                    PocketEditTemporaryInitiativeName,
-                    "Participant name",
-                    entry->name);
+                    app, PocketEditTemporaryInitiativeName, "Participant name", entry->name);
             }
         } else {
             pocket_sort_initiative(initiative);
@@ -7562,10 +8318,8 @@ static void pocket_handle_initiative_setup(PocketD20App* app, const InputEvent* 
     }
 }
 
-static void pocket_swap_initiative(
-    PocketInitiativeState* initiative,
-    uint8_t first,
-    uint8_t second) {
+static void
+    pocket_swap_initiative(PocketInitiativeState* initiative, uint8_t first, uint8_t second) {
     PocketInitiativeEntry temporary = initiative->entries[first];
     initiative->entries[first] = initiative->entries[second];
     initiative->entries[second] = temporary;
@@ -7573,6 +8327,24 @@ static void pocket_swap_initiative(
         initiative->current_turn = second;
     else if(initiative->current_turn == second)
         initiative->current_turn = first;
+}
+
+static void pocket_initiative_previous_turn(PocketD20App* app) {
+    PocketInitiativeState* initiative = &app->data.initiative;
+    if(!initiative->count) return;
+    if(initiative->current_turn > 0U) {
+        --initiative->current_turn;
+    } else if(initiative->round > 1U) {
+        --initiative->round;
+        initiative->current_turn = initiative->count - 1U;
+    } else {
+        initiative->current_turn = 0U;
+        pocket_set_status(app, "Already at first turn");
+    }
+    app->selection = initiative->current_turn;
+    if(app->selection < app->scroll) app->scroll = app->selection;
+    if(app->selection >= app->scroll + 5U) app->scroll = app->selection - 4U;
+    pocket_save(app, false);
 }
 
 static void pocket_handle_initiative_combat(PocketD20App* app, const InputEvent* event) {
@@ -7595,18 +8367,15 @@ static void pocket_handle_initiative_combat(PocketD20App* app, const InputEvent*
         if(app->selection < app->scroll) app->scroll = app->selection;
         if(app->selection >= app->scroll + 5U) app->scroll = app->selection - 4U;
         pocket_save(app, false);
-    } else if(pocket_is_move_event(event) &&
-              (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+    } else if(
+        pocket_is_move_event(event) &&
+        (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         PocketInitiativeEntry* entry = &initiative->entries[app->selection];
         int16_t before = entry->hp_current;
         entry->hp_current = pocket_clamp_i16(
             entry->hp_current + (event->key == InputKeyRight ? 1 : -1), -999, 999);
         pocket_history_push(
-            app,
-            PocketHistoryParticipantHp,
-            app->selection,
-            before,
-            entry->hp_current);
+            app, PocketHistoryParticipantHp, app->selection, before, entry->hp_current);
         if(entry->is_player_character) app->data.character.hp_current = entry->hp_current;
         pocket_save(app, false);
     } else if(event->type == InputTypeLong && event->key == InputKeyOk) {
@@ -7624,13 +8393,13 @@ static void pocket_handle_initiative_combat(PocketD20App* app, const InputEvent*
             PocketEditInitiativeConditions,
             "Participant conditions",
             initiative->entries[app->selection].conditions);
-    } else if(event->type == InputTypeLong && event->key == InputKeyLeft &&
-              app->selection > 0U) {
+    } else if(event->type == InputTypeLong && event->key == InputKeyLeft && app->selection > 0U) {
         pocket_swap_initiative(initiative, app->selection, app->selection - 1U);
         --app->selection;
         pocket_save(app, false);
-    } else if(event->type == InputTypeLong && event->key == InputKeyRight &&
-              app->selection + 1U < initiative->count) {
+    } else if(
+        event->type == InputTypeLong && event->key == InputKeyRight &&
+        app->selection + 1U < initiative->count) {
         pocket_swap_initiative(initiative, app->selection, app->selection + 1U);
         ++app->selection;
         pocket_save(app, false);
@@ -7688,11 +8457,25 @@ static void pocket_handle_initiative_edit(PocketD20App* app, const InputEvent* e
             break;
         case 1U:
             pocket_begin_number(
-                app, PocketNumberInitiative, 1U, 0U, "Initiative roll", entry->initiative_total, -99, 199);
+                app,
+                PocketNumberInitiative,
+                1U,
+                0U,
+                "Initiative roll",
+                entry->initiative_total,
+                -99,
+                199);
             break;
         case 2U:
             pocket_begin_number(
-                app, PocketNumberInitiative, 2U, 0U, "Initiative modifier", entry->initiative_modifier, -50, 50);
+                app,
+                PocketNumberInitiative,
+                2U,
+                0U,
+                "Initiative modifier",
+                entry->initiative_modifier,
+                -50,
+                50);
             break;
         case 3U:
             pocket_begin_number(
@@ -7708,10 +8491,7 @@ static void pocket_handle_initiative_edit(PocketD20App* app, const InputEvent* e
             break;
         case 6U:
             pocket_begin_text(
-                app,
-                PocketEditInitiativeConditions,
-                "Participant conditions",
-                entry->conditions);
+                app, PocketEditInitiativeConditions, "Participant conditions", entry->conditions);
             break;
         default:
             if(app->initiative_delete_armed)
@@ -8208,7 +8988,10 @@ static bool pocket_input_callback(InputEvent* event, void* context) {
         return true;
     }
     if(event->type == InputTypeShort && event->key == InputKeyBack) {
-        pocket_handle_back(app);
+        if(app->screen == PocketScreenInitiativeCombat)
+            pocket_initiative_previous_turn(app);
+        else
+            pocket_handle_back(app);
         pocket_refresh(app);
         return true;
     }
@@ -8301,6 +9084,9 @@ static bool pocket_input_callback(InputEvent* event, void* context) {
     case PocketScreenCampaignDiagnostics:
         pocket_handle_campaign_diagnostics(app, event);
         break;
+    case PocketScreenCampaignPacks:
+        pocket_handle_campaign_packs(app, event);
+        break;
     case PocketScreenAdventure:
         pocket_handle_adventure(app, event);
         break;
@@ -8321,36 +9107,137 @@ static bool pocket_navigation_callback(void* context) {
     return true;
 }
 
-static PocketD20App* pocket_app_alloc(void) {
+static bool pocket_launch_is_initiative(const char* launch_args) {
+    if(!launch_args) return false;
+    size_t token_length = strlen(POCKET_D20_HANDOFF_LAUNCH_ARG);
+    return !strncmp(launch_args, POCKET_D20_HANDOFF_LAUNCH_ARG, token_length) &&
+           (launch_args[token_length] == '\0' || launch_args[token_length] == ';');
+}
+
+static bool pocket_parse_launch_number(
+    const char* begin,
+    const char* end,
+    uint16_t maximum,
+    uint16_t* output) {
+    if(!begin || !end || !output || begin >= end) return false;
+    uint32_t value = 0U;
+    for(const char* cursor = begin; cursor < end; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        value = value * 10U + (uint32_t)(*cursor - '0');
+        if(value > maximum) return false;
+    }
+    *output = (uint16_t)value;
+    return true;
+}
+
+static uint8_t pocket_import_launch_party(PocketD20App* app, const char* launch_args) {
+    if(!app || !pocket_launch_is_initiative(launch_args) || !app->active_profile_loaded) return 0U;
+
+    const char* cursor = launch_args + strlen(POCKET_D20_HANDOFF_LAUNCH_ARG);
+    uint8_t added = 0U;
+    while(*cursor) {
+        if(*cursor != ';') break;
+        ++cursor;
+        if(!*cursor) break;
+
+        const char* record_end = strchr(cursor, ';');
+        if(!record_end) record_end = cursor + strlen(cursor);
+        const char* first_comma = memchr(cursor, ',', (size_t)(record_end - cursor));
+        if(!first_comma) {
+            cursor = record_end;
+            continue;
+        }
+        const char* second_comma =
+            memchr(first_comma + 1, ',', (size_t)(record_end - (first_comma + 1)));
+        if(!second_comma || first_comma == cursor) {
+            cursor = record_end;
+            continue;
+        }
+
+        uint16_t hp = 0U;
+        uint16_t armor_class = 0U;
+        if(!pocket_parse_launch_number(first_comma + 1, second_comma, 32767U, &hp) ||
+           !pocket_parse_launch_number(second_comma + 1, record_end, 32767U, &armor_class)) {
+            cursor = record_end;
+            continue;
+        }
+
+        if(app->data.party_count >= POCKET_D20_MAX_PARTY) break;
+        PocketPartyMember* member = &app->data.party[app->data.party_count++];
+        memset(member, 0, sizeof(*member));
+        size_t name_length = (size_t)(first_comma - cursor);
+        if(name_length >= sizeof(member->name)) name_length = sizeof(member->name) - 1U;
+        memcpy(member->name, cursor, name_length);
+        member->name[name_length] = '\0';
+        if(!member->name[0]) pocket_copy(member->name, sizeof(member->name), "Monster");
+        member->hp_current = (int16_t)hp;
+        member->hp_max = (int16_t)hp;
+        member->armor_class = (int16_t)armor_class;
+        member->initiative_modifier = 0;
+        ++added;
+
+        cursor = record_end;
+    }
+
+    if(added) {
+        bool saved = pocket_save_now(app, false);
+        if(saved) {
+            snprintf(
+                app->status,
+                sizeof(app->status),
+                "Added %u monster%s",
+                added,
+                added == 1U ? "" : "s");
+        }
+    }
+    return added;
+}
+
+static PocketD20App* pocket_app_alloc(const char* launch_args) {
+    const bool initiative_launch = pocket_launch_is_initiative(launch_args);
     PocketD20App* app = malloc(sizeof(PocketD20App));
     if(!app) {
-        FURI_LOG_E(TAG, "Unable to allocate %u-byte app state", (unsigned int)sizeof(PocketD20App));
+        FURI_LOG_E(
+            TAG, "Unable to allocate %u-byte app state", (unsigned int)sizeof(PocketD20App));
         return NULL;
     }
     memset(app, 0, sizeof(*app));
 
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
-    bool profile_migration_ok = pocket_d20_storage_migrate_legacy_profiles(
-        app->storage, &app->migrated_profile_files);
-    bool campaign_migration_ok = pocket_campaign_migrate_legacy_custom(
-        app->storage, &app->migrated_campaign_files);
+    bool profile_migration_ok =
+        pocket_d20_storage_migrate_legacy_profiles(app->storage, &app->migrated_profile_files);
+    /* Initiative launches need only the active character/profile. Avoid campaign
+       migration and enabled-pack rebuilds during this low-memory transition;
+       they run normally the next time D&D is opened without initiative args. */
+    bool campaign_migration_ok = true;
+    bool campaign_packs_ok = true;
+    if(!initiative_launch) {
+        campaign_migration_ok =
+            pocket_campaign_migrate_legacy_custom(app->storage, &app->migrated_campaign_files);
+        campaign_packs_ok = pocket_pack_rebuild_enabled(app->storage, PocketPackCampaign);
+    }
+    pocket_campaign_cache_reset();
     bool migration_ok = profile_migration_ok && campaign_migration_ok;
     bool profiles_loaded = pocket_d20_profiles_load(app->storage, &app->profiles);
-    bool had_profiles = app->profiles.count > 0U;
+    /* Only create a fresh character after a successful profile-directory scan proves
+       there is no existing character or recovery file. A failed legacy migration or
+       failed scan is treated conservatively as existing user data. */
+    bool character_file_available = app->profiles.character_file_seen ||
+                                    !app->profiles.scan_succeeded || !profile_migration_ok;
     bool recovered_backup = false;
     bool loaded = pocket_d20_storage_load_profile(
-        app->storage,
-        app->profiles.active_profile,
-        &app->data,
-        &recovered_backup);
+        app->storage, app->profiles.active_profile, &app->data, &recovered_backup);
     app->active_profile_loaded = loaded ? 1U : 0U;
     bool character_ready = loaded;
     bool metadata_saved = true;
     if(loaded && recovered_backup)
         character_ready = pocket_d20_storage_restore_backup(
             app->storage, app->profiles.active_profile, &app->data);
-    if(!loaded && !had_profiles) {
+    /* Never create/publish a blank character while any existing character data
+       is present. This includes a save whose filename/index cannot currently be
+       parsed and recovery files left by an interrupted transaction. */
+    if(!loaded && !character_file_available) {
         app->active_profile_loaded = 1U;
         character_ready = pocket_d20_storage_save_profile(
             app->storage, app->profiles.active_profile, &app->data);
@@ -8358,8 +9245,7 @@ static PocketD20App* pocket_app_alloc(void) {
     }
     if(app->active_profile_loaded) {
         bool active_included = pocket_profile_include_active(app);
-        metadata_saved = active_included &&
-                         pocket_d20_profiles_save(app->storage, &app->profiles);
+        metadata_saved = active_included && pocket_d20_profiles_save(app->storage, &app->profiles);
     }
     app->saved_fingerprint = pocket_data_fingerprint(&app->data);
     if(!migration_ok || !character_ready || !metadata_saved) {
@@ -8373,7 +9259,9 @@ static PocketD20App* pocket_app_alloc(void) {
     app->dice_sides = 20U;
     app->spell_filter_level = -1;
     app->spell_filter_class = UINT8_MAX;
-    if(!loaded && had_profiles)
+    if(!campaign_packs_ok)
+        pocket_set_status(app, "Installed campaign pack failed");
+    else if(!loaded && character_file_available)
         pocket_set_status(app, "Profile preserved - load failed");
     else if(!migration_ok)
         pocket_set_status(app, "User-data migration failed");
@@ -8395,6 +9283,17 @@ static PocketD20App* pocket_app_alloc(void) {
     else
         pocket_set_status(app, "New character");
 
+    /* Bestiary may append monster records directly to the launch argument:
+       initiative;Name,HP,AC;Name,HP,AC;...
+       Import them into the current character's Party Roster, persist the
+       character, then navigate to Initiative. No handoff files are involved. */
+    if(initiative_launch) {
+        pocket_import_launch_party(app, launch_args);
+        app->screen = PocketScreenInitiativeMenu;
+        app->selection = 0U;
+        app->scroll = 0U;
+    }
+
     app->dispatcher = view_dispatcher_alloc();
     view_dispatcher_set_event_callback_context(app->dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->dispatcher, pocket_navigation_callback);
@@ -8402,8 +9301,8 @@ static PocketD20App* pocket_app_alloc(void) {
     app->input_events = furi_record_open(RECORD_INPUT_EVENTS);
     app->input_subscription =
         furi_pubsub_subscribe(app->input_events, pocket_input_events_callback, app);
-    app->dice_timer =
-        furi_timer_alloc(pocket_dice_timer_callback, FuriTimerTypePeriodic, app);
+    app->dice_timer = furi_timer_alloc(pocket_dice_timer_callback, FuriTimerTypePeriodic, app);
+    app->autosave_timer = furi_timer_alloc(pocket_autosave_timer_callback, FuriTimerTypeOnce, app);
 
     app->main_view = view_alloc();
     view_allocate_model(app->main_view, ViewModelTypeLockFree, sizeof(PocketD20App*));
@@ -8422,17 +9321,20 @@ static PocketD20App* pocket_app_alloc(void) {
 
 static void pocket_app_free(PocketD20App* app) {
     furi_assert(app);
-    pocket_save(app, false);
+    pocket_flush_save(app, false);
+    pocket_campaign_cache_reset();
     pocket_catalog_release(app);
     pocket_adventure_release(app);
-    if(app->number_input)
-        view_dispatcher_remove_view(app->dispatcher, PocketViewNumberInput);
-    if(app->text_input)
-        view_dispatcher_remove_view(app->dispatcher, PocketViewTextInput);
+    if(app->number_input) view_dispatcher_remove_view(app->dispatcher, PocketViewNumberInput);
+    if(app->text_input) view_dispatcher_remove_view(app->dispatcher, PocketViewTextInput);
     view_dispatcher_remove_view(app->dispatcher, PocketViewMain);
     if(app->text_input) text_input_free(app->text_input);
     if(app->number_input) number_input_free(app->number_input);
     view_free(app->main_view);
+    if(app->autosave_timer) {
+        furi_timer_stop(app->autosave_timer);
+        furi_timer_free(app->autosave_timer);
+    }
     furi_timer_stop(app->dice_timer);
     furi_timer_free(app->dice_timer);
     if(app->input_subscription)
@@ -8447,8 +9349,8 @@ static void pocket_app_free(PocketD20App* app) {
 }
 
 int32_t pocket_d20_app(void* context) {
-    UNUSED(context);
-    PocketD20App* app = pocket_app_alloc();
+    const char* launch_args = context;
+    PocketD20App* app = pocket_app_alloc(launch_args);
     if(!app) return -1;
     view_dispatcher_switch_to_view(app->dispatcher, PocketViewMain);
     view_dispatcher_run(app->dispatcher);
