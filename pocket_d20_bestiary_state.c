@@ -32,6 +32,8 @@ typedef struct {
     uint16_t count;
 } StateReader;
 
+static bool state_parse_u8(const char* text, uint8_t minimum, uint8_t maximum, uint8_t* output);
+
 static void state_copy(char* output, size_t size, const char* value) {
     if(!output || !size) return;
     strncpy(output, value ? value : "", size - 1U);
@@ -152,14 +154,12 @@ bool pocket_bestiary_party_settings_load(
                 char* separator = strchr(line, '|');
                 if(separator) {
                     *separator++ = '\0';
-                    char* end_level = NULL;
-                    char* end_size = NULL;
-                    unsigned long level = strtoul(line, &end_level, 10);
-                    unsigned long size = strtoul(separator, &end_size, 10);
-                    if(end_level && *end_level == '\0' && end_size && *end_size == '\0' &&
-                       level >= 1U && level <= 20U && size >= 1U && size <= 12U) {
-                        *party_level = (uint8_t)level;
-                        *party_size = (uint8_t)size;
+                    uint8_t level = 0U;
+                    uint8_t size = 0U;
+                    if(state_parse_u8(line, 1U, 20U, &level) &&
+                       state_parse_u8(separator, 1U, 12U, &size)) {
+                        *party_level = level;
+                        *party_size = size;
                         loaded = true;
                     }
                 }
@@ -348,11 +348,12 @@ static bool state_parse_filter(char* line, PocketBestiaryFilterPreset* output) {
     memset(output, 0, sizeof(*output));
     state_copy(output->name, sizeof(output->name), fields[0]);
     state_copy(output->search, sizeof(output->search), fields[1]);
-    output->max_cr_eighths = (uint8_t)strtoul(fields[2], NULL, 10);
-    output->type_filter = (uint8_t)strtoul(fields[3], NULL, 10);
-    output->source_filter = (uint8_t)strtoul(fields[4], NULL, 10);
-    output->environment_filter = (uint8_t)strtoul(fields[5], NULL, 10);
-    output->role_filter = (uint8_t)strtoul(fields[6], NULL, 10);
+    if(!state_parse_u8(fields[2], 0U, UINT8_MAX, &output->max_cr_eighths) ||
+       !state_parse_u8(fields[3], 0U, UINT8_MAX, &output->type_filter) ||
+       !state_parse_u8(fields[4], 0U, UINT8_MAX, &output->source_filter) ||
+       !state_parse_u8(fields[5], 0U, UINT8_MAX, &output->environment_filter) ||
+       !state_parse_u8(fields[6], 0U, UINT8_MAX, &output->role_filter))
+        return false;
     return output->name[0];
 }
 
@@ -470,9 +471,16 @@ bool pocket_bestiary_filter_delete(Storage* storage, uint16_t wanted) {
 
 static bool state_parse_u8(const char* text, uint8_t minimum, uint8_t maximum, uint8_t* output) {
     if(!text || !text[0] || !output) return false;
-    char* end = NULL;
-    unsigned long value = strtoul(text, &end, 10);
-    if(!end || *end != '\0' || value < minimum || value > maximum) return false;
+    uint16_t value = 0U;
+    for(const char* cursor = text; *cursor; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint8_t digit = (uint8_t)(*cursor - '0');
+        if(value > (uint16_t)(maximum / 10U) ||
+           (value == (uint16_t)(maximum / 10U) && digit > (uint8_t)(maximum % 10U)))
+            return false;
+        value = (uint16_t)(value * 10U + digit);
+    }
+    if(value < minimum || value > maximum) return false;
     *output = (uint8_t)value;
     return true;
 }

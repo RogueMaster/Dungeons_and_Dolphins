@@ -17,11 +17,53 @@
 
 #define POCKET_D20_ACTIVE_PROFILE_PATH      APP_DATA_PATH("profiles/custom_active_profile.txt")
 #define POCKET_D20_ACTIVE_PROFILE_TEMP_PATH APP_DATA_PATH("profiles/custom_active_profile.tmp")
+#define POCKET_D20_ACTIVE_PROFILE_BACKUP_PATH APP_DATA_PATH("profiles/custom_active_profile.bak")
 
 static void pocket_d20_copy(char* destination, size_t size, const char* source) {
     if(size == 0U) return;
     strncpy(destination, source, size - 1U);
     destination[size - 1U] = '\0';
+}
+
+static bool pocket_d20_parse_u32_span(
+    const char* begin, const char* end, uint32_t maximum, uint32_t* output) {
+    if(!begin || !end || !output || begin >= end) return false;
+    uint32_t value = 0U;
+    for(const char* cursor = begin; cursor < end; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
+    }
+    *output = value;
+    return true;
+}
+
+static bool pocket_d20_parse_u32_range(const char* text, uint32_t maximum, uint32_t* output) {
+    return text && pocket_d20_parse_u32_span(text, text + strlen(text), maximum, output);
+}
+
+static bool pocket_d20_publish_temp(
+    Storage* storage,
+    const char* temporary,
+    const char* destination,
+    const char* backup) {
+    if(!storage || !temporary || !destination || !backup) return false;
+    bool had_destination = storage_file_exists(storage, destination);
+    if(had_destination) {
+        if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK)
+            return false;
+        if(storage_common_rename(storage, destination, backup) != FSE_OK) return false;
+    }
+    if(storage_common_rename(storage, temporary, destination) == FSE_OK) {
+        if(had_destination) storage_common_remove(storage, backup);
+        return true;
+    }
+    if(had_destination) storage_common_rename(storage, backup, destination);
+    storage_common_remove(storage, temporary);
+    return false;
 }
 
 static bool pocket_d20_schema_supported(unsigned long schema) {
@@ -238,22 +280,47 @@ static bool pocket_d20_read_string(
     return true;
 }
 
+static bool pocket_d20_parse_i32_span(const char* begin, const char* end, int32_t* output) {
+    if(!begin || !end || !output || begin >= end) return false;
+    bool negative = false;
+    if(*begin == '-') {
+        negative = true;
+        ++begin;
+        if(begin >= end) return false;
+    }
+    uint32_t maximum = negative ? (uint32_t)INT32_MAX + 1U : (uint32_t)INT32_MAX;
+    uint32_t value = 0U;
+    for(const char* cursor = begin; cursor < end; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
+    }
+    if(negative) {
+        *output = value == (uint32_t)INT32_MAX + 1U ? INT32_MIN : -(int32_t)value;
+    } else {
+        *output = (int32_t)value;
+    }
+    return true;
+}
+
 static size_t pocket_d20_parse_numbers(const char* value, int32_t* numbers, size_t maximum) {
+    if(!value || !numbers || !maximum || !value[0]) return 0U;
     size_t count = 0U;
     const char* cursor = value;
-    while(*cursor && count < maximum) {
-        char* end = NULL;
-        long number = strtol(cursor, &end, 10);
-        if(end == cursor) break;
-        numbers[count++] = (int32_t)number;
-        if(*end == ',')
-            cursor = end + 1U;
-        else if(*end == '\0')
-            break;
-        else
-            return 0U;
+    while(count < maximum) {
+        const char* separator = strchr(cursor, ',');
+        const char* end = separator ? separator : cursor + strlen(cursor);
+        if(!pocket_d20_parse_i32_span(cursor, end, &numbers[count])) return 0U;
+        ++count;
+        if(!separator) return count;
+        cursor = separator + 1U;
+        if(!cursor[0]) return 0U;
     }
-    return count;
+    /* More fields than expected are malformed rather than silently ignored. */
+    return cursor[0] ? 0U : count;
 }
 
 static bool pocket_d20_read_numbers(
@@ -626,7 +693,9 @@ static bool
     pocket_d20_data_clear(data);
 
     if(!pocket_d20_read_value(reader, "PocketD20Character", value, sizeof(value))) return false;
-    unsigned long schema = strtoul(value, NULL, 10);
+    uint32_t parsed_schema = 0U;
+    if(!pocket_d20_parse_u32_range(value, UINT32_MAX, &parsed_schema)) return false;
+    unsigned long schema = (unsigned long)parsed_schema;
     if(schema < POCKET_D20_OLDEST_SUPPORTED_TEXT_VERSION || !pocket_d20_schema_supported(schema))
         return false;
     if(loaded_schema) *loaded_schema = schema;
@@ -746,10 +815,10 @@ static bool
     c->currency_pp = n[4];
 
     if(!pocket_d20_read_value(reader, "SpellCount", value, sizeof(value))) return false;
-    c->spell_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->spell_count > POCKET_D20_MAX_SPELLS ||
-       !pocket_d20_data_reserve_spells(c, c->spell_count))
-        return false;
+    uint32_t parsed_count = 0U;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_SPELLS, &parsed_count)) return false;
+    c->spell_count = (uint8_t)parsed_count;
+    if(!pocket_d20_data_reserve_spells(c, c->spell_count)) return false;
     for(uint8_t i = 0U; i < c->spell_count; ++i) {
         snprintf(key, sizeof(key), "Spell%uName", i);
         if(!pocket_d20_read_string(reader, key, c->spells[i].name, sizeof(c->spells[i].name)))
@@ -785,10 +854,9 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "FeatureCount", value, sizeof(value))) return false;
-    c->feature_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->feature_count > POCKET_D20_MAX_FEATURES ||
-       !pocket_d20_data_reserve_features(c, c->feature_count))
-        return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_FEATURES, &parsed_count)) return false;
+    c->feature_count = (uint8_t)parsed_count;
+    if(!pocket_d20_data_reserve_features(c, c->feature_count)) return false;
     for(uint8_t i = 0U; i < c->feature_count; ++i) {
         snprintf(key, sizeof(key), "Feature%uName", i);
         if(!pocket_d20_read_string(reader, key, c->features[i].name, sizeof(c->features[i].name)))
@@ -809,9 +877,9 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "ItemCount", value, sizeof(value))) return false;
-    c->item_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->item_count > POCKET_D20_MAX_ITEMS || !pocket_d20_data_reserve_items(c, c->item_count))
-        return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_ITEMS, &parsed_count)) return false;
+    c->item_count = (uint8_t)parsed_count;
+    if(!pocket_d20_data_reserve_items(c, c->item_count)) return false;
     for(uint8_t i = 0U; i < c->item_count; ++i) {
         PocketItem* item = &c->items[i];
         snprintf(key, sizeof(key), "Item%uName", i);
@@ -852,8 +920,8 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "LanguageCount", value, sizeof(value))) return false;
-    c->language_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->language_count > POCKET_D20_MAX_LANGUAGES) return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_LANGUAGES, &parsed_count)) return false;
+    c->language_count = (uint8_t)parsed_count;
     for(uint8_t i = 0U; i < c->language_count; ++i) {
         snprintf(key, sizeof(key), "Language%u", i);
         if(!pocket_d20_read_string(reader, key, c->languages[i], sizeof(c->languages[i])))
@@ -861,10 +929,9 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "JournalCount", value, sizeof(value))) return false;
-    c->journal_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->journal_count > POCKET_D20_MAX_JOURNAL ||
-       !pocket_d20_data_reserve_journal(c, c->journal_count))
-        return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_JOURNAL, &parsed_count)) return false;
+    c->journal_count = (uint8_t)parsed_count;
+    if(!pocket_d20_data_reserve_journal(c, c->journal_count)) return false;
     for(uint8_t i = 0U; i < c->journal_count; ++i) {
         snprintf(key, sizeof(key), "Journal%uTitle", i);
         if(!pocket_d20_read_string(reader, key, c->journal[i].title, sizeof(c->journal[i].title)))
@@ -881,8 +948,8 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "PartyCount", value, sizeof(value))) return false;
-    data->party_count = (uint8_t)strtoul(value, NULL, 10);
-    if(data->party_count > POCKET_D20_MAX_PARTY) return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_PARTY, &parsed_count)) return false;
+    data->party_count = (uint8_t)parsed_count;
     for(uint8_t i = 0U; i < data->party_count; ++i) {
         snprintf(key, sizeof(key), "Party%uName", i);
         if(!pocket_d20_read_string(reader, key, data->party[i].name, sizeof(data->party[i].name)))
@@ -944,10 +1011,9 @@ static bool
     c->carrying_capacity_override = (int16_t)n[2];
 
     if(!pocket_d20_read_value(reader, "GrantCount", value, sizeof(value))) return false;
-    c->grant_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->grant_count > POCKET_D20_MAX_GRANTS ||
-       !pocket_d20_data_reserve_grants(c, c->grant_count))
-        return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_GRANTS, &parsed_count)) return false;
+    c->grant_count = (uint8_t)parsed_count;
+    if(!pocket_d20_data_reserve_grants(c, c->grant_count)) return false;
     for(uint8_t i = 0U; i < c->grant_count; ++i) {
         PocketGrant* grant = &c->grants[i];
         snprintf(key, sizeof(key), "Grant%uStableId", i);
@@ -974,8 +1040,8 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "AttackTemplateCount", value, sizeof(value))) return false;
-    c->attack_template_count = (uint8_t)strtoul(value, NULL, 10);
-    if(c->attack_template_count > POCKET_D20_MAX_ATTACK_TEMPLATES) return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_ATTACK_TEMPLATES, &parsed_count)) return false;
+    c->attack_template_count = (uint8_t)parsed_count;
     for(uint8_t i = 0U; i < c->attack_template_count; ++i) {
         PocketAttackTemplate* attack = &c->attack_templates[i];
         snprintf(key, sizeof(key), "AttackTemplate%uName", i);
@@ -1004,8 +1070,8 @@ static bool
     }
 
     if(!pocket_d20_read_value(reader, "EncounterHistoryCount", value, sizeof(value))) return false;
-    data->encounter_history_count = (uint8_t)strtoul(value, NULL, 10);
-    if(data->encounter_history_count > POCKET_D20_MAX_ENCOUNTER_HISTORY) return false;
+    if(!pocket_d20_parse_u32_range(value, POCKET_D20_MAX_ENCOUNTER_HISTORY, &parsed_count)) return false;
+    data->encounter_history_count = (uint8_t)parsed_count;
     for(uint8_t i = 0U; i < data->encounter_history_count; ++i) {
         snprintf(key, sizeof(key), "EncounterHistory%u", i);
         if(!pocket_d20_read_numbers(reader, key, n, 6U)) return false;
@@ -1029,6 +1095,7 @@ static bool pocket_d20_load_text_path(
     PocketSaveData* data,
     unsigned long* loaded_schema) {
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool success = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING) &&
                    pocket_d20_read_character(file, data, loaded_schema);
     storage_file_close(file);
@@ -1053,21 +1120,28 @@ static void
 }
 
 static bool pocket_d20_parse_profile_filename(const char* filename, PocketProfileEntry* entry) {
+    if(!filename || !entry) return false;
     size_t length = strlen(filename);
     if(length < 11U || strncmp(filename, "ch_", 3U) != 0 ||
        strcmp(filename + length - 4U, ".txt") != 0)
         return false;
-    char* id_end = NULL;
-    unsigned long id = strtoul(filename + 3U, &id_end, 10);
-    if(!id_end || *id_end != '_' || id > UINT32_MAX) return false;
+
+    const char* id_begin = filename + 3U;
+    const char* id_end = strchr(id_begin, '_');
+    if(!id_end) return false;
+    uint32_t id = 0U;
+    if(!pocket_d20_parse_u32_span(id_begin, id_end, UINT32_MAX, &id)) return false;
+
     const char* level_separator = filename + length - 5U;
     while(level_separator > id_end && *level_separator != '_')
         --level_separator;
     if(*level_separator != '_' || level_separator <= id_end + 1U) return false;
-    char* level_end = NULL;
-    unsigned long level = strtoul(level_separator + 1U, &level_end, 10);
-    if(!level_end || strcmp(level_end, ".txt") != 0 || level > 255U) return false;
-    entry->id = (uint32_t)id;
+    uint32_t level = 0U;
+    if(!pocket_d20_parse_u32_span(
+           level_separator + 1U, filename + length - 4U, UINT8_MAX, &level))
+        return false;
+
+    entry->id = id;
     entry->level = (uint8_t)level;
     size_t name_length = (size_t)(level_separator - (id_end + 1U));
     if(name_length >= sizeof(entry->name)) name_length = sizeof(entry->name) - 1U;
@@ -1081,6 +1155,7 @@ static bool pocket_d20_parse_profile_filename(const char* filename, PocketProfil
 static bool
     pocket_d20_find_profile_path(Storage* storage, uint32_t profile, char* output, size_t size) {
     File* directory = storage_file_alloc(storage);
+    if(!directory) return false;
     if(!storage_dir_open(directory, POCKET_D20_DATA_DIR)) {
         storage_file_free(directory);
         return false;
@@ -1130,6 +1205,7 @@ static bool pocket_d20_storage_save_profile_internal(
     pocket_d20_work_path(temp_path, sizeof(temp_path), profile, "write");
     pocket_d20_work_path(backup_path, sizeof(backup_path), profile, "backup");
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool written = storage_file_open(file, temp_path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
                    pocket_d20_write_character(file, data) && storage_file_sync(file);
     storage_file_close(file);
@@ -1229,6 +1305,11 @@ static bool pocket_d20_prepare_migration_snapshot(
     storage_common_remove(storage, temporary_path);
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
+    if(!input || !output) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        return false;
+    }
     bool copied = storage_file_open(input, primary_path, FSAM_READ, FSOM_OPEN_EXISTING) &&
                   storage_file_open(output, temporary_path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[POCKET_D20_READ_BUFFER];
@@ -1379,8 +1460,15 @@ static bool pocket_d20_copy_file(
     const char* source,
     const char* destination,
     const char* temporary) {
+    if(!storage || !source || !destination || !temporary) return false;
+    storage_common_remove(storage, temporary);
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
+    if(!input || !output) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        return false;
+    }
     bool success = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
                    storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[256];
@@ -1398,12 +1486,13 @@ static bool pocket_d20_copy_file(
         storage_common_remove(storage, temporary);
         return false;
     }
-    storage_common_remove(storage, destination);
-    if(storage_common_rename(storage, temporary, destination) != FSE_OK) {
+    char backup[224];
+    int backup_length = snprintf(backup, sizeof(backup), "%s.publish.bak", destination);
+    if(backup_length < 0 || (size_t)backup_length >= sizeof(backup)) {
         storage_common_remove(storage, temporary);
         return false;
     }
-    return true;
+    return pocket_d20_publish_temp(storage, temporary, destination, backup);
 }
 
 static bool pocket_d20_relocate_file_without_replace(
@@ -1418,6 +1507,11 @@ static bool pocket_d20_relocate_file_without_replace(
     storage_common_remove(storage, temporary);
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
+    if(!input || !output) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        return false;
+    }
     bool success = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
                    storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[256];
@@ -1453,6 +1547,7 @@ static bool pocket_d20_migrate_directory(
     uint8_t depth,
     uint16_t* copied_files) {
     File* directory = storage_file_alloc(storage);
+    if(!directory) return false;
     if(!storage_dir_open(directory, legacy_directory)) {
         storage_file_free(directory);
         return true;
@@ -1653,6 +1748,7 @@ bool pocket_d20_storage_rollback_migration(
 
 bool pocket_d20_storage_import_first(Storage* storage, uint32_t destination, PocketSaveData* data) {
     File* directory = storage_file_alloc(storage);
+    if(!directory) return false;
     if(!storage_dir_open(directory, POCKET_D20_EXPORT_DIR)) {
         storage_file_free(directory);
         return false;
@@ -1770,15 +1866,22 @@ bool pocket_d20_profiles_load(Storage* storage, PocketProfileState* profiles) {
     pocket_d20_profiles_set_defaults(profiles);
     char value[64];
     File* file = storage_file_alloc(storage);
-    bool metadata_loaded =
-        storage_file_open(file, POCKET_D20_ACTIVE_PROFILE_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
-    PocketD20Reader metadata_reader;
-    pocket_d20_reader_init(&metadata_reader, file);
-    metadata_loaded = metadata_loaded &&
-                      pocket_d20_read_value(&metadata_reader, "Active", value, sizeof(value));
-    if(metadata_loaded) profiles->active_profile = (uint32_t)strtoul(value, NULL, 10);
-    storage_file_close(file);
-    storage_file_free(file);
+    bool metadata_loaded = file &&
+                           storage_file_open(
+                               file, POCKET_D20_ACTIVE_PROFILE_PATH, FSAM_READ, FSOM_OPEN_EXISTING);
+    if(metadata_loaded) {
+        PocketD20Reader metadata_reader;
+        pocket_d20_reader_init(&metadata_reader, file);
+        metadata_loaded = pocket_d20_read_value(&metadata_reader, "Active", value, sizeof(value));
+        uint32_t active_profile = 0U;
+        metadata_loaded = metadata_loaded &&
+                          pocket_d20_parse_u32_range(value, UINT32_MAX, &active_profile);
+        if(metadata_loaded) profiles->active_profile = active_profile;
+    }
+    if(file) {
+        storage_file_close(file);
+        storage_file_free(file);
+    }
     bool scanned = pocket_d20_profiles_refresh(storage, profiles);
     bool active_found = false;
     for(uint16_t i = 0U; i < profiles->count; ++i)
@@ -1797,6 +1900,7 @@ bool pocket_d20_profiles_save(Storage* storage, const PocketProfileState* profil
     furi_assert(profiles);
     storage_common_mkdir(storage, POCKET_D20_DATA_DIR);
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool written =
         storage_file_open(
             file, POCKET_D20_ACTIVE_PROFILE_TEMP_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
@@ -1808,8 +1912,9 @@ bool pocket_d20_profiles_save(Storage* storage, const PocketProfileState* profil
         storage_common_remove(storage, POCKET_D20_ACTIVE_PROFILE_TEMP_PATH);
         return false;
     }
-    storage_common_remove(storage, POCKET_D20_ACTIVE_PROFILE_PATH);
-    return storage_common_rename(
-               storage, POCKET_D20_ACTIVE_PROFILE_TEMP_PATH, POCKET_D20_ACTIVE_PROFILE_PATH) ==
-           FSE_OK;
+    return pocket_d20_publish_temp(
+        storage,
+        POCKET_D20_ACTIVE_PROFILE_TEMP_PATH,
+        POCKET_D20_ACTIVE_PROFILE_PATH,
+        POCKET_D20_ACTIVE_PROFILE_BACKUP_PATH);
 }

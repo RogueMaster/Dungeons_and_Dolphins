@@ -1,6 +1,6 @@
 # Dungeons & Dolphins roadmap
 
-Current baseline: **3.2.5**. This roadmap lists future features only. Completed work belongs in `CHANGELOG.md`.
+Current baseline: **3.2.7**. This roadmap lists future features only. Completed work belongs in `CHANGELOG.md`.
 
 ## Pack management
 

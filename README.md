@@ -6,7 +6,7 @@
 
 # Dungeons & Dolphins
 
-Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The source tree builds two independent applications:
+Dungeons & Dolphins 3.2.7 is an offline 5E-compatible toolkit for Flipper Zero. The source tree builds two independent applications:
 
 - **Dungeons & Dolphins** — character management, spells, inventory, dice, combat, initiative, journal, and campaigns.
 - **Dolphin Bestiary** — monster browsing, custom monsters, encounters, saved encounters, and initiative handoff.
@@ -16,7 +16,7 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 ### Character management
 
 - Multiple independent character profiles stored as readable, manually editable text files.
-- Automatic saving with backup, validation, recovery, import, export, duplicate, rename, archive, and delete controls.
+- Automatic saving with backup, validation, recovery, import, export, duplicate, rename, archive, and delete controls; Retry Save appears only after a write failure.
 - Multiclass characters with up to four classes, subclasses, class levels, Hit Dice, and class-linked features.
 - Ability scores, saving throws, all 18 skills, proficiency, expertise, miscellaneous modifiers, and passive scores.
 - HP, temporary HP, AC, speed, initiative, exhaustion, death saves, inspiration, experience, and milestones.
@@ -27,6 +27,8 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 - Known, Prepared, Always Prepared, Ritual, and free-cast spell states.
 - Per-class spellcasting ability, casting mode, prepared limits, spellbook size, Pact Magic, Mystic Arcanum, and spell points.
 - Shared multiclass spell slots, Spell Attack, Spell Save DC, slot spending, Long Rest recovery, and Arcane Recovery.
+- Combat Spell Attacks lists currently castable tracked spells, supports allowed slot levels, Pact slots, spell points, free casts, cantrips, and no-slot ritual casting at ritual speed.
+- Direct-damage spell mappings roll SRD damage dice with supported cantrip/upcast scaling; custom spell notes can supply an `XdY` damage expression.
 - Spell filtering by class, level, ritual, school, source, and prepared state.
 - Streamed spell catalog with low-memory paging and custom spell support.
 
@@ -44,7 +46,7 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 - Animated d4, d6, d8, d10, d12, d20, and d100 rolls.
 - Advantage, Disadvantage, modifiers, multi-die rolls, and Guidance mode.
 - Individual dice results, dice sum, modifier, and final total display.
-- Weapon attacks, attack templates, spell/save/custom actions, damage, riders, Mastery, and recharge fields.
+- Weapon attacks, Spell Attacks, attack templates, spell/save/custom actions, damage, riders, Mastery, and recharge fields.
 - Combat tracking for HP, temporary HP, rests, Hit Dice, conditions, concentration, reactions, exhaustion, resistances, immunities, vulnerabilities, senses, and movement.
 
 ### Initiative
@@ -60,7 +62,7 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 ### Journal & campaigns
 
 - Character notes, adventure notes, item notes, and milestones.
-- Data-driven Adventure mode with branching choices, checks, rewards, flags, achievements, sprite tags, checkpoints, and 3-second skill-check result displays.
+- Data-driven Adventure mode with an explicit Start Adventure action, three-row scene text beside the sprite, branching choices, checks, rewards, flags, achievements, checkpoints, and 3-second skill-check result displays.
 - Campaign pack support with per-character progress and transactional installation.
 
 ### Dolphin Bestiary
@@ -83,6 +85,7 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 - Long Back returns toward the main screen; normal Back returns to the previous screen.
 - Catalogs, profiles, monsters, and campaign data are streamed or loaded on demand to reduce RAM use.
 - Large record collections use bounded pages and release temporary allocations after use.
+- The main Dungeons & Dolphins FAP uses a 9 KB stack, balancing stack headroom with heap availability on the Flipper Zero.
 - Initiative-only launches defer unnecessary campaign and pack initialization to reduce cross-FAP memory pressure.
 - User data is kept separate from packaged application assets.
 
@@ -101,5 +104,13 @@ Dungeons & Dolphins is an offline 5E-compatible toolkit for Flipper Zero. The so
 - Dolphin Bestiary writable data: `/ext/apps_data/dolphin_bestiary/`
 - Character profiles use `profiles/ch_{id}_{characterName}_{characterLevel}.txt`.
 - Packaged catalogs, campaigns, and monster tables remain in each FAP's asset namespace.
+
+## Build
+
+Place this directory in RogueMaster's `applications_user` tree, then build both applications from the shared manifest:
+
+```sh
+./fbt fap_dungeons_and_dolphins fap_dolphin_bestiary
+```
 
 See `CHANGELOG.md` for version history and `ROADMAP.md` for planned work.

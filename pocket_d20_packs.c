@@ -59,6 +59,21 @@ static void pack_copy(char* output, size_t size, const char* value) {
     output[size - 1U] = '\0';
 }
 
+static bool pack_parse_u32(const char* text, uint32_t maximum, uint32_t* output) {
+    if(!text || !text[0] || !output) return false;
+    uint32_t value = 0U;
+    for(const char* cursor = text; *cursor; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
+    }
+    *output = value;
+    return true;
+}
+
 static void pack_status(char* output, size_t size, const char* value) {
     pack_copy(output, size, value);
 }
@@ -146,7 +161,9 @@ static bool pack_parse_record(char* line, PackRecord* output) {
     memset(output, 0, sizeof(*output));
     pack_copy(output->summary.id, sizeof(output->summary.id), fields[0]);
     pack_copy(output->summary.name, sizeof(output->summary.name), fields[1]);
-    output->summary.enabled = (uint8_t)strtoul(fields[2], NULL, 10) ? 1U : 0U;
+    uint32_t enabled = 0U;
+    if(!pack_parse_u32(fields[2], 1U, &enabled)) return false;
+    output->summary.enabled = (uint8_t)enabled;
     return pack_safe_id(output->summary.id) && output->summary.name[0];
 }
 
@@ -157,6 +174,10 @@ static uint16_t pack_load_registry(
     bool* valid) {
     *valid = true;
     File* file = storage_file_alloc(storage);
+    if(!file) {
+        *valid = false;
+        return 0U;
+    }
     if(!storage_file_open(file, pack_registry(kind), FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
         return 0U;
@@ -198,6 +219,7 @@ static bool pack_write_registry(
     const char* temporary = pack_registry_temp(kind);
     storage_common_remove(storage, temporary);
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool ok = storage_file_open(file, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     char line[PACK_LINE_LEN];
     int length = snprintf(line, sizeof(line), "# PocketPackRegistry=%u\n", PACK_VERSION);
@@ -231,7 +253,10 @@ static bool pack_write_registry(
     const char* backup = pack_registry_backup(kind);
     storage_common_remove(storage, backup);
     bool had_registry = storage_common_rename(storage, registry, backup) == FSE_OK;
-    if(storage_common_rename(storage, temporary, registry) == FSE_OK) return true;
+    if(storage_common_rename(storage, temporary, registry) == FSE_OK) {
+        if(had_registry) storage_common_remove(storage, backup);
+        return true;
+    }
     if(had_registry) storage_common_rename(storage, backup, registry);
     storage_common_remove(storage, temporary);
     return false;
@@ -242,9 +267,15 @@ static bool pack_copy_file(
     const char* source,
     const char* destination,
     const char* temporary) {
+    if(!storage || !source || !destination || !temporary) return false;
     storage_common_remove(storage, temporary);
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
+    if(!input || !output) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        return false;
+    }
     bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
               storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[PACK_READ_BUFFER];
@@ -262,8 +293,26 @@ static bool pack_copy_file(
         storage_common_remove(storage, temporary);
         return false;
     }
-    storage_common_remove(storage, destination);
-    if(storage_common_rename(storage, temporary, destination) == FSE_OK) return true;
+    char backup[224];
+    int length = snprintf(backup, sizeof(backup), "%s.publish.bak", destination);
+    if(length < 0 || (size_t)length >= sizeof(backup)) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    bool had_destination = storage_file_exists(storage, destination);
+    if(had_destination && storage_common_rename(storage, destination, backup) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(storage_common_rename(storage, temporary, destination) == FSE_OK) {
+        if(had_destination) storage_common_remove(storage, backup);
+        return true;
+    }
+    if(had_destination) storage_common_rename(storage, backup, destination);
     storage_common_remove(storage, temporary);
     return false;
 }
@@ -304,6 +353,7 @@ static bool pack_files_match(Storage* storage, const char* left, const char* rig
 static bool
     pack_append_file(Storage* storage, const char* source, File* output, bool skip_comments) {
     File* input = storage_file_alloc(storage);
+    if(!input) return false;
     bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING);
     PackReader reader;
     pack_reader_init(&reader, input);
@@ -325,8 +375,12 @@ static bool pack_publish_one(
     const char* temporary,
     const char* destination,
     const char* backup) {
-    storage_common_remove(storage, backup);
-    bool had_destination = storage_common_rename(storage, destination, backup) == FSE_OK;
+    bool had_destination = storage_file_exists(storage, destination);
+    if(had_destination) {
+        if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK)
+            return false;
+        if(storage_common_rename(storage, destination, backup) != FSE_OK) return false;
+    }
     if(storage_common_rename(storage, temporary, destination) == FSE_OK) return true;
     if(had_destination) storage_common_rename(storage, backup, destination);
     storage_common_remove(storage, temporary);
@@ -340,6 +394,11 @@ static bool
     storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
     File* index = storage_file_alloc(storage);
     File* content = storage_file_alloc(storage);
+    if(!index || !content) {
+        if(index) storage_file_free(index);
+        if(content) storage_file_free(content);
+        return false;
+    }
     bool ok =
         storage_file_open(index, MONSTER_ENABLED_INDEX_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
         storage_file_open(content, MONSTER_ENABLED_CONTENT_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS);
@@ -373,25 +432,53 @@ static bool
         storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
         return false;
     }
-    if(!pack_publish_one(
-           storage,
-           MONSTER_ENABLED_INDEX_TEMP,
-           MONSTER_ENABLED_INDEX,
-           MONSTER_ENABLED_INDEX_BACKUP)) {
+    bool had_index = storage_file_exists(storage, MONSTER_ENABLED_INDEX);
+    bool had_content = storage_file_exists(storage, MONSTER_ENABLED_CONTENT);
+    if((storage_file_exists(storage, MONSTER_ENABLED_INDEX_BACKUP) &&
+        storage_common_remove(storage, MONSTER_ENABLED_INDEX_BACKUP) != FSE_OK) ||
+       (storage_file_exists(storage, MONSTER_ENABLED_CONTENT_BACKUP) &&
+        storage_common_remove(storage, MONSTER_ENABLED_CONTENT_BACKUP) != FSE_OK)) {
+        storage_common_remove(storage, MONSTER_ENABLED_INDEX_TEMP);
         storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
         return false;
     }
-    if(pack_publish_one(
-           storage,
-           MONSTER_ENABLED_CONTENT_TEMP,
-           MONSTER_ENABLED_CONTENT,
-           MONSTER_ENABLED_CONTENT_BACKUP)) {
+    if(had_index &&
+       storage_common_rename(
+           storage, MONSTER_ENABLED_INDEX, MONSTER_ENABLED_INDEX_BACKUP) != FSE_OK) {
+        storage_common_remove(storage, MONSTER_ENABLED_INDEX_TEMP);
+        storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
+        return false;
+    }
+    if(had_content &&
+       storage_common_rename(
+           storage, MONSTER_ENABLED_CONTENT, MONSTER_ENABLED_CONTENT_BACKUP) != FSE_OK) {
+        if(had_index)
+            storage_common_rename(
+                storage, MONSTER_ENABLED_INDEX_BACKUP, MONSTER_ENABLED_INDEX);
+        storage_common_remove(storage, MONSTER_ENABLED_INDEX_TEMP);
+        storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
+        return false;
+    }
+    bool index_published =
+        storage_common_rename(storage, MONSTER_ENABLED_INDEX_TEMP, MONSTER_ENABLED_INDEX) == FSE_OK;
+    bool content_published = index_published &&
+                             storage_common_rename(
+                                 storage,
+                                 MONSTER_ENABLED_CONTENT_TEMP,
+                                 MONSTER_ENABLED_CONTENT) == FSE_OK;
+    if(index_published && content_published) {
         storage_common_remove(storage, MONSTER_ENABLED_INDEX_BACKUP);
         storage_common_remove(storage, MONSTER_ENABLED_CONTENT_BACKUP);
         return true;
     }
-    storage_common_remove(storage, MONSTER_ENABLED_INDEX);
-    storage_common_rename(storage, MONSTER_ENABLED_INDEX_BACKUP, MONSTER_ENABLED_INDEX);
+    if(index_published) storage_common_remove(storage, MONSTER_ENABLED_INDEX);
+    if(content_published) storage_common_remove(storage, MONSTER_ENABLED_CONTENT);
+    if(had_index)
+        storage_common_rename(storage, MONSTER_ENABLED_INDEX_BACKUP, MONSTER_ENABLED_INDEX);
+    if(had_content)
+        storage_common_rename(storage, MONSTER_ENABLED_CONTENT_BACKUP, MONSTER_ENABLED_CONTENT);
+    storage_common_remove(storage, MONSTER_ENABLED_INDEX_TEMP);
+    storage_common_remove(storage, MONSTER_ENABLED_CONTENT_TEMP);
     return false;
 }
 
@@ -400,6 +487,7 @@ static bool
     storage_common_mkdir(storage, APP_DATA_PATH("campaigns"));
     storage_common_remove(storage, CAMPAIGN_ENABLED_INDEX_TEMP);
     File* output = storage_file_alloc(storage);
+    if(!output) return false;
     bool ok =
         storage_file_open(output, CAMPAIGN_ENABLED_INDEX_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     static const char header[] = "# CampaignPack=1\n";
@@ -487,8 +575,11 @@ static bool pack_read_manifest(Storage* storage, PocketPackKind kind, PackManife
         char* value = strchr(line, '=');
         if(!value) continue;
         *value++ = '\0';
-        if(!strcmp(line, "PocketPack"))
-            version = strtoul(value, NULL, 10) == PACK_VERSION;
+        if(!strcmp(line, "PocketPack")) {
+            uint32_t parsed_version = 0U;
+            version = pack_parse_u32(value, UINT32_MAX, &parsed_version) &&
+                      parsed_version == PACK_VERSION;
+        }
         else if(!strcmp(line, "Id"))
             pack_copy(output->id, sizeof(output->id), value);
         else if(!strcmp(line, "Name"))
@@ -507,6 +598,7 @@ static bool pack_validate_index(
     const char* path,
     const char* pack_id) {
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool ok = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
     PackReader reader;
     pack_reader_init(&reader, file);
@@ -533,6 +625,7 @@ static bool pack_validate_index(
 
 static bool pack_index_contains_id(Storage* storage, const char* path, const char* id) {
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool found = false;
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         PackReader reader;
@@ -565,6 +658,10 @@ static bool pack_unique_record_ids(Storage* storage, PocketPackKind kind, const 
     const char* enabled = kind == PocketPackMonster ? MONSTER_ENABLED_INDEX :
                                                       CAMPAIGN_ENABLED_INDEX;
     File* file = storage_file_alloc(storage);
+    if(!file) {
+        free(ids);
+        return false;
+    }
     bool ok = storage_file_open(file, new_index, FSAM_READ, FSOM_OPEN_EXISTING);
     PackReader reader;
     pack_reader_init(&reader, file);

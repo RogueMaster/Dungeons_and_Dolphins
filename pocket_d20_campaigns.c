@@ -52,6 +52,26 @@ static void campaign_copy(char* out, size_t size, const char* value) {
     out[length] = '\0';
 }
 
+static bool campaign_parse_u32_span(
+    const char* begin, const char* end, uint32_t maximum, uint32_t* output) {
+    if(!begin || !end || !output || begin >= end) return false;
+    uint32_t value = 0U;
+    for(const char* cursor = begin; cursor < end; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
+    }
+    *output = value;
+    return true;
+}
+
+static bool campaign_parse_u32(const char* text, uint32_t maximum, uint32_t* output) {
+    return text && campaign_parse_u32_span(text, text + strlen(text), maximum, output);
+}
+
 static void campaign_reader_init(CampaignReader* reader, File* file, uint32_t offset) {
     memset(reader, 0, sizeof(*reader));
     reader->file = file;
@@ -106,9 +126,14 @@ static bool campaign_parse(char* line, bool bundled, PocketCampaignSummary* outp
     memset(output, 0, sizeof(*output));
     campaign_copy(output->id, sizeof(output->id), fields[0]);
     campaign_copy(output->name, sizeof(output->name), fields[1]);
-    output->pack_version = (uint8_t)strtoul(fields[2], NULL, 10);
-    output->minimum_app = (uint16_t)strtoul(fields[3], NULL, 10);
-    output->maximum_app = (uint16_t)strtoul(fields[4], NULL, 10);
+    uint32_t pack_version = 0U, minimum_app = 0U, maximum_app = 0U;
+    if(!campaign_parse_u32(fields[2], UINT8_MAX, &pack_version) ||
+       !campaign_parse_u32(fields[3], UINT16_MAX, &minimum_app) ||
+       !campaign_parse_u32(fields[4], UINT16_MAX, &maximum_app))
+        return false;
+    output->pack_version = (uint8_t)pack_version;
+    output->minimum_app = (uint16_t)minimum_app;
+    output->maximum_app = (uint16_t)maximum_app;
     campaign_copy(output->entry_scene, sizeof(output->entry_scene), fields[5]);
     campaign_copy(output->scenes_file, sizeof(output->scenes_file), fields[6]);
     output->bundled = bundled ? 1U : 0U;
@@ -148,6 +173,7 @@ static bool campaign_path_cache_build(
     CampaignPathCache* cache) {
     campaign_path_cache_clear(cache);
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool ok = true;
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         CampaignReader reader;
@@ -195,6 +221,7 @@ static bool campaign_at_offset(
     uint32_t offset,
     PocketCampaignSummary* output) {
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool found = false;
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING) &&
        storage_file_seek(file, offset, true)) {
@@ -279,6 +306,11 @@ static bool campaign_path_exists(Storage* storage, const char* path) {
 static bool campaign_copy_file(Storage* storage, const char* source, const char* destination) {
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
+    if(!input || !output) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        return false;
+    }
     bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
               storage_file_open(output, destination, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[256];
@@ -327,6 +359,7 @@ static bool campaign_relocate_directory(
     uint16_t* copied_files) {
     if(depth > 3U) return false;
     File* directory = storage_file_alloc(storage);
+    if(!directory) return false;
     if(!storage_dir_open(directory, source_directory)) {
         storage_file_free(directory);
         return false;
@@ -365,6 +398,7 @@ static bool campaign_relocate_directory(
 
 static bool campaign_index_contains(Storage* storage, const char* path, const char* id) {
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool found = false;
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         CampaignReader reader;
@@ -391,6 +425,7 @@ static bool campaign_prepare_index_temp(Storage* storage) {
         "# CampaignPack=1\n"
         "# id|name|pack_version|min_app|max_app|entry_scene|scenes_file\n";
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool ok = storage_file_open(file, CAMPAIGN_USER_INDEX_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
               storage_file_write(file, header, sizeof(header) - 1U) == sizeof(header) - 1U &&
               storage_file_sync(file);
@@ -404,6 +439,7 @@ static bool campaign_merge_legacy_index(Storage* storage, uint16_t* copied_files
     if(!storage_file_exists(storage, CAMPAIGN_LEGACY_USER_INDEX)) return true;
     if(!campaign_prepare_index_temp(storage)) return false;
     File* source = storage_file_alloc(storage);
+    if(!source) return false;
     bool ok = storage_file_open(source, CAMPAIGN_LEGACY_USER_INDEX, FSAM_READ, FSOM_OPEN_EXISTING);
     CampaignReader reader;
     campaign_reader_init(&reader, source, 0U);
@@ -417,6 +453,10 @@ static bool campaign_merge_legacy_index(Storage* storage, uint16_t* copied_files
            campaign_index_contains(storage, CAMPAIGN_USER_INDEX_TEMP, campaign.id))
             continue;
         File* output = storage_file_alloc(storage);
+        if(!output) {
+            ok = false;
+            break;
+        }
         ok = storage_file_open(output, CAMPAIGN_USER_INDEX_TEMP, FSAM_WRITE, FSOM_OPEN_APPEND) &&
              storage_file_write(output, original, strlen(original)) == strlen(original) &&
              storage_file_write(output, "\n", 1U) == 1U && storage_file_sync(output);
@@ -455,6 +495,7 @@ bool pocket_campaign_migrate_legacy_custom(Storage* storage, uint16_t* copied_fi
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
     File* directory = storage_file_alloc(storage);
+    if(!directory) return false;
     if(!storage_dir_open(directory, CAMPAIGN_LEGACY_DIR)) {
         bool absent = !campaign_path_exists(storage, CAMPAIGN_LEGACY_DIR);
         storage_file_free(directory);
@@ -511,6 +552,7 @@ bool pocket_campaign_progress_save(
     campaign_progress_path(temp, sizeof(temp), profile_id, campaign->id, "tmp");
     campaign_progress_path(backup, sizeof(backup), profile_id, campaign->id, "bak");
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     bool ok = storage_file_open(file, temp, FSAM_WRITE, FSOM_CREATE_ALWAYS);
 #define CAMPAIGN_WRITE(...)                                                  \
     do {                                                                     \
@@ -563,6 +605,7 @@ bool pocket_campaign_progress_load(
     char path[192];
     campaign_progress_path(path, sizeof(path), profile_id, campaign->id, "txt");
     File* file = storage_file_alloc(storage);
+    if(!file) return false;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
         return true;
@@ -580,10 +623,13 @@ bool pocket_campaign_progress_load(
             campaign_copy(
                 character->adventure_checkpoint, sizeof(character->adventure_checkpoint), value);
         else if(!strcmp(line, "Flags")) {
-            unsigned long quests = 0U, achievements = 0U;
-            if(sscanf(value, "%lu,%lu", &quests, &achievements) == 2) {
-                character->adventure_quest_flags = (uint32_t)quests;
-                character->adventure_achievements = (uint32_t)achievements;
+            const char* comma = strchr(value, ',');
+            uint32_t quests = 0U, achievements = 0U;
+            if(comma && !strchr(comma + 1U, ',') &&
+               campaign_parse_u32_span(value, comma, UINT32_MAX, &quests) &&
+               campaign_parse_u32(comma + 1U, UINT32_MAX, &achievements)) {
+                character->adventure_quest_flags = quests;
+                character->adventure_achievements = achievements;
             }
         }
     }
@@ -623,6 +669,11 @@ static void campaign_validate_scenes(
         return;
     }
     File* file = storage_file_alloc(storage);
+    if(!file) {
+        free(scene_ids);
+        campaign_note_problem(output, campaign->id, "Diagnostics memory low");
+        return;
+    }
     uint8_t scene_count = 0U;
     if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         CampaignReader reader;
@@ -693,6 +744,7 @@ static void campaign_diagnose_path(
     uint16_t* seen_capacity,
     PocketCampaignDiagnostics* output) {
     File* file = storage_file_alloc(storage);
+    if(!file) return;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
         return;

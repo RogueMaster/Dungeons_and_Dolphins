@@ -137,6 +137,7 @@ typedef struct {
     char name[POCKET_MONSTER_NAME_LEN];
     uint16_t hit_points;
     uint8_t armor_class;
+    int8_t initiative_modifier;
     uint8_t quantity;
 } BestiaryLaunchMonster;
 
@@ -1616,10 +1617,11 @@ static bool bestiary_launch_args_append(
         int written = snprintf(
             args + *used,
             capacity - *used,
-            ";%s,%u,%u",
+            ";%s,%u,%u,%d",
             name,
             (unsigned int)hp,
-            (unsigned int)monster->armor_class);
+            (unsigned int)monster->armor_class,
+            (int)monster->initiative_modifier);
         if(written < 0 || (size_t)written >= capacity - *used) return false;
         *used += (size_t)written;
         ++(*emitted);
@@ -1651,6 +1653,9 @@ static bool bestiary_launch_dnd_monsters(
             monsters[index].name);
         launch_monsters[index].hit_points = monsters[index].hit_points;
         launch_monsters[index].armor_class = monsters[index].armor_class;
+        launch_monsters[index].initiative_modifier = 0;
+        pocket_monster_initiative_modifier(
+            app->storage, &monsters[index], &launch_monsters[index].initiative_modifier);
         launch_monsters[index].quantity = quantities ? quantities[index] : 1U;
     }
 
@@ -1715,6 +1720,9 @@ static bool bestiary_launch_saved_dnd(BestiaryApp* app, uint16_t index) {
             summary.name);
         launch_monsters[launch_count].hit_points = summary.hit_points;
         launch_monsters[launch_count].armor_class = summary.armor_class;
+        launch_monsters[launch_count].initiative_modifier = 0;
+        pocket_monster_initiative_modifier(
+            app->storage, &summary, &launch_monsters[launch_count].initiative_modifier);
         launch_monsters[launch_count].quantity = saved.quantities[record];
         ++launch_count;
     }
@@ -2293,9 +2301,11 @@ static BestiaryApp* bestiary_alloc(void) {
         furi_timer_alloc(bestiary_marquee_timer_callback, FuriTimerTypePeriodic, app);
     if(!app->marquee_timer) goto fail;
 
+    if(furi_timer_start(app->marquee_timer, furi_ms_to_ticks(BESTIARY_MARQUEE_MS)) !=
+       FuriStatusOk)
+        goto fail;
     view_dispatcher_add_view(app->dispatcher, BestiaryViewMain, app->view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-    furi_timer_start(app->marquee_timer, furi_ms_to_ticks(BESTIARY_MARQUEE_MS));
     if(!installed_packs_ok)
         bestiary_status(app, "Installed pack check failed");
     else if(!migration_ok)
@@ -2326,6 +2336,14 @@ fail:
 
 static void bestiary_free(BestiaryApp* app) {
     if(!app) return;
+
+    /* Quiesce asynchronous callbacks before releasing any state they can touch. */
+    if(app->input_subscription && app->input_events) {
+        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+        app->input_subscription = NULL;
+    }
+    if(app->marquee_timer) furi_timer_stop(app->marquee_timer);
+
     pocket_monster_cache_reset();
     bestiary_release_window(app);
     bestiary_release_detail(app);
@@ -2335,12 +2353,7 @@ static void bestiary_free(BestiaryApp* app) {
     if(app->dispatcher && app->view)
         view_dispatcher_remove_view(app->dispatcher, BestiaryViewMain);
     if(app->text_input) text_input_free(app->text_input);
-    if(app->marquee_timer) {
-        furi_timer_stop(app->marquee_timer);
-        furi_timer_free(app->marquee_timer);
-    }
-    if(app->input_subscription && app->input_events)
-        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->marquee_timer) furi_timer_free(app->marquee_timer);
     if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);

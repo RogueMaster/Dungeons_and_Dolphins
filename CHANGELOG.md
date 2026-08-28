@@ -1,8 +1,24 @@
 # Dungeons & Dolphins changelog
 
+## 3.2.7
+
+- Moved **Dolphin Bestiary** into the fixed Home menu above Combat so a failure-only **Retry Save** row cannot cover or block it; launching Bestiary makes a best-effort save but remains available after a write failure.
+- Added **Combat > Spell Attacks** for tracked castable spells, including selectable standard slot levels, Pact slots, spell points, free casts, cantrips, and ritual casts at ritual speed without spending a slot.
+- Added direct-damage spell dice mappings with supported cantrip and upcast scaling, plus an `XdY` parser fallback for custom spell notes; special repeat/target/rider mechanics remain player-managed.
+- Set the main Dungeons & Dolphins FAP stack to **9 KB**, retaining additional stack headroom while returning heap compared with the earlier 12 KB experiment.
+- Hardened D&D and Bestiary low-memory startup paths with allocation checks so failed views, timers, subscriptions, storage objects, and Loader service opens fail cleanly instead of becoming MPU faults.
+- Stop input subscriptions and periodic timers before releasing UI/app state during shutdown; timer-start failures now recover without leaving Adventure or autosave state stuck.
+- Made active-profile metadata, file copies, pack publications, and paired enabled-monster outputs rollback-safe so a failed rename cannot destroy the prior valid version.
+- Hardened manually editable numeric/count parsing so out-of-range values such as 256/280 cannot wrap through a uint8_t cast.
+- Bestiary initiative handoff now uses the strict `initiative;Name,HP,AC,InitMod;...` format. Monster stat blocks can carry explicit `Initiative=` metadata; when no trustworthy initiative value can be determined, Add to Initiative still proceeds and hands off a +0 modifier.
+- Fixed low-memory monster index-cache growth and interrupted custom-monster migration rollback paths.
+
 ## 3.2.6
 
 - Adventure Mode skill checks now show a dedicated roll-result screen with the natural d20, modifier, total vs. DC, and pass/fail result for 3 seconds before continuing.
+- Adventure Mode now opens with an explicit **Start Adventure** action before scene choices are active.
+- Adventure scene text now uses three 23-character rows beside the sprite, with the sprite shifted one pixel left and text shifted left/up for additional room.
+- Removed the always-visible Retry Save / Status Home row; **Retry Save** now appears only after a save failure and disappears after a successful retry.
 
 ## 3.2.5
 

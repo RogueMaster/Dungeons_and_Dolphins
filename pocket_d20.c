@@ -3,6 +3,7 @@
 #include "pocket_d20_handoff.h"
 #include "pocket_d20_packs.h"
 #include "pocket_d20_rules.h"
+#include "pocket_d20_spell_combat.h"
 #include "pocket_d20_storage.h"
 
 #include <furi.h>
@@ -57,6 +58,9 @@ typedef enum {
     PocketScreenCatalog,
     PocketScreenCombat,
     PocketScreenCombatSheet,
+    PocketScreenSpellAttacks,
+    PocketScreenSpellCast,
+    PocketScreenSpellResult,
     PocketScreenAttackTemplates,
     PocketScreenAttackTemplateEdit,
     PocketScreenDice,
@@ -124,6 +128,23 @@ typedef struct {
     uint8_t level;
     uint16_t class_mask;
 } PocketBuiltinSpell;
+
+typedef enum {
+    PocketSpellCastCantrip,
+    PocketSpellCastFree,
+    PocketSpellCastSlot,
+    PocketSpellCastPact,
+    PocketSpellCastPoints,
+    PocketSpellCastRitual,
+} PocketSpellCastResource;
+
+typedef struct {
+    uint8_t level;
+    uint8_t resource;
+    uint8_t class_index;
+} PocketSpellCastOption;
+
+#define POCKET_D20_MAX_SPELL_CAST_OPTIONS 24U
 
 typedef struct {
     const char* name;
@@ -327,6 +348,7 @@ typedef struct {
     uint8_t adventure_last_passed;
     uint8_t adventure_result_active;
     uint8_t adventure_result_ticks;
+    uint8_t adventure_started;
     uint8_t active_profile_loaded;
     uint8_t storage_read_only;
     uint8_t storage_unsaved;
@@ -366,6 +388,22 @@ typedef struct {
     PocketAttackRoll attack_roll;
     PocketDamageRoll damage_roll;
 
+    uint8_t spell_attack_index;
+    uint8_t spell_cast_level;
+    uint8_t spell_cast_resource;
+    uint8_t spell_cast_class_index;
+    uint8_t spell_cast_primary_dice;
+    uint8_t spell_cast_primary_die;
+    uint8_t spell_cast_secondary_dice;
+    uint8_t spell_cast_secondary_die;
+    uint8_t spell_cast_resolution;
+    uint8_t spell_cast_natural;
+    int16_t spell_cast_attack_total;
+    int16_t spell_cast_primary_total;
+    int16_t spell_cast_secondary_total;
+    int16_t spell_cast_flat_bonus;
+    int16_t spell_cast_damage_total;
+
     char status[32];
 } PocketD20App;
 
@@ -399,12 +437,13 @@ static const char* const pocket_home_items[] = {
     "Inventory Resources",
     "Journal",
     "Adventure",
+    "Dolphin Bestiary",
     "Combat",
     "Initiative",
     "Dice Roller",
-    "Retry Save / Status",
-    "Open Dolphin Bestiary",
 };
+
+static const char* const pocket_home_retry_save = "Retry Save";
 
 static const char* const pocket_profile_actions[] = {
     "Switch / Open",
@@ -750,6 +789,36 @@ static void pocket_copy(char* destination, size_t size, const char* source) {
     destination[size - 1U] = '\0';
 }
 
+static bool pocket_parse_u32_strict(const char* text, uint32_t maximum, uint32_t* output) {
+    if(!text || !text[0] || !output) return false;
+    uint32_t value = 0U;
+    for(const char* cursor = text; *cursor; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
+    }
+    *output = value;
+    return true;
+}
+
+static bool pocket_parse_i8_strict(const char* text, int8_t* output) {
+    if(!text || !text[0] || !output) return false;
+    bool negative = false;
+    if(*text == '-') {
+        negative = true;
+        ++text;
+        if(!*text) return false;
+    }
+    uint32_t maximum = negative ? 128U : 127U;
+    uint32_t value = 0U;
+    if(!pocket_parse_u32_strict(text, maximum, &value)) return false;
+    *output = negative ? (value == 128U ? INT8_MIN : (int8_t)-(int16_t)value) : (int8_t)value;
+    return true;
+}
+
 static void pocket_file_reader_init(PocketFileReader* reader, File* file) {
     memset(reader, 0, sizeof(*reader));
     reader->file = file;
@@ -912,7 +981,12 @@ static void pocket_start_dice_animation(PocketD20App* app, uint8_t count, uint8_
     app->dice_anim_count = count ? count : 1U;
     app->dice_anim_sides = sides >= 2U ? sides : 20U;
     furi_timer_stop(app->dice_timer);
-    furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U));
+    if(furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U)) != FuriStatusOk) {
+        app->dice_animating = 0U;
+        app->adventure_result_active = 0U;
+        app->adventure_result_ticks = 0U;
+        pocket_set_status(app, "Dice timer unavailable");
+    }
 }
 
 static bool pocket_custom_event_callback(void* context, uint32_t event) {
@@ -938,9 +1012,14 @@ static bool pocket_custom_event_callback(void* context, uint32_t event) {
             app->dice_animating = 0U;
             if(app->adventure_result_active) {
                 app->adventure_result_ticks = 0U;
-                furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U));
-            } else {
-                furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
+                if(furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U)) != FuriStatusOk) {
+                    app->adventure_result_active = 0U;
+                    pocket_set_status(app, "Result timer unavailable");
+                }
+            } else if(
+                furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS)) !=
+                FuriStatusOk) {
+                pocket_set_status(app, "Dice timer unavailable");
             }
         }
         pocket_refresh(app);
@@ -949,7 +1028,9 @@ static bool pocket_custom_event_callback(void* context, uint32_t event) {
         if(app->adventure_result_ticks >= POCKET_D20_ADVENTURE_RESULT_TICKS) {
             app->adventure_result_active = 0U;
             app->adventure_result_ticks = 0U;
-            furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
+            if(furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS)) !=
+               FuriStatusOk)
+                pocket_set_status(app, "Dice timer unavailable");
         }
         pocket_refresh(app);
     } else {
@@ -1059,7 +1140,11 @@ static bool pocket_save(PocketD20App* app, bool report) {
     if(!app->autosave_timer) return pocket_save_now(app, false);
     app->autosave_pending = 1U;
     furi_timer_stop(app->autosave_timer);
-    furi_timer_start(app->autosave_timer, furi_ms_to_ticks(POCKET_D20_AUTOSAVE_MS));
+    if(furi_timer_start(app->autosave_timer, furi_ms_to_ticks(POCKET_D20_AUTOSAVE_MS)) !=
+       FuriStatusOk) {
+        app->autosave_pending = 0U;
+        return pocket_save_now(app, false);
+    }
     return true;
 }
 
@@ -1880,8 +1965,8 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
         return;
     }
     *class_separator = '\0';
-    long parsed_level = strtol(level_separator + 1U, NULL, 10);
-    if(parsed_level < 0 || parsed_level > 9) {
+    uint32_t parsed_level = 0U;
+    if(!pocket_parse_u32_strict(level_separator + 1U, 9U, &parsed_level)) {
         pocket_catalog_add_metadata(app, start, 0U, 0U, false);
         return;
     }
@@ -1935,6 +2020,7 @@ static void pocket_catalog_process_line(PocketD20App* app, char* line) {
 
 static bool pocket_catalog_load_path(PocketD20App* app, const char* path) {
     File* file = storage_file_alloc(app->storage);
+    if(!file) return false;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
         return true;
@@ -2041,16 +2127,25 @@ static void pocket_adventure_process_line(
     } else if(
         count == 11U && strcmp(fields[0], "C") == 0 && strcmp(fields[1], target) == 0 &&
         scene->choice_count < POCKET_ADVENTURE_MAX_CHOICES) {
+        int8_t skill = 0;
+        uint32_t dc = 0U;
+        uint32_t quest_flag = 0U;
+        uint32_t achievement = 0U;
+        if(!pocket_parse_i8_strict(fields[3], &skill) ||
+           !pocket_parse_u32_strict(fields[4], UINT8_MAX, &dc) ||
+           !pocket_parse_u32_strict(fields[9], UINT8_MAX, &quest_flag) ||
+           !pocket_parse_u32_strict(fields[10], UINT8_MAX, &achievement))
+            return;
         PocketAdventureChoice* choice = &scene->choices[scene->choice_count++];
         pocket_copy(choice->label, sizeof(choice->label), fields[2]);
-        choice->skill = (int8_t)strtol(fields[3], NULL, 10);
-        choice->dc = (uint8_t)strtoul(fields[4], NULL, 10);
+        choice->skill = skill;
+        choice->dc = (uint8_t)dc;
         pocket_copy(choice->success_scene, sizeof(choice->success_scene), fields[5]);
         pocket_copy(choice->failure_scene, sizeof(choice->failure_scene), fields[6]);
         pocket_copy(choice->reward_item, sizeof(choice->reward_item), fields[7]);
         pocket_copy(choice->milestone, sizeof(choice->milestone), fields[8]);
-        choice->quest_flag = (uint8_t)strtoul(fields[9], NULL, 10);
-        choice->achievement = (uint8_t)strtoul(fields[10], NULL, 10);
+        choice->quest_flag = (uint8_t)quest_flag;
+        choice->achievement = (uint8_t)achievement;
     }
 }
 
@@ -2099,6 +2194,11 @@ static bool pocket_adventure_load(PocketD20App* app) {
         return false;
     }
     File* file = storage_file_alloc(app->storage);
+    if(!file) {
+        free(scene);
+        pocket_set_status(app, "Adventure memory low");
+        return false;
+    }
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
         free(scene);
@@ -2173,6 +2273,7 @@ static void pocket_run_catalog_diagnostics(PocketD20App* app) {
     app->diagnostics_duplicates = 0U;
     app->diagnostics_catalogs = 0U;
     File* file = storage_file_alloc(app->storage);
+    if(!file) return;
     if(!storage_file_open(
            file, pocket_active_metadata_path(app->storage), FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
@@ -2191,9 +2292,8 @@ static void pocket_run_catalog_diagnostics(PocketD20App* app) {
         ++app->diagnostics_records;
         bool valid = count == 8U && fields[0][0] && fields[1][0] && fields[2][0] && fields[3][0] &&
                      pocket_metadata_option_valid(fields[2]);
-        char* end = NULL;
-        long level = count == 8U ? strtol(fields[5], &end, 10) : -1;
-        if(!valid || !end || *end || level < 0 || level > 20) {
+        uint32_t level = 0U;
+        if(!valid || !pocket_parse_u32_strict(fields[5], 20U, &level)) {
             ++app->diagnostics_invalid;
             continue;
         }
@@ -2229,6 +2329,7 @@ static void pocket_run_catalog_diagnostics(PocketD20App* app) {
 static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const char* option) {
     PocketCharacter* character = &app->data.character;
     File* file = storage_file_alloc(app->storage);
+    if(!file) return 0U;
     if(!storage_file_open(
            file, pocket_active_metadata_path(app->storage), FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
@@ -2255,6 +2356,8 @@ static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const
                pocket_grant_source_from_text(fields[2]) != source_type ||
                strcmp(fields[3], option) != 0 || !fields[7][0])
                 continue;
+            uint32_t level_gained = 0U;
+            if(!pocket_parse_u32_strict(fields[5], UINT8_MAX, &level_gained)) continue;
             if(!pocket_d20_data_reserve_grants(character, character->grant_count + 1U)) continue;
             PocketGrant* grant = &character->grants[character->grant_count++];
             memset(grant, 0, sizeof(*grant));
@@ -2266,7 +2369,7 @@ static uint8_t pocket_stage_grants(PocketD20App* app, uint8_t source_type, const
             grant->source_type = source_type;
             grant->class_index = app->record_index < character->class_count ? app->record_index :
                                                                               0U;
-            grant->level_gained = (uint8_t)strtoul(fields[5], NULL, 10);
+            grant->level_gained = (uint8_t)level_gained;
             grant->status = PocketGrantPending;
             ++staged;
         }
@@ -2475,20 +2578,6 @@ static void pocket_draw_header(Canvas* canvas, const char* title, const char* st
         if(width < 62U) canvas_draw_str(canvas, 126 - width, 8, status);
     }
     canvas_set_color(canvas, ColorBlack);
-}
-
-static void pocket_truncate(char* output, size_t size, const char* text, size_t maximum) {
-    if(size == 0U) return;
-    size_t length = strlen(text);
-    if(length <= maximum) {
-        pocket_copy(output, size, text);
-        return;
-    }
-    size_t copy_length = maximum > 3U ? maximum - 3U : maximum;
-    if(copy_length >= size) copy_length = size - 1U;
-    memcpy(output, text, copy_length);
-    output[copy_length] = '\0';
-    if(maximum > 3U && copy_length + 3U < size) strcat(output, "...");
 }
 
 static void pocket_draw_row(Canvas* canvas, uint8_t row, bool selected, const char* text) {
@@ -2971,15 +3060,15 @@ static void pocket_number_done(void* context, int32_t number) {
         app->dice_roll_value_count = 0U;
         break;
     case PocketNumberCombat:
-        if(app->number_index == 3U)
+        if(app->number_index == 4U)
             character->hp_current = (int16_t)number;
-        else if(app->number_index == 4U)
+        else if(app->number_index == 5U)
             character->hp_temporary = (int16_t)number;
-        else if(app->number_index == 17U)
-            character->death_successes = (uint8_t)number;
         else if(app->number_index == 18U)
-            character->death_failures = (uint8_t)number;
+            character->death_successes = (uint8_t)number;
         else if(app->number_index == 19U)
+            character->death_failures = (uint8_t)number;
+        else if(app->number_index == 20U)
             character->exhaustion = (uint8_t)number;
         break;
     case PocketNumberInitiative:
@@ -3043,12 +3132,27 @@ static void pocket_begin_number(
     view_dispatcher_switch_to_view(app->dispatcher, PocketViewNumberInput);
 }
 
+static uint16_t pocket_home_count(const PocketD20App* app) {
+    return (uint16_t)(sizeof(pocket_home_items) / sizeof(pocket_home_items[0])) +
+           (app->storage_unsaved ? 1U : 0U);
+}
+
+static const char* pocket_home_item_at(const PocketD20App* app, uint16_t index) {
+    const uint16_t base_count = sizeof(pocket_home_items) / sizeof(pocket_home_items[0]);
+    if(index < base_count) return pocket_home_items[index];
+    return pocket_home_retry_save;
+}
+
 static void pocket_draw_home(Canvas* canvas, PocketD20App* app) {
     char title[48];
     snprintf(title, sizeof(title), "D&D v" FAP_VERSION " - %.27s", app->data.character.name);
     pocket_draw_header(canvas, title, app->status);
-    pocket_draw_menu_rows(
-        canvas, app, pocket_home_items, sizeof(pocket_home_items) / sizeof(pocket_home_items[0]));
+    uint16_t count = pocket_home_count(app);
+    for(uint8_t visible = 0U; visible < 5U; ++visible) {
+        uint16_t index = app->scroll + visible;
+        if(index >= count) break;
+        pocket_draw_row(canvas, visible, index == app->selection, pocket_home_item_at(app, index));
+    }
 }
 
 static void pocket_draw_profiles(Canvas* canvas, PocketD20App* app) {
@@ -4019,47 +4123,48 @@ static void pocket_draw_record_detail(Canvas* canvas, PocketD20App* app) {
 
 static void pocket_draw_combat(Canvas* canvas, PocketD20App* app) {
     PocketCharacter* character = &app->data.character;
-    char rows[20][48];
-    const char* row_ptrs[20];
-    for(uint8_t i = 0U; i < 20U; ++i)
+    char rows[21][48];
+    const char* row_ptrs[21];
+    for(uint8_t i = 0U; i < 21U; ++i)
         row_ptrs[i] = rows[i];
     snprintf(rows[0], sizeof(rows[0]), "Weapon Attacks");
-    snprintf(rows[1], sizeof(rows[1]), "Attack Templates (%u)", character->attack_template_count);
-    snprintf(rows[2], sizeof(rows[2]), "Initiative Tracker");
-    snprintf(rows[3], sizeof(rows[3]), "HP: %d/%d", character->hp_current, character->hp_max);
-    snprintf(rows[4], sizeof(rows[4]), "Temporary HP: %d", character->hp_temporary);
-    snprintf(rows[5], sizeof(rows[5]), "Short Rest");
+    snprintf(rows[1], sizeof(rows[1]), "Spell Attacks");
+    snprintf(rows[2], sizeof(rows[2]), "Attack Templates (%u)", character->attack_template_count);
+    snprintf(rows[3], sizeof(rows[3]), "Initiative Tracker");
+    snprintf(rows[4], sizeof(rows[4]), "HP: %d/%d", character->hp_current, character->hp_max);
+    snprintf(rows[5], sizeof(rows[5]), "Temporary HP: %d", character->hp_temporary);
+    snprintf(rows[6], sizeof(rows[6]), "Short Rest");
     snprintf(
-        rows[6],
-        sizeof(rows[6]),
+        rows[7],
+        sizeof(rows[7]),
         "Spend %.22s d%u: %u/%u",
         character->classes[app->hit_die_class_index].name,
         character->classes[app->hit_die_class_index].hit_die,
         character->classes[app->hit_die_class_index].hit_dice_current,
         character->classes[app->hit_die_class_index].hit_dice_max);
-    snprintf(rows[7], sizeof(rows[7]), "Long Rest");
-    snprintf(rows[8], sizeof(rows[8]), "Conditions: %.32s", character->conditions);
-    snprintf(
-        rows[9],
-        sizeof(rows[9]),
-        "Concentration: %.31s",
-        character->concentration[0] ? character->concentration : "None");
+    snprintf(rows[8], sizeof(rows[8]), "Long Rest");
+    snprintf(rows[9], sizeof(rows[9]), "Conditions: %.32s", character->conditions);
     snprintf(
         rows[10],
         sizeof(rows[10]),
+        "Concentration: %.31s",
+        character->concentration[0] ? character->concentration : "None");
+    snprintf(
+        rows[11],
+        sizeof(rows[11]),
         "Reaction: %s",
         character->reaction_available ? "Ready" : "Used");
-    snprintf(rows[11], sizeof(rows[11]), "Temp effects: %.30s", character->temporary_effects);
-    snprintf(rows[12], sizeof(rows[12]), "Resist: %.35s", character->resistances);
-    snprintf(rows[13], sizeof(rows[13]), "Immune: %.35s", character->immunities);
-    snprintf(rows[14], sizeof(rows[14]), "Vulnerable: %.31s", character->vulnerabilities);
-    snprintf(rows[15], sizeof(rows[15]), "Senses: %.35s", character->senses);
-    snprintf(rows[16], sizeof(rows[16]), "Movement: %.33s", character->movement_modes);
-    snprintf(rows[17], sizeof(rows[17]), "Death success: %u", character->death_successes);
-    snprintf(rows[18], sizeof(rows[18]), "Death failure: %u", character->death_failures);
-    snprintf(rows[19], sizeof(rows[19]), "Exhaustion: %u", character->exhaustion);
+    snprintf(rows[12], sizeof(rows[12]), "Temp effects: %.30s", character->temporary_effects);
+    snprintf(rows[13], sizeof(rows[13]), "Resist: %.35s", character->resistances);
+    snprintf(rows[14], sizeof(rows[14]), "Immune: %.35s", character->immunities);
+    snprintf(rows[15], sizeof(rows[15]), "Vulnerable: %.31s", character->vulnerabilities);
+    snprintf(rows[16], sizeof(rows[16]), "Senses: %.35s", character->senses);
+    snprintf(rows[17], sizeof(rows[17]), "Movement: %.33s", character->movement_modes);
+    snprintf(rows[18], sizeof(rows[18]), "Death success: %u", character->death_successes);
+    snprintf(rows[19], sizeof(rows[19]), "Death failure: %u", character->death_failures);
+    snprintf(rows[20], sizeof(rows[20]), "Exhaustion: %u", character->exhaustion);
     pocket_draw_header(canvas, "Combat", app->status);
-    pocket_draw_menu_rows(canvas, app, row_ptrs, 20U);
+    pocket_draw_menu_rows(canvas, app, row_ptrs, 21U);
 }
 
 static void pocket_draw_dice(Canvas* canvas, PocketD20App* app) {
@@ -4178,6 +4283,410 @@ static void pocket_draw_dice_result(Canvas* canvas, PocketD20App* app) {
     pocket_draw_header(canvas, title, app->status);
     for(uint8_t row = 0U; row < 5U; ++row) {
         if(rows[row][0]) pocket_draw_row(canvas, row, false, row_ptrs[row]);
+    }
+}
+
+
+static uint8_t pocket_spell_point_cost(uint8_t level) {
+    static const uint8_t costs[10] = {0U, 2U, 3U, 5U, 6U, 7U, 9U, 10U, 11U, 13U};
+    return level < 10U ? costs[level] : 0U;
+}
+
+static bool pocket_spell_tracked(const PocketCharacter* character, uint8_t index) {
+    if(index >= character->spell_count) return false;
+    return character->spell_known[index] || character->spells[index].prepared ||
+           character->spell_always_prepared[index];
+}
+
+static bool pocket_spell_can_ritual(const PocketCharacter* character, uint8_t index) {
+    if(index >= character->spell_count || !character->spells[index].ritual) return false;
+    return pocket_spell_tracked(character, index);
+}
+
+static uint8_t pocket_spell_casting_ability(const PocketCharacter* character, uint8_t spell_index) {
+    if(spell_index < character->spell_count) {
+        uint8_t class_index = character->spells[spell_index].class_index;
+        if(class_index < character->class_count &&
+           character->classes[class_index].spellcasting_mode != PocketSpellcastingNone &&
+           character->classes[class_index].spellcasting_ability < POCKET_D20_ABILITY_COUNT)
+            return character->classes[class_index].spellcasting_ability;
+    }
+    return character->spellcasting_ability < POCKET_D20_ABILITY_COUNT ?
+               character->spellcasting_ability :
+               PocketAbilityIntelligence;
+}
+
+static int8_t pocket_spell_attack_modifier_for(
+    const PocketCharacter* character,
+    uint8_t spell_index) {
+    uint8_t ability = pocket_spell_casting_ability(character, spell_index);
+    return (int8_t)(pocket_d20_ability_modifier(character->ability_scores[ability]) +
+                    pocket_d20_proficiency_bonus(character) + character->spell_attack_misc -
+                    (2 * character->exhaustion));
+}
+
+static int8_t pocket_spell_save_dc_for(const PocketCharacter* character, uint8_t spell_index) {
+    uint8_t ability = pocket_spell_casting_ability(character, spell_index);
+    return (int8_t)(8 + pocket_d20_ability_modifier(character->ability_scores[ability]) +
+                    pocket_d20_proficiency_bonus(character) + character->spell_save_misc);
+}
+
+static uint8_t pocket_build_spell_cast_options(
+    const PocketD20App* app,
+    uint8_t spell_index,
+    PocketSpellCastOption* options,
+    uint8_t capacity) {
+    const PocketCharacter* character = &app->data.character;
+    if(spell_index >= character->spell_count || !pocket_spell_tracked(character, spell_index))
+        return 0U;
+    const PocketSpell* spell = &character->spells[spell_index];
+    uint8_t count = 0U;
+#define POCKET_ADD_CAST_OPTION(lvl, kind, cls)                                                    \
+    do {                                                                                          \
+        if(options && count < capacity) {                                                         \
+            options[count].level = (lvl);                                                         \
+            options[count].resource = (kind);                                                     \
+            options[count].class_index = (cls);                                                   \
+        }                                                                                         \
+        if(count < 255U) ++count;                                                                 \
+    } while(false)
+
+    if(spell->level == 0U) {
+        POCKET_ADD_CAST_OPTION(0U, PocketSpellCastCantrip, spell->class_index);
+        return count;
+    }
+
+    if(character->spell_free_casts_current[spell_index])
+        POCKET_ADD_CAST_OPTION(spell->level, PocketSpellCastFree, spell->class_index);
+
+    for(uint8_t level = spell->level; level < POCKET_D20_SLOT_COUNT; ++level)
+        if(character->spell_slots_current[level])
+            POCKET_ADD_CAST_OPTION(level, PocketSpellCastSlot, spell->class_index);
+
+    for(uint8_t class_index = 0U; class_index < character->class_count; ++class_index) {
+        const PocketClassLevel* class_level = &character->classes[class_index];
+        if(class_level->spellcasting_mode == PocketSpellcastingPact &&
+           class_level->pact_slots_current && class_level->pact_slot_level >= spell->level)
+            POCKET_ADD_CAST_OPTION(
+                class_level->pact_slot_level, PocketSpellCastPact, class_index);
+    }
+
+    if(spell->class_index < character->class_count) {
+        const PocketClassLevel* class_level = &character->classes[spell->class_index];
+        if(class_level->spellcasting_mode == PocketSpellcastingSpellPoints) {
+            uint8_t maximum = pocket_class_max_spell_level(class_level);
+            if(maximum > 5U) maximum = 5U;
+            for(uint8_t level = spell->level; level <= maximum; ++level) {
+                uint8_t cost = pocket_spell_point_cost(level);
+                if(cost && class_level->spell_points_current >= cost)
+                    POCKET_ADD_CAST_OPTION(level, PocketSpellCastPoints, spell->class_index);
+            }
+        }
+    }
+
+    if(pocket_spell_can_ritual(character, spell_index))
+        POCKET_ADD_CAST_OPTION(spell->level, PocketSpellCastRitual, spell->class_index);
+#undef POCKET_ADD_CAST_OPTION
+    return count;
+}
+
+static uint8_t pocket_castable_spell_count(const PocketD20App* app) {
+    uint8_t count = 0U;
+    for(uint8_t index = 0U; index < app->data.character.spell_count; ++index)
+        if(pocket_build_spell_cast_options(app, index, NULL, 0U)) ++count;
+    return count;
+}
+
+static uint8_t pocket_castable_spell_index(const PocketD20App* app, uint16_t display_index) {
+    uint16_t seen = 0U;
+    for(uint8_t index = 0U; index < app->data.character.spell_count; ++index) {
+        if(!pocket_build_spell_cast_options(app, index, NULL, 0U)) continue;
+        if(seen == display_index) return index;
+        ++seen;
+    }
+    return 0xFFU;
+}
+
+static const char* pocket_spell_cast_resource_name(uint8_t resource) {
+    switch(resource) {
+    case PocketSpellCastCantrip:
+        return "Cantrip";
+    case PocketSpellCastFree:
+        return "Free cast";
+    case PocketSpellCastSlot:
+        return "Spell slot";
+    case PocketSpellCastPact:
+        return "Pact slot";
+    case PocketSpellCastPoints:
+        return "Spell points";
+    case PocketSpellCastRitual:
+        return "Ritual +10 min";
+    default:
+        return "Cast";
+    }
+}
+
+static void pocket_format_spell_cast_option(
+    const PocketD20App* app,
+    const PocketSpellCastOption* option,
+    char* output,
+    size_t size) {
+    const PocketCharacter* character = &app->data.character;
+    switch(option->resource) {
+    case PocketSpellCastCantrip:
+        snprintf(output, size, "Cast cantrip");
+        break;
+    case PocketSpellCastFree:
+        snprintf(
+            output,
+            size,
+            "Free cast L%u (%u left)",
+            option->level,
+            character->spell_free_casts_current[app->spell_attack_index]);
+        break;
+    case PocketSpellCastSlot:
+        snprintf(
+            output,
+            size,
+            "L%u slot (%u left)",
+            option->level,
+            character->spell_slots_current[option->level]);
+        break;
+    case PocketSpellCastPact:
+        snprintf(
+            output,
+            size,
+            "Pact L%u (%u left)",
+            option->level,
+            character->classes[option->class_index].pact_slots_current);
+        break;
+    case PocketSpellCastPoints:
+        snprintf(
+            output,
+            size,
+            "L%u points (%u cost)",
+            option->level,
+            pocket_spell_point_cost(option->level));
+        break;
+    case PocketSpellCastRitual:
+        snprintf(output, size, "Ritual (+10 minutes)");
+        break;
+    default:
+        output[0] = '\0';
+        break;
+    }
+}
+
+static bool pocket_consume_spell_cast_resource(
+    PocketD20App* app,
+    const PocketSpellCastOption* option) {
+    PocketCharacter* character = &app->data.character;
+    switch(option->resource) {
+    case PocketSpellCastCantrip:
+    case PocketSpellCastRitual:
+        return true;
+    case PocketSpellCastFree:
+        if(!character->spell_free_casts_current[app->spell_attack_index]) return false;
+        --character->spell_free_casts_current[app->spell_attack_index];
+        return true;
+    case PocketSpellCastSlot:
+        if(option->level >= POCKET_D20_SLOT_COUNT || !character->spell_slots_current[option->level])
+            return false;
+        --character->spell_slots_current[option->level];
+        return true;
+    case PocketSpellCastPact:
+        if(option->class_index >= character->class_count ||
+           !character->classes[option->class_index].pact_slots_current)
+            return false;
+        --character->classes[option->class_index].pact_slots_current;
+        return true;
+    case PocketSpellCastPoints: {
+        if(option->class_index >= character->class_count) return false;
+        uint8_t cost = pocket_spell_point_cost(option->level);
+        if(!cost || character->classes[option->class_index].spell_points_current < cost) return false;
+        character->classes[option->class_index].spell_points_current -= cost;
+        return true;
+    }
+    default:
+        return false;
+    }
+}
+
+static void pocket_cast_spell(PocketD20App* app, const PocketSpellCastOption* option) {
+    PocketCharacter* character = &app->data.character;
+    if(app->spell_attack_index >= character->spell_count ||
+       !pocket_consume_spell_cast_resource(app, option)) {
+        pocket_set_status(app, "Casting resource unavailable");
+        return;
+    }
+
+    const PocketSpell* spell = &character->spells[app->spell_attack_index];
+    app->spell_cast_level = option->level;
+    app->spell_cast_resource = option->resource;
+    app->spell_cast_class_index = option->class_index;
+    app->spell_cast_primary_total = 0;
+    app->spell_cast_secondary_total = 0;
+    app->spell_cast_flat_bonus = 0;
+    app->spell_cast_damage_total = 0;
+    app->spell_cast_natural = 0U;
+    app->spell_cast_attack_total = 0;
+    app->spell_cast_resolution = PocketSpellResolutionNone;
+    app->spell_cast_primary_dice = 0U;
+    app->spell_cast_primary_die = 0U;
+    app->spell_cast_secondary_dice = 0U;
+    app->spell_cast_secondary_die = 0U;
+
+    uint8_t ability = pocket_spell_casting_ability(character, app->spell_attack_index);
+    int8_t ability_modifier = pocket_d20_ability_modifier(character->ability_scores[ability]);
+    PocketSpellDamageSpec damage;
+    if(pocket_d20_spell_damage_spec(
+           spell,
+           option->level,
+           pocket_d20_total_level(character),
+           ability_modifier,
+           &damage)) {
+        app->spell_cast_primary_dice = damage.primary_dice;
+        app->spell_cast_primary_die = damage.primary_die;
+        app->spell_cast_secondary_dice = damage.secondary_dice;
+        app->spell_cast_secondary_die = damage.secondary_die;
+        app->spell_cast_flat_bonus = damage.flat_bonus;
+        app->spell_cast_resolution = damage.resolution;
+        if(damage.primary_dice && damage.primary_die)
+            app->spell_cast_primary_total =
+                (int16_t)pocket_d20_roll_dice(damage.primary_dice, damage.primary_die);
+        if(damage.secondary_dice && damage.secondary_die)
+            app->spell_cast_secondary_total =
+                (int16_t)pocket_d20_roll_dice(damage.secondary_dice, damage.secondary_die);
+        app->spell_cast_damage_total = app->spell_cast_primary_total +
+                                       app->spell_cast_secondary_total + damage.flat_bonus;
+        if(damage.resolution == PocketSpellResolutionAttack) {
+            app->spell_cast_natural = (uint8_t)pocket_d20_roll_dice(1U, 20U);
+            app->spell_cast_attack_total = app->spell_cast_natural +
+                                           pocket_spell_attack_modifier_for(
+                                               character, app->spell_attack_index);
+        }
+    }
+
+    pocket_save(app, false);
+    pocket_enter_screen(app, PocketScreenSpellResult);
+}
+
+static void pocket_draw_spell_attacks(Canvas* canvas, PocketD20App* app) {
+    uint8_t count = pocket_castable_spell_count(app);
+    pocket_draw_header(canvas, "Spell Attacks", app->status);
+    if(!count) {
+        pocket_draw_row(canvas, 0U, false, "No castable spells");
+        pocket_draw_row(canvas, 1U, false, "Check prepared/slots");
+        return;
+    }
+    for(uint8_t visible = 0U; visible < 5U; ++visible) {
+        uint16_t display_index = app->scroll + visible;
+        if(display_index >= count) break;
+        uint8_t spell_index = pocket_castable_spell_index(app, display_index);
+        if(spell_index == 0xFFU) break;
+        const PocketSpell* spell = &app->data.character.spells[spell_index];
+        char row[64];
+        if(spell->level)
+            snprintf(row, sizeof(row), "L%u %s%s", spell->level, spell->name, spell->ritual ? " [R]" : "");
+        else
+            snprintf(row, sizeof(row), "C %s", spell->name);
+        pocket_draw_row(canvas, visible, display_index == app->selection, row);
+    }
+}
+
+static void pocket_draw_spell_cast(Canvas* canvas, PocketD20App* app) {
+    if(app->spell_attack_index >= app->data.character.spell_count) return;
+    PocketSpellCastOption options[POCKET_D20_MAX_SPELL_CAST_OPTIONS];
+    uint8_t count = pocket_build_spell_cast_options(
+        app, app->spell_attack_index, options, POCKET_D20_MAX_SPELL_CAST_OPTIONS);
+    if(count > POCKET_D20_MAX_SPELL_CAST_OPTIONS) count = POCKET_D20_MAX_SPELL_CAST_OPTIONS;
+    pocket_draw_header(canvas, app->data.character.spells[app->spell_attack_index].name, app->status);
+    for(uint8_t visible = 0U; visible < 5U; ++visible) {
+        uint16_t index = app->scroll + visible;
+        if(index >= count) break;
+        char row[64];
+        pocket_format_spell_cast_option(app, &options[index], row, sizeof(row));
+        pocket_draw_row(canvas, visible, index == app->selection, row);
+    }
+}
+
+static void pocket_draw_spell_result(Canvas* canvas, PocketD20App* app) {
+    if(app->spell_attack_index >= app->data.character.spell_count) return;
+    const PocketCharacter* character = &app->data.character;
+    const PocketSpell* spell = &character->spells[app->spell_attack_index];
+    pocket_draw_header(canvas, spell->name, app->status);
+    char row[64];
+    if(app->spell_cast_resource == PocketSpellCastRitual)
+        snprintf(row, sizeof(row), "Ritual cast: +10 minutes");
+    else if(app->spell_cast_level)
+        snprintf(
+            row,
+            sizeof(row),
+            "Cast L%u - %s",
+            app->spell_cast_level,
+            pocket_spell_cast_resource_name(app->spell_cast_resource));
+    else
+        snprintf(row, sizeof(row), "Cantrip cast");
+    pocket_draw_row(canvas, 0U, false, row);
+
+    if(app->spell_cast_resolution == PocketSpellResolutionAttack) {
+        snprintf(
+            row,
+            sizeof(row),
+            "Attack d20 %u %+d = %d",
+            app->spell_cast_natural,
+            pocket_spell_attack_modifier_for(character, app->spell_attack_index),
+            app->spell_cast_attack_total);
+    } else if(app->spell_cast_resolution == PocketSpellResolutionSave) {
+        snprintf(
+            row,
+            sizeof(row),
+            "Target save DC %d",
+            pocket_spell_save_dc_for(character, app->spell_attack_index));
+    } else if(app->spell_cast_resolution == PocketSpellResolutionAutomatic) {
+        snprintf(row, sizeof(row), "Automatic / no attack roll");
+    } else if(app->spell_cast_resolution == PocketSpellResolutionTriggered) {
+        snprintf(row, sizeof(row), "Damage after triggering hit");
+    } else {
+        snprintf(
+            row,
+            sizeof(row),
+            "Spell +%d / DC %d",
+            pocket_spell_attack_modifier_for(character, app->spell_attack_index),
+            pocket_spell_save_dc_for(character, app->spell_attack_index));
+    }
+    pocket_draw_row(canvas, 1U, false, row);
+
+    if(!app->spell_cast_primary_dice && !app->spell_cast_secondary_dice &&
+       !app->spell_cast_flat_bonus) {
+        pocket_draw_row(canvas, 2U, false, "No mapped damage roll");
+        pocket_draw_row(canvas, 3U, false, "Cast/resource recorded");
+    } else {
+        if(app->spell_cast_primary_dice) {
+            snprintf(
+                row,
+                sizeof(row),
+                "%ud%u = %d",
+                app->spell_cast_primary_dice,
+                app->spell_cast_primary_die,
+                app->spell_cast_primary_total);
+            pocket_draw_row(canvas, 2U, false, row);
+        }
+        if(app->spell_cast_secondary_dice) {
+            snprintf(
+                row,
+                sizeof(row),
+                "+ %ud%u = %d",
+                app->spell_cast_secondary_dice,
+                app->spell_cast_secondary_die,
+                app->spell_cast_secondary_total);
+            pocket_draw_row(canvas, 3U, false, row);
+        } else if(app->spell_cast_flat_bonus) {
+            snprintf(row, sizeof(row), "Modifier: %+d", app->spell_cast_flat_bonus);
+            pocket_draw_row(canvas, 3U, false, row);
+        }
+        snprintf(row, sizeof(row), "Damage total: %d", app->spell_cast_damage_total);
+        pocket_draw_row(canvas, 4U, false, row);
     }
 }
 
@@ -4706,29 +5215,29 @@ static void pocket_draw_dice_animation(Canvas* canvas, PocketD20App* app) {
 }
 
 static void pocket_draw_adventure_sprite(Canvas* canvas, const PocketAdventureScene* scene) {
-    canvas_draw_frame(canvas, 2, 13, 27, 27);
+    canvas_draw_frame(canvas, 1, 13, 27, 27);
     if(strcmp(scene->sprite, "dolphin") == 0) {
-        canvas_draw_line(canvas, 6, 28, 13, 22);
-        canvas_draw_line(canvas, 13, 22, 23, 24);
-        canvas_draw_line(canvas, 23, 24, 16, 30);
-        canvas_draw_line(canvas, 16, 30, 8, 31);
-        canvas_draw_line(canvas, 8, 31, 6, 28);
-        canvas_draw_line(canvas, 18, 23, 21, 19);
-        canvas_draw_line(canvas, 9, 29, 5, 34);
-        canvas_draw_dot(canvas, 20, 25);
+        canvas_draw_line(canvas, 5, 28, 12, 22);
+        canvas_draw_line(canvas, 12, 22, 22, 24);
+        canvas_draw_line(canvas, 22, 24, 15, 30);
+        canvas_draw_line(canvas, 15, 30, 7, 31);
+        canvas_draw_line(canvas, 7, 31, 5, 28);
+        canvas_draw_line(canvas, 17, 23, 20, 19);
+        canvas_draw_line(canvas, 8, 29, 4, 34);
+        canvas_draw_dot(canvas, 19, 25);
     } else if(strcmp(scene->sprite, "pearl") == 0) {
-        canvas_draw_circle(canvas, 15, 26, 8);
-        canvas_draw_circle(canvas, 15, 26, 5);
-        canvas_draw_dot(canvas, 13, 23);
+        canvas_draw_circle(canvas, 14, 26, 8);
+        canvas_draw_circle(canvas, 14, 26, 5);
+        canvas_draw_dot(canvas, 12, 23);
     } else {
-        canvas_draw_line(canvas, 4, 31, 9, 27);
-        canvas_draw_line(canvas, 9, 27, 14, 31);
-        canvas_draw_line(canvas, 14, 31, 19, 27);
-        canvas_draw_line(canvas, 19, 27, 26, 31);
-        canvas_draw_line(canvas, 4, 35, 9, 32);
-        canvas_draw_line(canvas, 9, 32, 14, 35);
-        canvas_draw_line(canvas, 14, 35, 19, 32);
-        canvas_draw_line(canvas, 19, 32, 26, 35);
+        canvas_draw_line(canvas, 3, 31, 8, 27);
+        canvas_draw_line(canvas, 8, 27, 13, 31);
+        canvas_draw_line(canvas, 13, 31, 18, 27);
+        canvas_draw_line(canvas, 18, 27, 25, 31);
+        canvas_draw_line(canvas, 3, 35, 8, 32);
+        canvas_draw_line(canvas, 8, 32, 13, 35);
+        canvas_draw_line(canvas, 13, 35, 18, 32);
+        canvas_draw_line(canvas, 18, 32, 25, 35);
     }
 }
 
@@ -4837,14 +5346,22 @@ static void pocket_draw_adventure(Canvas* canvas, PocketD20App* app) {
     snprintf(title, sizeof(title), "Adventure: %s", scene->title);
     pocket_draw_header(canvas, title, app->status);
     pocket_draw_adventure_sprite(canvas, scene);
-    char first[20];
-    char second[20];
-    pocket_truncate(first, sizeof(first), scene->body, 17U);
-    const char* remainder = strlen(scene->body) > 17U ? scene->body + 17U : "";
-    pocket_truncate(second, sizeof(second), remainder, 17U);
+    char first[24];
+    char second[24];
+    char third[24];
+    snprintf(first, sizeof(first), "%.23s", scene->body);
+    snprintf(
+        second, sizeof(second), "%.23s", strlen(scene->body) > 23U ? scene->body + 23U : "");
+    snprintf(
+        third, sizeof(third), "%.23s", strlen(scene->body) > 46U ? scene->body + 46U : "");
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 32, 21, first);
-    canvas_draw_str(canvas, 32, 31, second);
+    canvas_draw_str(canvas, 31, 19, first);
+    canvas_draw_str(canvas, 31, 28, second);
+    canvas_draw_str(canvas, 31, 37, third);
+    if(!app->adventure_started) {
+        pocket_draw_row(canvas, 4U, true, "Start Adventure");
+        return;
+    }
     uint8_t visible = scene->choice_count > 2U ? 2U : scene->choice_count;
     for(uint8_t row = 0U; row < visible; ++row) {
         uint8_t index = app->scroll + row;
@@ -4927,6 +5444,15 @@ static void pocket_draw_callback(Canvas* canvas, void* model) {
         break;
     case PocketScreenCombat:
         pocket_draw_combat(canvas, app);
+        break;
+    case PocketScreenSpellAttacks:
+        pocket_draw_spell_attacks(canvas, app);
+        break;
+    case PocketScreenSpellCast:
+        pocket_draw_spell_cast(canvas, app);
+        break;
+    case PocketScreenSpellResult:
+        pocket_draw_spell_result(canvas, app);
         break;
     case PocketScreenAttackTemplates:
         pocket_draw_attack_templates(canvas, app);
@@ -5542,6 +6068,15 @@ static void pocket_handle_back(PocketD20App* app) {
     case PocketScreenSpellFilters:
         pocket_enter_screen(app, PocketScreenMagic);
         break;
+    case PocketScreenSpellAttacks:
+        pocket_enter_screen(app, PocketScreenCombat);
+        break;
+    case PocketScreenSpellCast:
+        pocket_enter_screen(app, PocketScreenSpellAttacks);
+        break;
+    case PocketScreenSpellResult:
+        pocket_enter_screen(app, PocketScreenSpellAttacks);
+        break;
     case PocketScreenAttackTemplates:
         pocket_enter_screen(app, PocketScreenCombat);
         break;
@@ -5730,13 +6265,33 @@ static void pocket_handle_profile_actions(PocketD20App* app, const InputEvent* e
     }
 }
 
+static void pocket_launch_bestiary(PocketD20App* app) {
+    /* Best effort only: a prior SD write failure must not hide or block Bestiary. */
+    pocket_flush_save(app, false);
+    Loader* loader = furi_record_open(RECORD_LOADER);
+    if(!loader) {
+        pocket_set_status(app, "Loader unavailable");
+        return;
+    }
+    loader_enqueue_launch(
+        loader, "/ext/apps/Games/dolphin_bestiary.fap", NULL, LoaderDeferredLaunchFlagGui);
+    furi_record_close(RECORD_LOADER);
+    view_dispatcher_stop(app->dispatcher);
+}
+
 static void pocket_handle_home(PocketD20App* app, const InputEvent* event) {
-    uint16_t count = sizeof(pocket_home_items) / sizeof(pocket_home_items[0]);
+    const uint16_t base_count = sizeof(pocket_home_items) / sizeof(pocket_home_items[0]);
+    uint16_t count = pocket_home_count(app);
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
         pocket_menu_move(app, count, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
         pocket_menu_move(app, count, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        if(app->selection >= base_count) {
+            app->storage_read_only = 0U;
+            pocket_save(app, true);
+            return;
+        }
         switch(app->selection) {
         case 0:
             pocket_d20_profiles_refresh(app->storage, &app->profiles);
@@ -5781,33 +6336,19 @@ static void pocket_handle_home(PocketD20App* app, const InputEvent* event) {
                 pocket_set_status(app, "No campaign manifests");
             break;
         case 12:
+            pocket_launch_bestiary(app);
+            break;
+        case 13:
             app->hit_die_class_index = 0U;
             if(app->roll_mode == PocketRollGuidance) app->roll_mode = PocketRollNormal;
             pocket_enter_screen(app, PocketScreenCombat);
             break;
-        case 13:
+        case 14:
             pocket_enter_screen(app, PocketScreenInitiativeMenu);
             break;
-        case 14:
+        case 15:
             pocket_enter_screen(app, PocketScreenDice);
             break;
-        case 15:
-            app->storage_read_only = 0U;
-            pocket_save(app, true);
-            break;
-        case 16: {
-            if(app->storage_unsaved) {
-                pocket_set_status(app, "Retry save before switching");
-                break;
-            }
-            pocket_flush_save(app, false);
-            Loader* loader = furi_record_open(RECORD_LOADER);
-            loader_enqueue_launch(
-                loader, "/ext/apps/Games/dolphin_bestiary.fap", NULL, LoaderDeferredLaunchFlagGui);
-            furi_record_close(RECORD_LOADER);
-            view_dispatcher_stop(app->dispatcher);
-            break;
-        }
         }
     }
 }
@@ -6641,6 +7182,7 @@ static void pocket_handle_campaigns(PocketD20App* app, const InputEvent* event) 
         if(pocket_adventure_load(app)) {
             pocket_save(app, false);
             pocket_enter_screen(app, PocketScreenAdventure);
+            app->adventure_started = 0U;
         } else {
             pocket_set_status(app, "Campaign scene invalid");
         }
@@ -6697,7 +7239,17 @@ static void pocket_handle_campaign_diagnostics(PocketD20App* app, const InputEve
 
 static void pocket_handle_adventure(PocketD20App* app, const InputEvent* event) {
     PocketAdventureScene* scene = app->adventure_scene;
-    if(!scene || !scene->choice_count) return;
+    if(!scene) return;
+    if(!app->adventure_started) {
+        if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            app->adventure_started = 1U;
+            app->selection = 0U;
+            app->scroll = 0U;
+            pocket_clear_status(app);
+        }
+        return;
+    }
+    if(!scene->choice_count) return;
     if(pocket_is_move_event(event) && event->key == InputKeyUp) {
         if(app->selection == 0U)
             app->selection = scene->choice_count - 1U;
@@ -7860,52 +8412,112 @@ static void pocket_handle_catalog(PocketD20App* app, const InputEvent* event) {
         pocket_apply_catalog_selection(app);
 }
 
+
+static void pocket_handle_spell_attacks(PocketD20App* app, const InputEvent* event) {
+    uint8_t count = pocket_castable_spell_count(app);
+    if(!count) return;
+    if(pocket_is_move_event(event) && event->key == InputKeyUp)
+        pocket_menu_move(app, count, -1);
+    else if(pocket_is_move_event(event) && event->key == InputKeyDown)
+        pocket_menu_move(app, count, 1);
+    else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        uint8_t spell_index = pocket_castable_spell_index(app, app->selection);
+        if(spell_index == 0xFFU) return;
+        app->spell_attack_index = spell_index;
+        PocketSpellCastOption options[POCKET_D20_MAX_SPELL_CAST_OPTIONS];
+        uint8_t option_count = pocket_build_spell_cast_options(
+            app, spell_index, options, POCKET_D20_MAX_SPELL_CAST_OPTIONS);
+        if(!option_count) {
+            pocket_set_status(app, "No casting resource");
+            return;
+        }
+        if(option_count == 1U) {
+            pocket_cast_spell(app, &options[0]);
+            return;
+        }
+        pocket_enter_screen(app, PocketScreenSpellCast);
+    }
+}
+
+static void pocket_handle_spell_cast(PocketD20App* app, const InputEvent* event) {
+    PocketSpellCastOption options[POCKET_D20_MAX_SPELL_CAST_OPTIONS];
+    uint8_t count = pocket_build_spell_cast_options(
+        app, app->spell_attack_index, options, POCKET_D20_MAX_SPELL_CAST_OPTIONS);
+    if(count > POCKET_D20_MAX_SPELL_CAST_OPTIONS) count = POCKET_D20_MAX_SPELL_CAST_OPTIONS;
+    if(!count) {
+        pocket_enter_screen(app, PocketScreenSpellAttacks);
+        pocket_set_status(app, "No casting resource");
+        return;
+    }
+    if(pocket_is_move_event(event) && event->key == InputKeyUp)
+        pocket_menu_move(app, count, -1);
+    else if(pocket_is_move_event(event) && event->key == InputKeyDown)
+        pocket_menu_move(app, count, 1);
+    else if(event->type == InputTypeShort && event->key == InputKeyOk && app->selection < count)
+        pocket_cast_spell(app, &options[app->selection]);
+}
+
+static void pocket_handle_spell_result(PocketD20App* app, const InputEvent* event) {
+    if(event->type != InputTypeShort || event->key != InputKeyOk) return;
+    PocketSpellCastOption options[POCKET_D20_MAX_SPELL_CAST_OPTIONS];
+    uint8_t count = pocket_build_spell_cast_options(
+        app, app->spell_attack_index, options, POCKET_D20_MAX_SPELL_CAST_OPTIONS);
+    if(count == 1U) {
+        pocket_enter_screen(app, PocketScreenSpellCast);
+        app->selection = 0U;
+    } else if(count > 1U) {
+        pocket_enter_screen(app, PocketScreenSpellCast);
+    } else {
+        pocket_enter_screen(app, PocketScreenSpellAttacks);
+    }
+}
+
 static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
     PocketCharacter* character = &app->data.character;
     if(pocket_is_move_event(event) && event->key == InputKeyUp)
-        pocket_menu_move(app, 20U, -1);
+        pocket_menu_move(app, 21U, -1);
     else if(pocket_is_move_event(event) && event->key == InputKeyDown)
-        pocket_menu_move(app, 20U, 1);
+        pocket_menu_move(app, 21U, 1);
     else if(
         pocket_is_move_event(event) &&
         (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int16_t delta = event->key == InputKeyRight ? 1 : -1;
-        if(app->selection == 3U)
+        if(app->selection == 4U)
             character->hp_current = pocket_clamp_i16(character->hp_current + delta, 0, 999);
-        else if(app->selection == 4U)
+        else if(app->selection == 5U)
             character->hp_temporary = pocket_clamp_i16(character->hp_temporary + delta, 0, 999);
-        else if(app->selection == 6U) {
+        else if(app->selection == 7U) {
             int16_t class_index = app->hit_die_class_index + delta;
             if(class_index < 0) class_index = character->class_count - 1U;
             if(class_index >= character->class_count) class_index = 0;
             app->hit_die_class_index = (uint8_t)class_index;
             return;
-        } else if(app->selection == 10U)
+        } else if(app->selection == 11U)
             character->reaction_available = !character->reaction_available;
-        else if(app->selection == 17U)
-            character->death_successes = pocket_clamp_u8(character->death_successes + delta, 3U);
         else if(app->selection == 18U)
-            character->death_failures = pocket_clamp_u8(character->death_failures + delta, 3U);
+            character->death_successes = pocket_clamp_u8(character->death_successes + delta, 3U);
         else if(app->selection == 19U)
+            character->death_failures = pocket_clamp_u8(character->death_failures + delta, 3U);
+        else if(app->selection == 20U)
             character->exhaustion = pocket_clamp_u8(character->exhaustion + delta, 6U);
         else
             return;
         pocket_save(app, false);
     } else if(
         event->type == InputTypeLong && event->key == InputKeyOk &&
-        (app->selection == 3U || app->selection == 4U ||
-         (app->selection >= 17U && app->selection <= 19U))) {
-        const char* header = app->selection == 3U  ? "Current HP" :
-                             app->selection == 4U  ? "Temporary HP" :
-                             app->selection == 17U ? "Death successes" :
-                             app->selection == 18U ? "Death failures" :
+        (app->selection == 4U || app->selection == 5U ||
+         (app->selection >= 18U && app->selection <= 20U))) {
+        const char* header = app->selection == 4U  ? "Current HP" :
+                             app->selection == 5U  ? "Temporary HP" :
+                             app->selection == 18U ? "Death successes" :
+                             app->selection == 19U ? "Death failures" :
                                                      "Exhaustion";
-        int32_t value = app->selection == 3U  ? character->hp_current :
-                        app->selection == 4U  ? character->hp_temporary :
-                        app->selection == 17U ? character->death_successes :
-                        app->selection == 18U ? character->death_failures :
+        int32_t value = app->selection == 4U  ? character->hp_current :
+                        app->selection == 5U  ? character->hp_temporary :
+                        app->selection == 18U ? character->death_successes :
+                        app->selection == 19U ? character->death_failures :
                                                 character->exhaustion;
-        int32_t maximum = app->selection <= 4U ? 999 : app->selection <= 18U ? 3 : 6;
+        int32_t maximum = app->selection <= 5U ? 999 : app->selection <= 19U ? 3 : 6;
         pocket_begin_number(
             app, PocketNumberCombat, (uint8_t)app->selection, 0U, header, value, 0, maximum);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
@@ -7914,20 +8526,23 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
             pocket_enter_screen(app, PocketScreenAttackList);
             break;
         case 1:
-            pocket_enter_screen(app, PocketScreenAttackTemplates);
+            pocket_enter_screen(app, PocketScreenSpellAttacks);
             break;
         case 2:
-            pocket_enter_screen(app, PocketScreenInitiativeMenu);
+            pocket_enter_screen(app, PocketScreenAttackTemplates);
             break;
         case 3:
+            pocket_enter_screen(app, PocketScreenInitiativeMenu);
+            break;
+        case 4:
             character->hp_current = pocket_clamp_i16(character->hp_current + 1, 0, 999);
             pocket_save(app, false);
             break;
-        case 4:
+        case 5:
             character->hp_temporary = pocket_clamp_i16(character->hp_temporary + 1, 0, 999);
             pocket_save(app, false);
             break;
-        case 5:
+        case 6:
             if(character->hp_current < 1) {
                 pocket_set_status(app, "Need at least 1 HP");
                 break;
@@ -7939,7 +8554,7 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
                 break;
             pocket_set_status(app, "Short rest applied");
             break;
-        case 6:
+        case 7:
             if(character->hp_current < 1) {
                 pocket_set_status(app, "Need at least 1 HP");
             } else if(character->hp_current >= character->hp_max) {
@@ -7965,7 +8580,7 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
                     app, 1U, character->classes[app->hit_die_class_index].hit_die);
             }
             break;
-        case 7:
+        case 8:
             if(character->hp_current < 1) {
                 pocket_set_status(app, "Need at least 1 HP");
                 break;
@@ -7974,47 +8589,47 @@ static void pocket_handle_combat(PocketD20App* app, const InputEvent* event) {
             pocket_save(app, false);
             pocket_set_status(app, "Long rest applied");
             break;
-        case 8:
+        case 9:
             pocket_begin_text(app, PocketEditConditions, "Conditions", character->conditions);
             break;
-        case 9:
+        case 10:
             pocket_begin_text(
                 app, PocketEditConcentration, "Concentration", character->concentration);
             break;
-        case 10:
+        case 11:
             character->reaction_available = !character->reaction_available;
             pocket_save(app, false);
             break;
-        case 11:
+        case 12:
             pocket_begin_text(
                 app, PocketEditTemporaryEffects, "Temporary effects", character->temporary_effects);
             break;
-        case 12:
+        case 13:
             pocket_begin_text(app, PocketEditResistances, "Resistances", character->resistances);
             break;
-        case 13:
+        case 14:
             pocket_begin_text(app, PocketEditImmunities, "Immunities", character->immunities);
             break;
-        case 14:
+        case 15:
             pocket_begin_text(
                 app, PocketEditVulnerabilities, "Vulnerabilities", character->vulnerabilities);
             break;
-        case 15:
+        case 16:
             pocket_begin_text(app, PocketEditSenses, "Senses", character->senses);
             break;
-        case 16:
+        case 17:
             pocket_begin_text(
                 app, PocketEditMovementModes, "Movement modes", character->movement_modes);
             break;
-        case 17:
+        case 18:
             character->death_successes = pocket_clamp_u8(character->death_successes + 1, 3U);
             pocket_save(app, false);
             break;
-        case 18:
+        case 19:
             character->death_failures = pocket_clamp_u8(character->death_failures + 1, 3U);
             pocket_save(app, false);
             break;
-        case 19:
+        case 20:
             character->exhaustion = pocket_clamp_u8(character->exhaustion + 1, 6U);
             pocket_save(app, false);
             break;
@@ -9119,6 +9734,15 @@ static bool pocket_input_callback(InputEvent* event, void* context) {
     case PocketScreenCombat:
         pocket_handle_combat(app, event);
         break;
+    case PocketScreenSpellAttacks:
+        pocket_handle_spell_attacks(app, event);
+        break;
+    case PocketScreenSpellCast:
+        pocket_handle_spell_cast(app, event);
+        break;
+    case PocketScreenSpellResult:
+        pocket_handle_spell_result(app, event);
+        break;
     case PocketScreenAttackTemplates:
         pocket_handle_attack_templates(app, event);
         break;
@@ -9194,10 +9818,35 @@ static bool pocket_parse_launch_number(
     uint32_t value = 0U;
     for(const char* cursor = begin; cursor < end; ++cursor) {
         if(*cursor < '0' || *cursor > '9') return false;
-        value = value * 10U + (uint32_t)(*cursor - '0');
-        if(value > maximum) return false;
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = value * 10U + digit;
     }
     *output = (uint16_t)value;
+    return true;
+}
+
+static bool pocket_parse_launch_i8(const char* begin, const char* end, int8_t* output) {
+    if(!begin || !end || !output || begin >= end) return false;
+    bool negative = false;
+    if(*begin == '-') {
+        negative = true;
+        ++begin;
+        if(begin >= end) return false;
+    }
+    uint16_t maximum = negative ? 128U : 127U;
+    uint16_t value = 0U;
+    for(const char* cursor = begin; cursor < end; ++cursor) {
+        if(*cursor < '0' || *cursor > '9') return false;
+        uint8_t digit = (uint8_t)(*cursor - '0');
+        if(value > maximum / 10U ||
+           (value == maximum / 10U && digit > maximum % 10U))
+            return false;
+        value = (uint16_t)(value * 10U + digit);
+    }
+    *output = negative ? (value == 128U ? INT8_MIN : (int8_t)-(int16_t)value) : (int8_t)value;
     return true;
 }
 
@@ -9220,15 +9869,24 @@ static uint8_t pocket_import_launch_party(PocketD20App* app, const char* launch_
         }
         const char* second_comma =
             memchr(first_comma + 1, ',', (size_t)(record_end - (first_comma + 1)));
-        if(!second_comma || first_comma == cursor) {
+        const char* third_comma = second_comma ?
+                                      memchr(
+                                          second_comma + 1,
+                                          ',',
+                                          (size_t)(record_end - (second_comma + 1))) :
+                                      NULL;
+        if(!second_comma || !third_comma || first_comma == cursor ||
+           memchr(third_comma + 1, ',', (size_t)(record_end - (third_comma + 1)))) {
             cursor = record_end;
             continue;
         }
 
         uint16_t hp = 0U;
         uint16_t armor_class = 0U;
+        int8_t initiative_modifier = 0;
         if(!pocket_parse_launch_number(first_comma + 1, second_comma, 32767U, &hp) ||
-           !pocket_parse_launch_number(second_comma + 1, record_end, 32767U, &armor_class)) {
+           !pocket_parse_launch_number(second_comma + 1, third_comma, 32767U, &armor_class) ||
+           !pocket_parse_launch_i8(third_comma + 1, record_end, &initiative_modifier)) {
             cursor = record_end;
             continue;
         }
@@ -9244,7 +9902,7 @@ static uint8_t pocket_import_launch_party(PocketD20App* app, const char* launch_
         member->hp_current = (int16_t)hp;
         member->hp_max = (int16_t)hp;
         member->armor_class = (int16_t)armor_class;
-        member->initiative_modifier = 0;
+        member->initiative_modifier = initiative_modifier;
         ++added;
 
         cursor = record_end;
@@ -9275,7 +9933,9 @@ static PocketD20App* pocket_app_alloc(const char* launch_args) {
     memset(app, 0, sizeof(*app));
 
     app->gui = furi_record_open(RECORD_GUI);
+    if(!app->gui) goto fail;
     app->storage = furi_record_open(RECORD_STORAGE);
+    if(!app->storage) goto fail;
     bool profile_migration_ok =
         pocket_d20_storage_migrate_legacy_profiles(app->storage, &app->migrated_profile_files);
     /* Initiative launches need only the active character/profile. Avoid campaign
@@ -9355,7 +10015,7 @@ static PocketD20App* pocket_app_alloc(const char* launch_args) {
         pocket_set_status(app, "New character");
 
     /* Bestiary may append monster records directly to the launch argument:
-       initiative;Name,HP,AC;Name,HP,AC;...
+       initiative;Name,HP,AC,InitiativeMod;Name,HP,AC,InitiativeMod;...
        Import them into the current character's Party Roster, persist the
        character, then navigate to Initiative. No handoff files are involved. */
     if(initiative_launch) {
@@ -9366,56 +10026,91 @@ static PocketD20App* pocket_app_alloc(const char* launch_args) {
     }
 
     app->dispatcher = view_dispatcher_alloc();
+    if(!app->dispatcher) goto fail;
     view_dispatcher_set_event_callback_context(app->dispatcher, app);
     view_dispatcher_set_navigation_event_callback(app->dispatcher, pocket_navigation_callback);
     view_dispatcher_set_custom_event_callback(app->dispatcher, pocket_custom_event_callback);
     app->input_events = furi_record_open(RECORD_INPUT_EVENTS);
+    if(!app->input_events) goto fail;
     app->input_subscription =
         furi_pubsub_subscribe(app->input_events, pocket_input_events_callback, app);
+    if(!app->input_subscription) goto fail;
     app->dice_timer = furi_timer_alloc(pocket_dice_timer_callback, FuriTimerTypePeriodic, app);
+    if(!app->dice_timer) goto fail;
     app->autosave_timer = furi_timer_alloc(pocket_autosave_timer_callback, FuriTimerTypeOnce, app);
+    if(!app->autosave_timer) goto fail;
 
     app->main_view = view_alloc();
+    if(!app->main_view) goto fail;
     view_allocate_model(app->main_view, ViewModelTypeLockFree, sizeof(PocketD20App*));
     PocketD20App** model = view_get_model(app->main_view);
+    if(!model) goto fail;
     *model = app;
     view_commit_model(app->main_view, false);
     view_set_context(app->main_view, app);
     view_set_draw_callback(app->main_view, pocket_draw_callback);
     view_set_input_callback(app->main_view, pocket_input_callback);
 
+    if(furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS)) !=
+       FuriStatusOk)
+        goto fail;
     view_dispatcher_add_view(app->dispatcher, PocketViewMain, app->main_view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-    furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
     return app;
+
+fail:
+    if(app->input_subscription && app->input_events)
+        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
+    if(app->autosave_timer) furi_timer_free(app->autosave_timer);
+    if(app->dice_timer) furi_timer_free(app->dice_timer);
+    if(app->main_view) view_free(app->main_view);
+    if(app->dispatcher) view_dispatcher_free(app->dispatcher);
+    pocket_campaign_cache_reset();
+    pocket_catalog_release(app);
+    pocket_adventure_release(app);
+    pocket_d20_profiles_free(&app->profiles);
+    pocket_d20_data_clear(&app->data);
+    if(app->storage) furi_record_close(RECORD_STORAGE);
+    if(app->gui) furi_record_close(RECORD_GUI);
+    free(app);
+    return NULL;
 }
 
 static void pocket_app_free(PocketD20App* app) {
     furi_assert(app);
+
+    /* Quiesce asynchronous callbacks before any UI or app state is released. */
+    if(app->input_subscription && app->input_events) {
+        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+        app->input_subscription = NULL;
+    }
+    if(app->autosave_timer) furi_timer_stop(app->autosave_timer);
+    if(app->dice_timer) furi_timer_stop(app->dice_timer);
+
     pocket_flush_save(app, false);
     pocket_campaign_cache_reset();
     pocket_catalog_release(app);
     pocket_adventure_release(app);
-    if(app->number_input) view_dispatcher_remove_view(app->dispatcher, PocketViewNumberInput);
-    if(app->text_input) view_dispatcher_remove_view(app->dispatcher, PocketViewTextInput);
-    view_dispatcher_remove_view(app->dispatcher, PocketViewMain);
+
+    if(app->dispatcher && app->number_input)
+        view_dispatcher_remove_view(app->dispatcher, PocketViewNumberInput);
+    if(app->dispatcher && app->text_input)
+        view_dispatcher_remove_view(app->dispatcher, PocketViewTextInput);
+    if(app->dispatcher && app->main_view)
+        view_dispatcher_remove_view(app->dispatcher, PocketViewMain);
     if(app->text_input) text_input_free(app->text_input);
     if(app->number_input) number_input_free(app->number_input);
-    view_free(app->main_view);
-    if(app->autosave_timer) {
-        furi_timer_stop(app->autosave_timer);
-        furi_timer_free(app->autosave_timer);
-    }
-    furi_timer_stop(app->dice_timer);
-    furi_timer_free(app->dice_timer);
-    if(app->input_subscription)
-        furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->main_view) view_free(app->main_view);
+
+    if(app->autosave_timer) furi_timer_free(app->autosave_timer);
+    if(app->dice_timer) furi_timer_free(app->dice_timer);
     if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
-    view_dispatcher_free(app->dispatcher);
+    if(app->dispatcher) view_dispatcher_free(app->dispatcher);
     pocket_d20_profiles_free(&app->profiles);
     pocket_d20_data_clear(&app->data);
-    furi_record_close(RECORD_STORAGE);
-    furi_record_close(RECORD_GUI);
+    if(app->storage) furi_record_close(RECORD_STORAGE);
+    if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
 }
 

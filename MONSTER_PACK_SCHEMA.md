@@ -4,7 +4,7 @@ Monster pack schema 1 is stable as of application version 2.0. Compatible releas
 
 `id|name|challenge_eighths|xp|armor_class|hit_points|type|environment|source|role`
 
-Each ID maps to an `[id]` section in `statblocks.txt`. Required keys are `SizeAlignment`, `Speed`, `Abilities`, `Senses`, `Languages`, and `Actions`. Optional keys are `Skills`, `Defenses`, `Traits`, and `Extra`. Values are single-line UTF-8 text and should not exceed 191 bytes. `Abilities` contains six comma-separated integers in STR, DEX, CON, INT, WIS, CHA order.
+Each ID maps to an `[id]` section in `statblocks.txt`. Required keys are `SizeAlignment`, `Speed`, `Abilities`, `Senses`, `Languages`, and `Actions`. Optional keys are `Initiative`, `Skills`, `Defenses`, `Traits`, and `Extra`. Values are single-line UTF-8 text and should not exceed 191 bytes. `Abilities` contains six comma-separated integers in STR, DEX, CON, INT, WIS, CHA order. `Initiative` is the signed initiative modifier and should be supplied when the creature has an initiative modifier that is not simply its Dexterity modifier. If `Initiative` is omitted, the app derives initiative from Dexterity only when the ability data is known to be valid.
 
 IDs must remain stable and unique. New optional fields may be added without changing the schema. Any incompatible index or required-field change needs a new pack version and an explicit importer.
 
