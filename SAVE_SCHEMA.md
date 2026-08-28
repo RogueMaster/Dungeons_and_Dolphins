@@ -1,34 +1,36 @@
-# Save schema 3
+# Save and storage schema
 
-Schema 3 is the current writer. Schema 2 remains the permanent compatibility baseline. Character filenames remain `ch_{id}_{characterName}_{characterLevel}.txt` and each file contains the entire independent profile.
+## Ownership
 
-## Envelope
+Each FAP writes only its own app-data root:
 
-- The first record written by version 3.1 is `PocketD20Character=3`.
-- Records use ordered `key=value` lines.
-- Text uses percent escaping for control bytes, line breaks, carriage returns, and `%`.
-- Repeated collections use a count record followed by indexed records.
-- `End=OK` closes the canonical payload.
-- No checksum field is stored or required. Users may manually edit a file as long as its schema, ordered fields, values, counts, and closing `End=OK` remain valid.
+- DNDolphins: characters, active profile, spell/item sidecars, exports/archive.
+- DNDAdventure: active campaign, progress, direct custom campaigns and installed campaign registry/index.
+- DNDJournal: per-character journal entries.
+- DNDInitiative: party/initiative state.
+- DNDBestiary: favorites, recents, filters, encounters, custom monsters and installed monster packs.
 
-## Compatibility
+## DNDolphins
 
-- Readers dispatch by explicit schema number and reject unknown versions rather than guessing field meanings.
-- Schema 2 is the oldest supported version in 3.1. Future releases must retain its reader and migration harness before publishing a newer schema.
-- Schema 2 files are validated before their ordered records are parsed.
-- On first successful schema-2 load, the exact file is copied to `custom_migration_{profile}.rollback`, parsed again, and only then rewritten through the normal schema-3 transaction.
-- The published schema-3 file is reloaded and structurally validated. Any write, rename, or reload failure restores the schema-2 snapshot to the original primary path.
-- **Rollback Migration** restores the retained schema-2 snapshot transactionally and keeps the schema-3 generation as `custom_migration_{profile}.forward`.
-- A failed primary load attempts the retained backup. If neither validates and a profile file exists, the app preserves every file and refuses to autosave a blank replacement.
-- A fresh character is created only when no profile files exist.
-- Legacy asset-path profiles are relocated into persistent app data only when the destination file and profile ID are absent. Existing app-data files are authoritative and never overwritten; the legacy source is removed only after the destination is safely present.
+Primary character files are named `ch_{id}_{safeName}_{level}.txt`. Recognized fields load independently and unknown fields are ignored; a readable file is not rejected solely because no body field is recognized by the current build. Character `.shd` files are write-only history and are never used as live input.
 
-## Data groups
+Level progression adds no new persisted schema. Derived resource maxima are synchronized into existing fields, and deterministic fixed feature/spell grants use the existing feature records and spell sidecar fields. Progression metadata is read only during a level-gain operation and is never stored as a hash/signature/checksum. Choice-based level-up outcomes remain explicit user selections rather than new implicit save state.
 
-The ordered payload covers identity and builder fields; adventure state; multiclass and spellcasting data; abilities, saves, skills, and vitals; currency; spells; features and resources; inventory and weapons; languages; journal and milestones; party presets including HP and AC; active initiative; combat-sheet state; structured grants; attack templates; and encounter history.
+Owned spells and items live in character-specific sidecars. Only one aligned page of up to eight records is resident at a time. Collection-wide operations stream the sidecar rather than allocating all records. Current-level `.swd` snapshots are write history; live `.txt` sidecars remain authoritative.
 
-## Transfer folders
+Starting inventory is not a character-creation side effect. On first Inventory open, if the live item sidecar is missing or contains no valid item records, the Items module requests class/species/background rows plus one hidden d100 trinket and applies any starting currency once.
 
-- `exports/` contains user-transferable complete character files.
-- `archive/` contains profiles removed from the active list without deletion.
-- Import reads the first valid exported text file, assigns a new profile ID, and writes it through the normal atomic-save path.
+## Adventure
+
+Campaign progress is DNDAdventure-owned and stores campaign ID, scene/checkpoint, quest flags and achievements in its own text files. Milestones are journaled after the corresponding guard is saved so replaying a guarded reward does not intentionally duplicate it.
+
+## Bestiary custom monsters
+
+Custom monsters use:
+
+- `/ext/apps_data/dndbestiary/monsters/custom_index.txt`
+- `/ext/apps_data/dndbestiary/monsters/custom_statblocks.txt`
+
+If neither exists, Bestiary may seed both from bundled default-custom assets. If either user file already exists, the seed does nothing. Existing recovery/transaction logic remains authoritative for user custom edits.
+
+No campaign, Bestiary, Journal or Initiative state is serialized into the core character file.

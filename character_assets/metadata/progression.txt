@@ -1,0 +1,173 @@
+# Deterministic level progression only.
+# stable_id|scope|owner|level|kind|value|spell_level|free_casts
+# Choice outcomes (subclasses, feats/ASI choices, fighting-style choice, learned-spell choices,
+# invocation/metamagic selections, etc.) are intentionally not selected here.
+prog-barbarian-rage|class|Barbarian|1|feature|Rage|0|0
+prog-barbarian-unarmored-defense|class|Barbarian|1|feature|Unarmored Defense|0|0
+prog-barbarian-weapon-mastery|class|Barbarian|1|feature|Weapon Mastery|0|0
+prog-barbarian-reckless-attack|class|Barbarian|2|feature|Reckless Attack|0|0
+prog-barbarian-danger-sense|class|Barbarian|2|feature|Danger Sense|0|0
+prog-barbarian-primal-knowledge|class|Barbarian|3|feature|Primal Knowledge|0|0
+prog-barbarian-extra-attack|class|Barbarian|5|feature|Extra Attack|0|0
+prog-barbarian-fast-movement|class|Barbarian|5|feature|Fast Movement|0|0
+prog-barbarian-feral-instinct|class|Barbarian|7|feature|Feral Instinct|0|0
+prog-barbarian-instinctive-pounce|class|Barbarian|7|feature|Instinctive Pounce|0|0
+prog-barbarian-brutal-strike|class|Barbarian|9|feature|Brutal Strike|0|0
+prog-barbarian-relentless-rage|class|Barbarian|11|feature|Relentless Rage|0|0
+prog-barbarian-improved-brutal-strike|class|Barbarian|13|feature|Improved Brutal Strike|0|0
+prog-barbarian-persistent-rage|class|Barbarian|15|feature|Persistent Rage|0|0
+prog-barbarian-indomitable-might|class|Barbarian|18|feature|Indomitable Might|0|0
+prog-barbarian-primal-champion|class|Barbarian|20|feature|Primal Champion|0|0
+prog-bard-bardic-inspiration|class|Bard|1|feature|Bardic Inspiration|0|0
+prog-bard-spellcasting|class|Bard|1|feature|Spellcasting|0|0
+prog-bard-expertise|class|Bard|2|feature|Expertise|0|0
+prog-bard-jack-of-all-trades|class|Bard|2|feature|Jack of All Trades|0|0
+prog-bard-font-of-inspiration|class|Bard|5|feature|Font of Inspiration|0|0
+prog-bard-countercharm|class|Bard|7|feature|Countercharm|0|0
+prog-bard-magical-secrets|class|Bard|10|feature|Magical Secrets|0|0
+prog-bard-superior-inspiration|class|Bard|18|feature|Superior Inspiration|0|0
+prog-bard-words-of-creation|class|Bard|20|feature|Words of Creation|0|0
+prog-cleric-spellcasting|class|Cleric|1|feature|Spellcasting|0|0
+prog-cleric-divine-order|class|Cleric|1|feature|Divine Order|0|0
+prog-cleric-channel-divinity|class|Cleric|2|feature|Channel Divinity|0|0
+prog-cleric-sear-undead|class|Cleric|5|feature|Sear Undead|0|0
+prog-cleric-blessed-strikes|class|Cleric|7|feature|Blessed Strikes|0|0
+prog-cleric-divine-intervention|class|Cleric|10|feature|Divine Intervention|0|0
+prog-cleric-improved-blessed-strikes|class|Cleric|14|feature|Improved Blessed Strikes|0|0
+prog-cleric-greater-divine-intervention|class|Cleric|20|feature|Greater Divine Intervention|0|0
+prog-druid-druidic|class|Druid|1|feature|Druidic|0|0
+prog-druid-spellcasting|class|Druid|1|feature|Spellcasting|0|0
+prog-druid-primal-order|class|Druid|1|feature|Primal Order|0|0
+prog-druid-speak-with-animals|class|Druid|1|spell|Speak with Animals|1|0
+prog-druid-wild-shape|class|Druid|2|feature|Wild Shape|0|0
+prog-druid-wild-companion|class|Druid|2|feature|Wild Companion|0|0
+prog-druid-wild-resurgence|class|Druid|5|feature|Wild Resurgence|0|0
+prog-druid-elemental-fury|class|Druid|7|feature|Elemental Fury|0|0
+prog-druid-improved-elemental-fury|class|Druid|15|feature|Improved Elemental Fury|0|0
+prog-druid-beast-spells|class|Druid|18|feature|Beast Spells|0|0
+prog-druid-archdruid|class|Druid|20|feature|Archdruid|0|0
+prog-fighter-second-wind|class|Fighter|1|feature|Second Wind|0|0
+prog-fighter-fighting-style|class|Fighter|1|feature|Fighting Style|0|0
+prog-fighter-weapon-mastery|class|Fighter|1|feature|Weapon Mastery|0|0
+prog-fighter-action-surge|class|Fighter|2|feature|Action Surge|0|0
+prog-fighter-tactical-mind|class|Fighter|2|feature|Tactical Mind|0|0
+prog-fighter-extra-attack|class|Fighter|5|feature|Extra Attack|0|0
+prog-fighter-tactical-shift|class|Fighter|5|feature|Tactical Shift|0|0
+prog-fighter-indomitable|class|Fighter|9|feature|Indomitable|0|0
+prog-fighter-tactical-master|class|Fighter|9|feature|Tactical Master|0|0
+prog-fighter-studied-attacks|class|Fighter|13|feature|Studied Attacks|0|0
+prog-fighter-two-extra-attacks|class|Fighter|11|feature|Two Extra Attacks|0|0
+prog-fighter-three-extra-attacks|class|Fighter|20|feature|Three Extra Attacks|0|0
+prog-monk-martial-arts|class|Monk|1|feature|Martial Arts|0|0
+prog-monk-unarmored-defense|class|Monk|1|feature|Unarmored Defense|0|0
+prog-monk-monks-focus|class|Monk|2|feature|Monk's Focus|0|0
+prog-monk-unarmored-movement|class|Monk|2|feature|Unarmored Movement|0|0
+prog-monk-uncanny-metabolism|class|Monk|2|feature|Uncanny Metabolism|0|0
+prog-monk-deflect-attacks|class|Monk|3|feature|Deflect Attacks|0|0
+prog-monk-slow-fall|class|Monk|4|feature|Slow Fall|0|0
+prog-monk-extra-attack|class|Monk|5|feature|Extra Attack|0|0
+prog-monk-stunning-strike|class|Monk|5|feature|Stunning Strike|0|0
+prog-monk-empowered-strikes|class|Monk|6|feature|Empowered Strikes|0|0
+prog-monk-evasion|class|Monk|7|feature|Evasion|0|0
+prog-monk-acrobatic-movement|class|Monk|9|feature|Acrobatic Movement|0|0
+prog-monk-heightened-focus|class|Monk|10|feature|Heightened Focus|0|0
+prog-monk-self-restoration|class|Monk|10|feature|Self-Restoration|0|0
+prog-monk-deflect-energy|class|Monk|13|feature|Deflect Energy|0|0
+prog-monk-disciplined-survivor|class|Monk|14|feature|Disciplined Survivor|0|0
+prog-monk-perfect-focus|class|Monk|15|feature|Perfect Focus|0|0
+prog-monk-superior-defense|class|Monk|18|feature|Superior Defense|0|0
+prog-monk-body-and-mind|class|Monk|20|feature|Body and Mind|0|0
+prog-paladin-lay-on-hands|class|Paladin|1|feature|Lay on Hands|0|0
+prog-paladin-spellcasting|class|Paladin|1|feature|Spellcasting|0|0
+prog-paladin-weapon-mastery|class|Paladin|1|feature|Weapon Mastery|0|0
+prog-paladin-paladins-smite|class|Paladin|2|feature|Paladin's Smite|0|0
+prog-paladin-fighting-style|class|Paladin|2|feature|Fighting Style|0|0
+prog-paladin-channel-divinity|class|Paladin|3|feature|Channel Divinity|0|0
+prog-paladin-extra-attack|class|Paladin|5|feature|Extra Attack|0|0
+prog-paladin-faithful-steed|class|Paladin|5|feature|Faithful Steed|0|0
+prog-paladin-find-steed|class|Paladin|5|spell|Find Steed|2|1
+prog-paladin-abjure-foes|class|Paladin|9|feature|Abjure Foes|0|0
+prog-paladin-divine-smite|class|Paladin|2|spell|Divine Smite|1|1
+prog-paladin-aura-protection|class|Paladin|6|feature|Aura of Protection|0|0
+prog-paladin-aura-courage|class|Paladin|10|feature|Aura of Courage|0|0
+prog-paladin-radiant-strikes|class|Paladin|11|feature|Radiant Strikes|0|0
+prog-paladin-restoring-touch|class|Paladin|14|feature|Restoring Touch|0|0
+prog-paladin-aura-expansion|class|Paladin|18|feature|Aura Expansion|0|0
+prog-ranger-favored-enemy|class|Ranger|1|feature|Favored Enemy|0|0
+prog-ranger-hunters-mark|class|Ranger|1|spell|Hunter's Mark|1|2
+prog-ranger-hunters-mark-5|class|Ranger|5|spell|Hunter's Mark|1|3
+prog-ranger-hunters-mark-9|class|Ranger|9|spell|Hunter's Mark|1|4
+prog-ranger-hunters-mark-13|class|Ranger|13|spell|Hunter's Mark|1|5
+prog-ranger-hunters-mark-17|class|Ranger|17|spell|Hunter's Mark|1|6
+prog-ranger-spellcasting|class|Ranger|1|feature|Spellcasting|0|0
+prog-ranger-weapon-mastery|class|Ranger|1|feature|Weapon Mastery|0|0
+prog-ranger-deft-explorer|class|Ranger|2|feature|Deft Explorer|0|0
+prog-ranger-fighting-style|class|Ranger|2|feature|Fighting Style|0|0
+prog-ranger-extra-attack|class|Ranger|5|feature|Extra Attack|0|0
+prog-ranger-roving|class|Ranger|6|feature|Roving|0|0
+prog-ranger-tireless|class|Ranger|10|feature|Tireless|0|0
+prog-ranger-expertise|class|Ranger|9|feature|Expertise|0|0
+prog-ranger-natures-veil|class|Ranger|14|feature|Nature's Veil|0|0
+prog-ranger-precise-hunter|class|Ranger|17|feature|Precise Hunter|0|0
+prog-ranger-feral-senses|class|Ranger|18|feature|Feral Senses|0|0
+prog-ranger-relentless-hunter|class|Ranger|13|feature|Relentless Hunter|0|0
+prog-ranger-foe-slayer|class|Ranger|20|feature|Foe Slayer|0|0
+prog-rogue-expertise|class|Rogue|1|feature|Expertise|0|0
+prog-rogue-sneak-attack|class|Rogue|1|feature|Sneak Attack|0|0
+prog-rogue-thieves-cant|class|Rogue|1|feature|Thieves' Cant|0|0
+prog-rogue-weapon-mastery|class|Rogue|1|feature|Weapon Mastery|0|0
+prog-rogue-cunning-action|class|Rogue|2|feature|Cunning Action|0|0
+prog-rogue-steady-aim|class|Rogue|3|feature|Steady Aim|0|0
+prog-rogue-cunning-strike|class|Rogue|5|feature|Cunning Strike|0|0
+prog-rogue-uncanny-dodge|class|Rogue|5|feature|Uncanny Dodge|0|0
+prog-rogue-evasion|class|Rogue|7|feature|Evasion|0|0
+prog-rogue-reliable-talent|class|Rogue|7|feature|Reliable Talent|0|0
+prog-rogue-improved-cunning-strike|class|Rogue|11|feature|Improved Cunning Strike|0|0
+prog-rogue-devious-strikes|class|Rogue|14|feature|Devious Strikes|0|0
+prog-rogue-slippery-mind|class|Rogue|15|feature|Slippery Mind|0|0
+prog-rogue-elusive|class|Rogue|18|feature|Elusive|0|0
+prog-rogue-stroke-of-luck|class|Rogue|20|feature|Stroke of Luck|0|0
+prog-sorcerer-spellcasting|class|Sorcerer|1|feature|Spellcasting|0|0
+prog-sorcerer-innate-sorcery|class|Sorcerer|1|feature|Innate Sorcery|0|0
+prog-sorcerer-font-of-magic|class|Sorcerer|2|feature|Font of Magic|0|0
+prog-sorcerer-sorcerous-restoration|class|Sorcerer|5|feature|Sorcerous Restoration|0|0
+prog-sorcerer-metamagic|class|Sorcerer|2|feature|Metamagic|0|0
+prog-sorcerer-sorcery-incarnate|class|Sorcerer|7|feature|Sorcery Incarnate|0|0
+prog-sorcerer-arcane-apotheosis|class|Sorcerer|20|feature|Arcane Apotheosis|0|0
+prog-warlock-pact-magic|class|Warlock|1|feature|Pact Magic|0|0
+prog-warlock-eldritch-invocations|class|Warlock|1|feature|Eldritch Invocations|0|0
+prog-warlock-magical-cunning|class|Warlock|2|feature|Magical Cunning|0|0
+prog-warlock-mystic-arcanum|class|Warlock|11|feature|Mystic Arcanum|0|0
+prog-warlock-contact-patron|class|Warlock|9|feature|Contact Patron|0|0
+prog-warlock-eldritch-master|class|Warlock|20|feature|Eldritch Master|0|0
+prog-wizard-spellcasting|class|Wizard|1|feature|Spellcasting|0|0
+prog-wizard-ritual-adept|class|Wizard|1|feature|Ritual Adept|0|0
+prog-wizard-arcane-recovery|class|Wizard|1|feature|Arcane Recovery|0|0
+prog-wizard-spellbook|class|Wizard|1|feature|Spellbook|0|0
+prog-wizard-scholar|class|Wizard|2|feature|Scholar|0|0
+prog-wizard-memorize-spell|class|Wizard|5|feature|Memorize Spell|0|0
+prog-wizard-spell-mastery|class|Wizard|18|feature|Spell Mastery|0|0
+prog-wizard-signature-spells|class|Wizard|20|feature|Signature Spells|0|0
+prog-aasimar-light|species|Aasimar|1|spell|Light|0|0
+prog-aasimar-celestial-revelation|species|Aasimar|3|feature|Celestial Revelation|0|0
+prog-drow-dancing-lights|species|Drow Elf|1|spell|Dancing Lights|0|0
+prog-drow-faerie-fire|species|Drow Elf|3|spell|Faerie Fire|1|1
+prog-drow-darkness|species|Drow Elf|5|spell|Darkness|2|1
+prog-high-elf-prestidigitation|species|High Elf|1|spell|Prestidigitation|0|0
+prog-high-elf-detect-magic|species|High Elf|3|spell|Detect Magic|1|1
+prog-high-elf-misty-step|species|High Elf|5|spell|Misty Step|2|1
+prog-wood-elf-druidcraft|species|Wood Elf|1|spell|Druidcraft|0|0
+prog-wood-elf-longstrider|species|Wood Elf|3|spell|Longstrider|1|1
+prog-wood-elf-pass-without-trace|species|Wood Elf|5|spell|Pass without Trace|2|1
+prog-abyssal-tiefling-poison-spray|species|Abyssal Tiefling|1|spell|Poison Spray|0|0
+prog-abyssal-tiefling-thaumaturgy|species|Abyssal Tiefling|1|spell|Thaumaturgy|0|0
+prog-abyssal-tiefling-ray-sickness|species|Abyssal Tiefling|3|spell|Ray of Sickness|1|1
+prog-abyssal-tiefling-hold-person|species|Abyssal Tiefling|5|spell|Hold Person|2|1
+prog-chthonic-tiefling-chill-touch|species|Chthonic Tiefling|1|spell|Chill Touch|0|0
+prog-chthonic-tiefling-thaumaturgy|species|Chthonic Tiefling|1|spell|Thaumaturgy|0|0
+prog-chthonic-tiefling-false-life|species|Chthonic Tiefling|3|spell|False Life|1|1
+prog-chthonic-tiefling-ray-enfeeblement|species|Chthonic Tiefling|5|spell|Ray of Enfeeblement|2|1
+prog-infernal-tiefling-fire-bolt|species|Infernal Tiefling|1|spell|Fire Bolt|0|0
+prog-infernal-tiefling-thaumaturgy|species|Infernal Tiefling|1|spell|Thaumaturgy|0|0
+prog-infernal-tiefling-hellish-rebuke|species|Infernal Tiefling|3|spell|Hellish Rebuke|1|1
+prog-infernal-tiefling-darkness|species|Infernal Tiefling|5|spell|Darkness|2|1

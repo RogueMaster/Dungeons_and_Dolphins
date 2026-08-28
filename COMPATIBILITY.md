@@ -1,15 +1,11 @@
-# Compatibility matrix
+# Compatibility
 
-| Environment | Status | Notes |
-|---|---|---|
-| Flipper Zero | Target | 128x64 screen and five-way buttons; physical verification remains pending |
-| RogueMaster branch 420 | Recipient verification pending | Source passes local strict host compilation; this source-only patch was not rebuilt with the firmware toolchain |
-| Official firmware | Not verified | May require manifest/API adjustments |
-| Momentum firmware | Not verified | May require manifest/API adjustments |
-| SD card present | Required for persistence | Bundled references use app assets; profiles and other mutable user state use persistent app data |
-| No SD card / removed SD | Unsupported for saves | App reports save/load failure; device behavior remains in the hardware matrix |
-| Schema 1 | Unsupported | Outside the supported compatibility baseline |
-| Schema 2 | Supported | Readable text format with complete party presets |
-| Unknown schemas | Preserved, not loaded | Files remain untouched and cannot be replaced by a blank autosave; future versions must add an explicit migration branch |
-
-The source-only release does not bundle a compiled FAP. Build both targets using the command in `README.md`.
+- Character files load best-effort by field name. A readable character file is not rejected merely because every body field is unknown to the current build; filename metadata and sanitized defaults remain usable while unknown fields are ignored.
+- Standard-array defaults apply only when a new character object is initialized; existing saved ability scores are never replaced by the new defaults.
+- Level-progression synchronization derives from existing class/species/level state and writes only existing character/feature/spell fields, so it requires no save migration. Fixed-grant metadata is best-effort and used only by the explicit level-1 **Grant Initial Traits** action or an actual level increase; it is not consulted to accept/reject an existing save.
+- Current spell/item sidecars remain authoritative; historical SWD/SHD files are not used as live collection/character state.
+- Journal, Adventure, Initiative and Bestiary keep independent storage ownership.
+- Pack text is intentionally editable and has no checksum requirement.
+- The default Dolphin/Capybara custom seed runs only when no user custom monster files exist, so upgrades do not replace an existing custom pack.
+- Ghost Protocol uses the existing campaign schema and therefore requires no progress-file conversion.
+- Save structure changes are avoided unless new information truly must be persisted.

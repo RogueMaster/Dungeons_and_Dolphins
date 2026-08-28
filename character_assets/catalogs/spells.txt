@@ -1,5 +1,5 @@
 # Dungeons & Dolphins complete SRD 5.2.1 spell catalog.
-# Format: Spell|Level|Class, Class
+# Format: Spell|Level|Class, Class|School|Ritual|Source (last three optional)
 # Forgotten Realms: Heroes of Faerun - 19 spell names only
 # Ravenloft: The Undead expanded spell-list names; the source adds no dedicated spell chapter
 # Xanathar's Guide to Everything - all 95 chapter 3 spell names only

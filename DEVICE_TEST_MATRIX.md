@@ -1,40 +1,62 @@
-# Physical-device qualification matrix
+# Device test matrix
 
-This is the complete 2.7 hardware procedure. Compiler and automated validation are performed before packaging. A row remains `Pending hardware` until it is performed on a physical Flipper Zero; build success is never substituted for device evidence.
+## Launch and handoff
 
-Record device serial suffix, SD-card model/capacity, battery level, firmware commit, operator, date, observed result, and any issue ID for every run.
+- [ ] Launch each FAP directly.
+- [ ] Cycle DNDolphins → Bestiary → Initiative → DNDolphins repeatedly.
+- [ ] Cycle DNDolphins → Journal/Adventure → DNDolphins repeatedly.
+- [ ] Confirm active-character fallback and teardown-before-launch behavior.
 
-| ID | Area | Setup and action | Expected result | 2.7 status |
-|---|---|---|---|---|
-| CTRL-01 | Navigation | Visit every Home destination; use Up/Down, short OK, and Back. | Selection remains visible, screens open once, Back returns one level, Home Back autosaves and exits. | Pending hardware |
-| CTRL-02 | Long press | Exercise long OK/Left/Right on profiles, catalogs, Dolphin Bestiary, adventure, initiative, and dice. | Only documented alternate action fires; short action does not also fire. | Pending hardware |
-| CTRL-03 | Editors | Edit every attack-template and structured-grant field, exit, reopen, and reboot. | Values autosave, display correctly, and survive reboot. | Pending hardware |
-| DISP-01 | Truncation | Enter maximum-length character, item, spell, grant, monster, campaign, and participant text. | Rows remain navigable; labels and numeric values remain distinguishable; no drawing outside 128x64. | Pending hardware |
-| DISP-02 | Core stats | Inspect passive statistics, all six saves, all 18 grouped skills, spell attack/DC, and initiative. | Every label/value is visible or predictably abbreviated with no overlap. | Pending hardware |
-| DISP-03 | Animation | Roll 1, 2, 10, and 20 dice; roll weapon damage and page results. | Animation completes; every die, dice sum, modifier, and total can be reviewed. | Pending hardware |
-| DISP-04 | Icon/sprites | Inspect launcher icon, campaign sprites, monster lists, and diagnostics. | 10x10 icon is crisp; rows and monochrome sprites render without corruption. | Pending hardware |
-| SD-01 | Removal while idle | Remove SD on Home, edit a value, navigate through several screens. | App remains responsive, enters read-only fallback, and shows a persistent UNSAVED warning. | Pending hardware |
-| SD-02 | Removal during save | Remove SD immediately after a rapid value change. | Save failure is detected; in-memory state remains usable; no false Saved message appears. | Pending hardware |
-| SD-03 | Retry | Reinsert SD and select Home > Retry Save / Status. | Read-only mode clears only after success; pending character state is written and warning disappears. | Pending hardware |
-| SD-04 | Removal during reads | Remove SD while opening a catalog, campaign, monster, profile list, and language pack. | Each operation fails with a clear status and returns safely without stale pointers or a crash. | Pending hardware |
-| PWR-01 | Character interruption | Cut power during character temp-file write and again during publish. | Original or complete new generation loads; backup restore remains available; no partial record is accepted. | Pending hardware |
-| PWR-02 | Monster interruption | Cut power during custom block update, index rewrite, and delete. | Transaction recovery completes or rolls back; stable ID survives; bundled records are untouched. | Pending hardware |
-| PWR-03 | Campaign interruption | Cut power during campaign progress replacement. | Previous progress backup or complete new progress loads; scene/checkpoint/flags are internally consistent. | Pending hardware |
-| MEM-01 | Repeated allocation | Run 100 cycles opening/closing character catalogs, profiles, campaign scenes, bestiary pages, stat blocks, and generated encounters. | Every buffer is released on exit; responsiveness and available heap stabilize. | Pending hardware |
-| MEM-02 | Largest data | Repeatedly page through the largest spell/item catalogs and the 340-monster browser in 20-record windows. | No out-of-memory error, reboot, frozen input, or progressive heap loss. | Pending hardware |
-| MEM-03 | Forced low heap | With other memory-heavy firmware services active, open catalogs, language pack, monster detail, and encounter transfer. | Allocation failure is reported and control returns safely; existing data is not changed. | Pending hardware |
-| LONG-01 | Long session | Keep the app open for 4 hours; perform at least 250 edits/rolls and 50 screen cycles. | Input remains responsive, saves remain valid, and heap readings do not show unbounded decline. | Pending hardware |
-| PROF-01 | Profiles | Create, switch, duplicate, rename, export, import, archive, restore, and delete profiles. | Separate character, campaign progress, inventory, party preset, and initiative state remain isolated. | Pending hardware |
-| PACK-01 | User packs | Install valid and intentionally broken monster/campaign/language packs. | Valid packs work; diagnostics identify exact invalid IDs/files/links; bundled assets remain read-only. | Pending hardware |
+## Character / Inventory / Spells
 
-## Automated qualification for 2.7
+- [ ] Create a character and confirm STR/DEX/CON/INT/WIS/CHA start at 15/14/13/12/10/8; edit them and confirm existing/save-loaded scores are not overwritten by defaults.
+- [ ] On both first launch with no characters and **Create Character**, confirm Class and Species start unconfirmed and no fixed features/spells are granted. Rename the character, choose Species and choose Wizard; confirm no Fighter traits appear.
+- [ ] Select **Grant Initial Traits** at level 1 and confirm the chosen class/species deterministic traits are added. Select it again and confirm no duplicates. Verify it refuses default names, unconfirmed Class/Species and characters above level 1.
+- [ ] Increase total level across proficiency thresholds and confirm PB changes at 5/9/13/17 while multiclass levels contribute to the same total.
+- [ ] Increase/decrease class levels and confirm per-class Hit Dice maxima follow class level while already-spent Hit Dice are preserved.
+- [ ] Test full-caster and Paladin/Ranger multiclass combinations: shared slot maxima follow combined caster level while each class keeps its own cantrip/prepared limit.
+- [ ] Test Warlock level thresholds for Pact slot count/level and Mystic Arcanum availability; test Sorcerer level 2+ for Sorcery Point maximum.
+- [ ] Test Wizard level increases: minimum spellbook capacity rises by two per Wizard level after 1 and never deletes/copied extra spells when the level is reduced.
+- [ ] Cross fixed class-feature progression thresholds and confirm grants are added once with no duplicates; reload the same profile repeatedly and confirm ordinary loads do not rescan or mutate progression state.
+- [ ] Exercise ordinary non-progression screens, profile switches and repeated saves after a successful level-up; confirm none opens progression metadata. Increase a class level and confirm the bounded eight-line scan reconciles every fixed class/species grant currently due.
+- [ ] Verify fixed grant spells such as Divine Smite/Find Steed/Hunter's Mark update the existing spell record rather than duplicating it; Hunter's Mark free-cast maximum scales at its configured Ranger thresholds and Long Rest restores current free casts.
+- [ ] For a supported level-gated species spell lineage, cross total-character-level 3 and 5 using both single-class and multiclass characters; confirm fixed spells/features grant once and Long Rest restores configured free casts.
+- [ ] Confirm progression never auto-selects a subclass, ASI/feat, learned-spell choice, Fighting Style option, invocation, metamagic option or other player choice.
+- [ ] Load a readable character file containing only unknown/future body fields and confirm the profile remains usable with filename/default fallback rather than being rejected wholesale.
+- [ ] Create a character and confirm no inventory exists until Inventory is opened.
+- [ ] Inventory opened before Class/Species confirmation remains usable but does not seed defaults. After both choices are confirmed, first Inventory open seeds class/species/background equipment plus exactly one hidden d100 trinket; repeat with a header-only/record-empty item sidecar and confirm it is repaired instead of opening empty.
+- [ ] Reopen Inventory and confirm no duplicate starting items/currency.
+- [ ] Resources and Weapon Attacks do not create missing inventory.
+- [ ] In Spellbook, OK on **+ Add New** opens a blank spell editor; OK on **Name** opens allowed spells, selecting a name updates that same record, and the spell remains after reopening the app.
+- [ ] For a multiclass character, the default allowed-spell catalog is the union of eligible spells for every class at each class's own level; the Class filter narrows to one class and selected spells get an eligible Source class.
+- [ ] In Inventory, OK on **+ Add New** opens a blank item editor; OK on **Name** opens the item catalog, selecting a name updates that same record, and the item remains after reopening the app.
+- [ ] Repeat both Add tests with a sidecar containing valid records followed by a malformed/truncated trailing line; valid records remain visible and the newly appended record opens directly in its editor without a post-append reread.
+- [ ] Hold OK on the **Name** row in Spellbook/Inventory opens custom text entry.
+- [ ] Simulate/retry after an SD write failure and confirm an interrupted append does not leave a partial spell/item record.
+- [ ] Exercise >8 items and >8 spells across page boundaries.
+- [ ] Verify spell attack/DC, slots/Pact/points and weapon attack/damage behavior.
 
-| Check | Expected | Status |
-|---|---|---|
-| Host rules/parser/catalog/package suite | All assertions pass | Passed |
-| RogueMaster dual-FAP compile and link | No warnings or errors | Passed |
-| Firmware API validation | API 88.4 accepted | Passed |
-| FAP metadata, packaged assets, FASTFAP, APPCHK | All stages complete | Passed |
-| Source archive policy | No `dist`, FAP, ELF, object, or cache output | Passed |
+## Adventure
 
-Physical results must be entered only by the operator who ran them. A failed row blocks a stable hardware-qualified release until its issue is fixed and the row is rerun.
+- [ ] Reef Wardens loads and completes.
+- [ ] Ghost Protocol appears as bundled content and loads `audit_brief`.
+- [ ] Exercise successful and failed checks through several branches.
+- [ ] Confirm rewards are granted once when guarded and milestone journaling does not intentionally duplicate.
+- [ ] Confirm Ghost Protocol contains no external/device-operation dependency.
+
+## Bestiary
+
+- [ ] Fresh app data: Dolphin and Capybara appear as custom monsters after first launch.
+- [ ] Existing custom pack: launch does not replace or merge the default seed.
+- [ ] Partial custom files: launch preserves them for existing recovery/manual repair behavior.
+- [ ] View/edit/delete custom monsters, install/enable packs and generate encounters.
+- [ ] Open every monster-stat field with OK and confirm the full-screen reader wraps at up to 26 characters without truncating text or miscounting scroll lines.
+- [ ] Send individual and generated monsters to Initiative.
+
+## Stress
+
+- [ ] Inspect long selected/unselected rows in all five FAPs and confirm full-width rows display or marquee exactly 26 characters without drawing beyond the screen; verify compact sprite/numeric layouts remain intact.
+- [ ] Repeated launch/back cycles without heap growth or crash.
+- [ ] Large profile and Journal counts.
+- [ ] Large monster/campaign indexes.
+- [ ] Maximum-size encounter save/rename/delete paths.

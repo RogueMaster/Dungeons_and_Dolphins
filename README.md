@@ -4,113 +4,134 @@
 &nbsp;<a href='https://www.patreon.com/RogueMaster?filters[tag]=Latest%20Release' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Patreon.png"  alt='Latest PATREON Release' title='Latest PATREON Release'></a>
 &nbsp;<a href='https://github.com/RogueMaster/awesome-flipperzero-withModules' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Resources.png"  alt='More Research / Assets' title='More Research / Assets'></a></h1>
 
-# Dungeons & Dolphins
+# DNDolphins
 
-Dungeons & Dolphins 3.2.7 is an offline 5E-compatible toolkit for Flipper Zero. The source tree builds two independent applications:
+Offline 5E-compatible tools for Flipper Zero, split into five FAPs so each workflow owns its data and runtime memory.
 
-- **Dungeons & Dolphins** — character management, spells, inventory, dice, combat, initiative, journal, and campaigns.
-- **Dolphin Bestiary** — monster browsing, custom monsters, encounters, saved encounters, and initiative handoff.
+## Apps
+
+| App | Purpose | Writable root |
+|---|---|---|
+| DNDolphins | Characters, spells, inventory, dice and character combat | `/ext/apps_data/dndolphins/` |
+| DNDAdventure | Campaigns, checks, rewards, milestones and campaign packs | `/ext/apps_data/dndadventure/` |
+| DNDJournal | Per-character notes and Adventure milestone history | `/ext/apps_data/dndjournal/` |
+| DNDInitiative | Party roster, initiative, rounds, HP/AC and conditions | `/ext/apps_data/dndinitiative/` |
+| DNDBestiary | Monsters, custom monsters, packs and encounters | `/ext/apps_data/dndbestiary/` |
+
+Cross-app launches use explicit `/ext/apps/Games/*.fap` paths. The outgoing app tears down its views, callbacks, services, caches and heap state before Loader starts the next FAP. Journal, Adventure and Initiative use the active character when launched directly; Bestiary remains usable without a character.
 
 ## Features
 
-### Character management
+### Characters
 
 - Multiple independent character profiles stored as readable, manually editable text files.
-- Automatic saving with backup, validation, recovery, import, export, duplicate, rename, archive, and delete controls; Retry Save appears only after a write failure.
-- Multiclass characters with up to four classes, subclasses, class levels, Hit Dice, and class-linked features.
-- Ability scores, saving throws, all 18 skills, proficiency, expertise, miscellaneous modifiers, and passive scores.
-- HP, temporary HP, AC, speed, initiative, exhaustion, death saves, inspiration, experience, and milestones.
-- Species, background, alignment, languages, feats, tools, armor training, weapon training, size, senses, and proficiencies.
+- Best-effort named-field loading: unknown, reordered, missing or individually malformed fields do not invalidate otherwise usable character data.
+- Automatic saves plus import, export, duplicate, rename, archive, delete, retry and write-only shadow history.
+- Multiclass characters with class levels, subclasses, Hit Dice and class-linked feature handling.
+- New characters start from the standard array **15, 14, 13, 12, 10, 8** in STR/DEX/CON/INT/WIS/CHA order; every score remains editable and existing saves are unchanged.
+- Deterministic level progression synchronizes proficiency, per-class Hit Dice, caster limits/resources and fixed class/species grants without silently choosing player-choice rewards. New characters start with unconfirmed Class/Species placeholders; after naming and choosing both, **Grant Initial Traits** explicitly applies duplicate-safe level-1 grants. Later scans run only when a level is gained, and progression metadata is not retained in memory.
+- Ability scores, saving throws, skills, proficiency/expertise, passive scores and miscellaneous modifiers.
+- HP, temporary HP, AC, speed, initiative, exhaustion, death saves, inspiration, XP and milestones.
+- Species, background, alignment, languages, feats, tools, armor/weapon training, size, senses and proficiencies.
 
 ### Magic & spells
 
-- Known, Prepared, Always Prepared, Ritual, and free-cast spell states.
-- Per-class spellcasting ability, casting mode, prepared limits, spellbook size, Pact Magic, Mystic Arcanum, and spell points.
-- Shared multiclass spell slots, Spell Attack, Spell Save DC, slot spending, Long Rest recovery, and Arcane Recovery.
-- Combat Spell Attacks lists currently castable tracked spells, supports allowed slot levels, Pact slots, spell points, free casts, cantrips, and no-slot ritual casting at ritual speed.
-- Direct-damage spell mappings roll SRD damage dice with supported cantrip/upcast scaling; custom spell notes can supply an `XdY` damage expression.
-- Spell filtering by class, level, ritual, school, source, and prepared state.
-- Streamed spell catalog with low-memory paging and custom spell support.
+- Known, Prepared, Always Prepared, Ritual and free-cast spell states.
+- Per-class casting ability/mode, prepared limits, spellbook size, Pact Magic, Mystic Arcanum and spell points.
+- Shared multiclass slots, level-synchronized slot maxima, Pact Magic, Sorcery Point maxima, class cantrip/prepared limits, Wizard spellbook minimums, Spell Attack, Spell Save DC, slot spending and rest recovery.
+- Fixed level-gated class/species spells can be granted through bundled progression metadata; the explicit level-1 action and later level-up scans process eight lines at a time, duplicate-safe grants preserve existing spell records, and free-cast uses reset on Long Rest.
+- Spell filtering by class and level for normal Allowed eligibility, with optional School, Ritual, Source and prepared-state filters that default to Any and never narrow the default picker unless selected.
+- Streamed spell catalog plus custom spell support; **+ Add New** opens a blank spell editor, OK on **Name** selects from spells allowed by all of the character's classes at their individual levels, and Hold OK on **Name** enters a custom spell name.
+- Combat Spell Attacks use structured spell mappings for supported attacks, saves, scaling, healing and multi-part effects; unmapped custom spells can use the first valid `XdY`/`XDY` expression in Notes as a bounded fallback.
+- Character-owned spellbooks use eight-record sidecar paging instead of keeping the whole collection resident.
 
-### Features, grants, inventory & equipment
+### Inventory, equipment & items
 
-- Class, subclass, species, background, feat, item, spell, and custom feature grants.
-- Feature uses with manual, proficiency-based, or ability-based maximums and configurable recharge rules.
-- Inventory quantities, weight, containers, equipped/attuned state, charges, and ammunition groups.
-- Weapon attack data, damage dice, versatile damage, riders, proficiency, magic bonuses, and weapon properties.
-- Armor and shield values with calculated AC and optional encumbrance tracking.
-- Copper, Silver, Electrum, Gold, and Platinum currency tracking.
+- Inventory quantities, weight, containers, equipped/attuned state, charges and ammunition groups.
+- Weapon attack modifiers, damage dice, versatile damage, riders, proficiency, magic bonuses and weapon properties.
+- Armor/shield values, calculated AC, carrying capacity and currency normalization.
+- Copper, Silver, Electrum, Gold and Platinum tracking.
+- Starting inventory is created only when Inventory is first opened after Class and Species are chosen and the live inventory has no valid item records. Class/species/background defaults are streamed from assets and one hidden d100 trinket is added.
+- Resources, Weapon Attacks and Adventure do not silently seed starting equipment.
+- Character-owned inventory uses eight-record sidecar paging and streamed whole-collection calculations; **+ Add New** opens a blank item editor, OK on **Name** selects from the item catalog, and Hold OK on **Name** enters a custom item name.
 
 ### Dice & combat
 
-- Animated d4, d6, d8, d10, d12, d20, and d100 rolls.
-- Advantage, Disadvantage, modifiers, multi-die rolls, and Guidance mode.
-- Individual dice results, dice sum, modifier, and final total display.
-- Weapon attacks, Spell Attacks, attack templates, spell/save/custom actions, damage, riders, Mastery, and recharge fields.
-- Combat tracking for HP, temporary HP, rests, Hit Dice, conditions, concentration, reactions, exhaustion, resistances, immunities, vulnerabilities, senses, and movement.
+- Animated d4, d6, d8, d10, d12, d20 and d100 rolls.
+- Advantage, Disadvantage, modifiers, multiple dice and Guidance mode.
+- Individual results, dice sum, modifier and final total display.
+- Weapon Attacks and Spell Attacks use the character's owned records and current resources.
+- HP, temporary HP, rests, Hit Dice, conditions, concentration, reactions, exhaustion, resistances, immunities, vulnerabilities, senses and movement support.
 
 ### Initiative
 
-- Saved Party Roster with name, initiative modifier, AC, current HP, and maximum HP.
-- **Roll for All** when starting combat, plus individual automatic initiative rolls.
-- Hold OK on a participant for manual d20 initiative entry or participant editing.
-- Round and turn tracking with Back moving to the previous turn.
-- Hold Back during combat to return to the Initiative screen.
-- Temporary participants, negative HP, conditions, and participant removal.
-- Bestiary transfers are appended to the active character's saved Party Roster before Initiative opens.
+- Standalone per-character Party Roster with name, initiative modifier, AC, current HP and maximum HP.
+- Roll for All, individual automatic rolls and hold-OK manual d20 entry.
+- Round/current-turn tracking; short Back moves to the previous turn and hold Back returns to the Initiative screen.
+- Participant editing, temporary participants, negative HP, conditions and removal.
+- Bestiary Add to Initiative can append selected monsters or encounter members to the active character roster before opening Initiative.
 
-### Journal & campaigns
+### Journal
 
-- Character notes, adventure notes, item notes, and milestones.
-- Data-driven Adventure mode with an explicit Start Adventure action, three-row scene text beside the sprite, branching choices, checks, rewards, flags, achievements, checkpoints, and 3-second skill-check result displays.
-- Campaign pack support with per-character progress and transactional installation.
+- Standalone per-character timestamped text entries stored outside the character save.
+- Newest-first storage-backed listing with bounded metadata caching and body-on-open loading.
+- Adventure milestone history is written directly to Journal.
+- Journal can return to DNDolphins or launch Adventure to continue after a milestone; Journal does not create Adventure progress.
 
-### Dolphin Bestiary
+### Adventure
 
-- 340 bundled monster records with streamed browsing and stat-block viewing.
-- Search and filtering by name, challenge, type, source, environment, and encounter role.
-- Favorites, recent monsters, saved filters, and diagnostics.
-- Custom monster creation, editing, and confirmed deletion without modifying packaged monster data.
-- Transactional third-party monster pack installation with enable/disable controls and stable-ID conflict validation.
-- Party-level encounter generation with difficulty targeting and role-aware weighting.
-- Named saved encounters with resume, rename, duplicate, archive, delete, and **Add to Initiative** actions.
-- **Add to Initiative** works from individual monsters, generated encounters, and saved encounters.
-- Generated encounters can be saved for later use.
-- Full stat-block rows can be opened in a scrolling full-screen reader.
+- Declarative campaign manifests/scenes with branching choices, skill checks, flags, achievements, item rewards, milestones and checkpoints.
+- Per-character campaign progress owned by DNDAdventure rather than embedded in the character file.
+- Bundled **Reef Wardens** aquatic adventure.
+- Bundled **Ghost Protocol**, a fictional authorized security-audit adventure using a Flipper Zero as an in-world inspection tool; it contains game checks and branching outcomes rather than real exploit instructions.
+- Adventure item rewards use shared item storage behavior but never initialize starting equipment.
+- Installable campaign-pack support with bounded storage-backed loading.
 
-### Interface & performance
+### Bestiary
 
-- Designed for the Flipper Zero screen and buttons with no network or external hardware required.
-- Long selected labels scroll horizontally where space permits.
-- Long Back returns toward the main screen; normal Back returns to the previous screen.
-- Catalogs, profiles, monsters, and campaign data are streamed or loaded on demand to reduce RAM use.
-- Large record collections use bounded pages and release temporary allocations after use.
-- The main Dungeons & Dolphins FAP uses a 9 KB stack, balancing stack headroom with heap availability on the Flipper Zero.
-- Initiative-only launches defer unnecessary campaign and pack initialization to reduce cross-FAP memory pressure.
-- User data is kept separate from packaged application assets.
+- Large bundled monster catalog with streamed browsing, filtering, detail views and encounter generation.
+- Search/filter support for monster metadata such as name, challenge, type, source, environment and encounter role where present.
+- Favorites, recents, saved filters, diagnostics and named saved encounters.
+- Saved encounter resume, rename, duplicate, archive, delete and Add to Initiative workflows.
+- Custom monster create/edit/delete without rewriting packaged monster assets.
+- Installable monster packs remain separate from packaged and direct-custom records.
+- If no custom monster files exist, Bestiary seeds a small bundled custom pack containing **Dolphin** and **Capybara**. Existing or partial user custom files always win and are never overwritten by the seed.
+- Full stat-block rows can be opened in the scrolling full-screen reader, wrapped at 26 characters per line.
+
+### Storage, memory & resilience
+
+- Character core saves, spellbooks, inventories, Journal entries, Adventure progress and Bestiary state are owned by the FAP that uses them.
+- Character shadows are write-only history and are never used as live recovery input.
+- Packaged catalogs/campaigns/monsters remain in app assets; mutable user data remains in app data.
+- Large lists are streamed, paged or bounded rather than loaded wholesale.
+- Cross-FAP handoffs free outgoing runtime state before launching the next app.
+- Full-width scrolling/menu rows use a consistent 26-character visible window across all five FAPs; specialized compact layouts retain their own bounded widths.
+- Text data remains manually editable; no checksum match is required for ordinary character/custom-pack loading.
 
 ## Controls
 
-- **OK** — select, open, confirm, or roll.
-- **Hold OK** — alternate action such as custom text, numeric entry, or participant editing where supported.
-- **Back** — return to the previous screen; during combat, move to the previous turn.
-- **Hold Back** — return toward the main screen; during combat, return to Initiative.
+- **OK** — select, open, confirm or roll.
+- **Hold OK** — alternate action such as custom text, numeric entry or participant editing where supported.
+- **Back** — previous screen; during active combat, previous turn.
+- **Hold Back** — return toward the parent/main workflow; during active combat, return to Initiative.
 - **Left / Right** — change pages or values where supported.
-- **Up / Down** — move through menu rows and lists.
+- **Up / Down** — move through rows and lists.
 
-## Data locations
+## Memory model
 
-- Dungeons & Dolphins writable data: `/ext/apps_data/dungeons_and_dolphins/`
-- Dolphin Bestiary writable data: `/ext/apps_data/dolphin_bestiary/`
-- Character profiles use `profiles/ch_{id}_{characterName}_{characterLevel}.txt`.
-- Packaged catalogs, campaigns, and monster tables remain in each FAP's asset namespace.
+- DNDolphins: 6 KB stack
+- DNDAdventure: 4 KB
+- DNDJournal: 4 KB
+- DNDInitiative: 4 KB
+- DNDBestiary: 6 KB
 
-## Build
+See `MEMORY_AUDIT.md` for current source-derived stack-use estimates and remaining device stress targets.
 
-Place this directory in RogueMaster's `applications_user` tree, then build both applications from the shared manifest:
+## Documentation
 
-```sh
-./fbt fap_dungeons_and_dolphins fap_dolphin_bestiary
-```
-
-See `CHANGELOG.md` for version history and `ROADMAP.md` for planned work.
+- `CHANGELOG.md` — released history from the retained release line onward, summarized per revision.
+- `ROADMAP.md` — future work only.
+- `SAVE_SCHEMA.md` — persistence ownership and paths.
+- `CAMPAIGN_PACK_SCHEMA.md` / `MONSTER_PACK_SCHEMA.md` — declarative pack formats.
+- `MEMORY_AUDIT.md` — stack reservations, estimated source-visible usage and memory ownership.
+- `DEVICE_TEST_MATRIX.md` — device validation checklist.
