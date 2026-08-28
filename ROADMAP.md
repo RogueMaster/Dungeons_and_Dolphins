@@ -1,33 +1,36 @@
 # Dungeons & Dolphins roadmap
 
-This document contains planned work only. Implemented work belongs in `CHANGELOG.md`. Each release is ordered by play value and memory/SD impact.
+Current baseline: **3.2.5**. This roadmap lists future features only. Completed work belongs in `CHANGELOG.md`.
 
-## 3.3 — pack lifecycle
+## Pack management
 
-- Add transactional uninstall and export for installed campaign and monster packs with an explicit stable-ID conflict preview.
-- Add an on-device manifest preview showing record count, compatibility range, source files, and destination before installation.
-- Add installed-pack rename and notes fields while keeping every text file manually editable and fully offline.
+- Transactional uninstall and export for installed campaign and monster packs.
+- Stable-ID conflict preview before pack changes are committed.
+- On-device manifest preview with record count, compatibility range, source files, and destination.
+- Rename and notes fields for installed packs while keeping pack files manually editable.
 
-## 3.4 — low-latency state
+## Performance & diagnostics
 
-- Persist compact summary-ID indexes so favorites, recents, and saved encounters can reopen without rebuilding unchanged caches after app launch.
-- Batch adjacent Bestiary state updates into one transactional write while flushing immediately on app switch or exit.
-- Add a low-memory diagnostics page for current heap headroom, peak transient allocation, cache sizes, and SD transaction recovery.
+- Compact persistent summary indexes so favorites, recents, and saved encounters can reopen without rebuilding unchanged state.
+- Batched adjacent Bestiary state updates with immediate flush on app switch or exit.
+- Low-memory diagnostics showing heap headroom, peak transient allocation, cache sizes, and SD transaction recovery state.
 
-## 3.5 — campaign state engine
+## Campaign enhancements
 
-- Add typed campaign variables and conditional choice visibility without embedding executable scripts.
-- Add campaign objectives synchronized with journal milestones and inventory rewards.
-- Add conflict-safe campaign progress import/export with manifest compatibility preview.
+- Typed campaign variables without executable scripting.
+- Conditional campaign choices based on stored campaign state.
+- Campaign objectives linked with journal milestones and inventory rewards.
+- Conflict-safe campaign progress import/export with compatibility preview.
 
-## 3.6 — accessibility and controls
+## Accessibility & controls
 
-- Add compact, standard, and large-text row layouts with per-screen previews.
-- Add configurable long-press shortcuts and left/right behavior with a reset-to-default control map.
-- Add a reduced-motion option that stops marquee and dice animation timers on static screens.
+- Compact, standard, and large-text row layouts with per-screen previews.
+- Configurable long-press shortcuts and Left/Right behavior.
+- Reset-to-default control mapping.
+- Reduced-motion option for marquee and dice animations.
 
-## 3.7 — encounter history
+## Encounter history
 
-- Add a compact completed-encounter log with date, rounds, party state, and surviving opponents.
-- Allow a completed encounter to be cloned into a new named encounter without retaining its old initiative state.
-- Add streamed encounter-history export and pruning controls with no full-history RAM allocation.
+- Compact completed-encounter history with date, rounds, party state, and surviving opponents.
+- Clone a completed encounter into a new named encounter without retaining old initiative state.
+- Streamed encounter-history export and pruning without loading the entire history into RAM.

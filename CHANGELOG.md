@@ -1,5 +1,9 @@
 # Dungeons & Dolphins changelog
 
+## 3.2.6
+
+- Adventure Mode skill checks now show a dedicated roll-result screen with the natural d20, modifier, total vs. DC, and pass/fail result for 3 seconds before continuing.
+
 ## 3.2.5
 
 - Restored Bestiary **Save Encounter** and **Add to Initiative** actions for individual monsters, generated encounters, and saved encounters.

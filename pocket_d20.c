@@ -20,6 +20,7 @@
 #define TAG                              "PocketD20"
 #define POCKET_D20_MAX_GENERIC_ROLLS     20U
 #define POCKET_D20_DICE_ANIMATION_FRAMES 8U
+#define POCKET_D20_ADVENTURE_RESULT_TICKS 30U
 #define POCKET_D20_DICE_ANIMATION_EVENT  0xD120U
 #define POCKET_D20_LONG_BACK_EVENT       0xD121U
 #define POCKET_D20_AUTOSAVE_EVENT        0xD122U
@@ -319,7 +320,13 @@ typedef struct {
     uint8_t campaign_active_valid;
     PocketCampaignDiagnostics campaign_diagnostics;
     int16_t adventure_last_total;
+    int8_t adventure_last_modifier;
+    int8_t adventure_last_skill;
     uint8_t adventure_last_natural;
+    uint8_t adventure_last_dc;
+    uint8_t adventure_last_passed;
+    uint8_t adventure_result_active;
+    uint8_t adventure_result_ticks;
     uint8_t active_profile_loaded;
     uint8_t storage_read_only;
     uint8_t storage_unsaved;
@@ -929,6 +936,19 @@ static bool pocket_custom_event_callback(void* context, uint32_t event) {
         ++app->dice_anim_frame;
         if(app->dice_anim_frame >= POCKET_D20_DICE_ANIMATION_FRAMES) {
             app->dice_animating = 0U;
+            if(app->adventure_result_active) {
+                app->adventure_result_ticks = 0U;
+                furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U));
+            } else {
+                furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
+            }
+        }
+        pocket_refresh(app);
+    } else if(app->adventure_result_active) {
+        ++app->adventure_result_ticks;
+        if(app->adventure_result_ticks >= POCKET_D20_ADVENTURE_RESULT_TICKS) {
+            app->adventure_result_active = 0U;
+            app->adventure_result_ticks = 0U;
             furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
         }
         pocket_refresh(app);
@@ -4775,6 +4795,38 @@ static void pocket_draw_campaign_diagnostics(Canvas* canvas, PocketD20App* app) 
     pocket_draw_menu_rows(canvas, app, rows, 10U);
 }
 
+static void pocket_draw_adventure_result(Canvas* canvas, PocketD20App* app) {
+    char row[48];
+    pocket_draw_header(canvas, "Adventure Roll Result", NULL);
+
+    if(app->adventure_last_skill >= 0 &&
+       (uint8_t)app->adventure_last_skill < POCKET_D20_SKILL_COUNT) {
+        snprintf(
+            row,
+            sizeof(row),
+            "%s check",
+            pocket_d20_skill_names[(uint8_t)app->adventure_last_skill]);
+        pocket_draw_row(canvas, 0U, false, row);
+    }
+
+    snprintf(
+        row,
+        sizeof(row),
+        "d20 %u %+d",
+        app->adventure_last_natural,
+        app->adventure_last_modifier);
+    pocket_draw_row(canvas, 1U, false, row);
+    snprintf(
+        row,
+        sizeof(row),
+        "Total %d vs DC %u",
+        app->adventure_last_total,
+        app->adventure_last_dc);
+    pocket_draw_row(canvas, 2U, false, row);
+    snprintf(row, sizeof(row), "%s", app->adventure_last_passed ? "PASS" : "FAIL");
+    pocket_draw_row(canvas, 3U, false, row);
+}
+
 static void pocket_draw_adventure(Canvas* canvas, PocketD20App* app) {
     const PocketAdventureScene* scene = app->adventure_scene;
     if(!scene) {
@@ -4818,6 +4870,10 @@ static void pocket_draw_callback(Canvas* canvas, void* model) {
     canvas_clear(canvas);
     if(app->dice_animating) {
         pocket_draw_dice_animation(canvas, app);
+        return;
+    }
+    if(app->adventure_result_active) {
+        pocket_draw_adventure_result(canvas, app);
         return;
     }
     switch(app->screen) {
@@ -5537,6 +5593,8 @@ static void pocket_handle_long_back(PocketD20App* app) {
         return;
     }
     app->dice_animating = 0U;
+    app->adventure_result_active = 0U;
+    app->adventure_result_ticks = 0U;
     app->arcane_recovery_active = 0U;
     pocket_catalog_release(app);
     if(app->screen == PocketScreenAdventure) pocket_campaign_save_active_progress(app);
@@ -6692,8 +6750,12 @@ static void pocket_handle_adventure(PocketD20App* app, const InputEvent* event) 
             natural = (uint8_t)pocket_d20_roll_dice(1U, 20U);
             modifier = pocket_d20_skill_modifier(&app->data.character, (uint8_t)choice.skill);
             app->adventure_last_natural = natural;
+            app->adventure_last_modifier = modifier;
+            app->adventure_last_skill = choice.skill;
+            app->adventure_last_dc = choice.dc;
             app->adventure_last_total = (int16_t)natural + modifier;
-            passed = app->adventure_last_total >= choice.dc;
+            app->adventure_last_passed = app->adventure_last_total >= choice.dc;
+            passed = app->adventure_last_passed;
         }
         bool first_reward =
             choice.quest_flag >= 32U ||
@@ -6738,6 +6800,8 @@ static void pocket_handle_adventure(PocketD20App* app, const InputEvent* event) 
                 app->adventure_last_total,
                 passed ? "pass" : "fail");
             pocket_set_status(app, result);
+            app->adventure_result_active = 1U;
+            app->adventure_result_ticks = 0U;
             pocket_start_dice_animation(app, 1U, 20U);
         } else {
             pocket_set_status(app, "Choice applied");
@@ -8982,8 +9046,15 @@ static bool pocket_input_callback(InputEvent* event, void* context) {
     if(app->dice_animating) {
         if(event->type == InputTypeShort && event->key == InputKeyBack) {
             app->dice_animating = 0U;
-            furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
+            if(app->adventure_result_active)
+                furi_timer_start(app->dice_timer, furi_ms_to_ticks(100U));
+            else
+                furi_timer_start(app->dice_timer, furi_ms_to_ticks(POCKET_D20_MARQUEE_MS));
         }
+        pocket_refresh(app);
+        return true;
+    }
+    if(app->adventure_result_active) {
         pocket_refresh(app);
         return true;
     }
