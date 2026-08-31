@@ -5,11 +5,17 @@
 #include <stdint.h>
 #include <storage/storage.h>
 
-/* Resolve DNDolphins' persisted active character reference for companion FAPs.
-   This reads only the canonical active-profile metadata and validates that the
-   referenced primary character file exists. */
-bool dnd_profile_ref_active(Storage* storage, uint32_t* profile);
+/* Read only DNDolphins' persisted Active= ID from custom_active_profile.txt.
+   This tiny shared companion reader does not depend on dnd_storage.c and does
+   not scan, infer, validate, or switch characters. */
+bool dnd_profile_ref_active_id(Storage* storage, uint32_t* profile);
+
+/* Resolve only the persisted active character. No cross-character fallback is performed. */
+bool dnd_profile_ref_active_exact(Storage* storage, uint32_t* profile);
 
 /* Resolve the canonical primary character file for a profile. Collection files
    such as inventory_<id>.txt and spellbook_<id>.txt are deliberately excluded. */
 bool dnd_profile_ref_path(Storage* storage, uint32_t profile, char* output, size_t size);
+
+/* True only when this exact profile ID has a canonical primary character file. */
+bool dnd_profile_ref_exists(Storage* storage, uint32_t profile);

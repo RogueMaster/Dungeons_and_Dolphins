@@ -2,35 +2,74 @@
 
 ## Launch and handoff
 
-- [ ] Launch each FAP directly.
+- [ ] Build all seven FAPs and confirm no unresolved application symbols. In particular, Journal, Initiative and Bestiary must resolve `dnd_profile_ref_active_id()` without requiring or importing `dnd_storage_active_profile_load`.
+- [ ] Open Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook with active IDs 0 and nonzero; confirm `[id]` appears at the top-right on each app's main screen only and disappears from detail/editor/tool/result screens.
+- [ ] Launch all seven FAPs directly.
+- [ ] In Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook, press Short Back from the main screen and confirm DNDolphins is launched when `/ext/apps/Games/dndolphins.fap` exists. Temporarily remove/rename that FAP and confirm the same Short Back exits cleanly without a dead Loader handoff.
+- [ ] In each companion main screen, Hold Back and confirm the companion exits back to firmware without launching DNDolphins. Confirm Initiative and Bestiary no longer contain a normal main-menu Return/Open-DNDolphins row.
+- [ ] In companion sub-screens, Short Back must continue to move up one screen rather than immediately returning to DNDolphins; Initiative active-combat Short Back must retain previous-turn behavior.
+- [ ] Cycle DNDolphins → DNDInventory → DNDolphins repeatedly.
+- [ ] Cycle DNDolphins → DNDSpellbook → DNDolphins repeatedly.
 - [ ] Cycle DNDolphins → Bestiary → Initiative → DNDolphins repeatedly.
 - [ ] Cycle DNDolphins → Journal/Adventure → DNDolphins repeatedly.
-- [ ] Confirm active-character fallback and teardown-before-launch behavior.
+- [ ] Confirm Inventory/Spellbook direct launch resolves the active canonical DNDolphins character and never creates `/ext/apps_data/dndinventory/` or `/ext/apps_data/dndspellbook/` character data.
+- [ ] With `custom_active_profile.txt` containing `Active=1`, repeatedly open/close DNDInventory and DNDSpellbook both directly and from DNDolphins; every launch must show `[1]`, never transient `[0]`, and must enter the list rather than `No character`.
+- [ ] On the Inventory/Spellbook main views, confirm the draw callback and input callback agree on the same screen: `[4294967295]` must never appear, a displayed `No character / OK: Open DNDolphins` screen must actually launch DNDolphins on OK, and a displayed list/detail screen must perform only that screen's actions.
+- [ ] Repeatedly press Back from the Inventory/Spellbook top-level list and no-character screen; confirm the dispatcher exits promptly without an extra redraw or apparent input loop.
+- [ ] With 1, 2, 3 and 4 Items, move through every row and confirm `+ Add New` remains visible; add a fifth Item and confirm it scrolls away only when needed. Repeat the same 1–5 check in Spellbook.
+- [ ] Populate more than eight Items and Spells. Confirm the normal lists show no persistent `<>`; Up/Down Repeat remains responsive and performs storage I/O only when crossing an eight-record boundary. If using short Left/Right list page jumps, confirm each changes only one aligned eight-record page and holding does not churn through pages.
+- [ ] From a later Item/Spell page, wrap Up/Down back to `+ Add New` and confirm page zero is reloaded: first-page rows render normally with no `Page unavailable`, empty-page artifact or stale later-page data.
+- [ ] Verify Spellbook list row marks: `A` always prepared, `P` prepared, `K` known, `-` neither, and `F` appended whenever a free cast remains (including `AF`).
+- [ ] Repeat Inventory/Spellbook launch/return cycles with empty and populated sidecars; confirm no blank/undrawn main page appears after repeated launches.
+- [ ] Force a valid `Active=1` with character 1 unreadable/missing; Inventory/Spellbook must retain `[1]` on the error/no-character screen rather than resetting the displayed ID to `[0]` or choosing another character.
+- [ ] On Inventory/Spellbook error/status/detail/tool screens, confirm `[id]` is not drawn; on the main list confirm only `[id]` occupies the top-right and no persistent `<>` is present.
+- [ ] Confirm exact active-character selection, Initiative/Bestiary ID-0 fallback and teardown-before-launch behavior.
+- [ ] From a cold boot or low-free-heap state, launch DNDolphins repeatedly and confirm Loader does not show `Not enough RAM to run the app`.
+
+- [ ] Launch DNDolphins on an ordinary healthy profile and confirm the home header does not persist `Loaded`; the character name is visible. Then exercise a backup recovery or forced save/read error and confirm meaningful recovery/error status still appears.
+- [ ] Weapon Combat: test STR, ranged DEX and finesse-best weapons; proficient/unproficient and magic bonuses; advantage/disadvantage; natural 1/20; ammunition decrement/persistence; versatile damage; extra dice; and critical damage-dice doubling.
+- [ ] Spell Combat: test a cantrip across character-level scaling thresholds, an upcast mapped spell, a Notes-only `XdY` fallback spell, a spell attack and save spell, plus available normal slot, Pact slot, spell points, free cast and ritual options. Confirm the selected resource is consumed/preserved correctly and results use the spell's source-class casting ability. For a Wizard specifically, confirm an unprepared level-1+ spell with no Free Cast is absent; the same spell appears once Prepared/Always Prepared; and an unprepared spell with a Free Cast appears but offers **Free Cast only**. Wizard cantrips remain available without preparation.
 
 ## Character / Inventory / Spells
 
-- [ ] Create a character and confirm no inventory exists until Inventory is opened.
-- [ ] First Inventory open seeds class/species/background equipment plus exactly one hidden d100 trinket.
-- [ ] Reopen Inventory and confirm no duplicate starting items/currency.
-- [ ] Resources and Weapon Attacks do not create missing inventory.
+- [ ] Create a character and confirm no Inventory sidecar exists after character creation or merely opening DNDInventory.
+- [ ] Use Hold Up → Inventory Tools → Grant Initial Inventory with matching defaults; confirm class/species/background equipment is seeded and **no extra trinket** is added.
+- [ ] Force a no-match/failed normal starting-equipment seed, invoke Grant Initial Inventory, and confirm DNDInventory rolls one random d100 trinket as fallback; invoke the grant again and confirm it does not seed again.
+- [ ] If normal equipment and trinket fallback both cannot be written, confirm manual Add New remains usable and can establish the canonical Inventory sidecar.
+- [ ] Reopen Inventory and confirm no duplicate starting items/currency are added automatically.
+- [ ] Inventory Resources, Weapon Attacks and Adventure do not create or seed missing inventory.
 - [ ] In Spellbook, short OK on **+ Add New** creates a blank spell and immediately opens its full editor; short OK on the Name field opens the spell catalog and hold OK on Name allows a custom name.
 - [ ] In Inventory, short OK on **+ Add New** creates a blank item and immediately opens its full editor; short OK on the Name field opens the item catalog and hold OK on Name allows a custom name.
 - [ ] Hold OK on **+ Add New** in Spellbook/Inventory follows the same blank-record/full-editor path rather than becoming a no-op.
-- [ ] After first Inventory/Spellbook open, confirm `/ext/apps_data/dndolphins/inventory_{id}.txt` and `/ext/apps_data/dndolphins/spellbook_{id}.txt` are created and remain distinct from `ch_{id}_{name}_{level}.txt` profiles.
+- [ ] After Grant Initial Inventory or manual Item Add, confirm `/ext/apps_data/dndolphins/inventory_{id}.txt` exists; after the first actual Spell Add/save, confirm `/ext/apps_data/dndolphins/spellbook_{id}.txt` exists. Merely opening an absent collection remains read-only. Both sidecars remain distinct from `ch_{id}_{name}_{level}.txt` profiles.
 - [ ] Add three Items consecutively without leaving Inventory; confirm all three appear, the file contains three valid `I|` records, then delete the middle item and confirm it stays deleted after app restart.
 - [ ] Add three Spells consecutively without leaving Spellbook; confirm all three appear, the file contains three valid `S|` records, then delete the middle spell and confirm it stays deleted after app restart.
 - [ ] Exercise the 8→9 Item and Spell boundary; confirm the first eight records persist before the next resident page is opened and the ninth record survives restart.
 - [ ] With generated starting equipment already present, add three Items in succession. After each Add New, load a catalog item, Back to Inventory, confirm the new item remains visible/focused without restarting, and verify the live inventory file already contains the final catalog-populated record.
 - [ ] Exercise starting-equipment tail sizes around an eight-record boundary (especially 7→8→9 and 15→16→17). Confirm no MPU fault, no `<read error>` rows, and no render-time pause/storage access while scrolling between pages.
 - [ ] After editing an existing Item/Spell by catalog, text input, numeric input, or left/right adjustment, inspect the live sidecar before leaving the app and confirm the change is already present.
-- [ ] Add at least three items and three spells consecutively, close/relaunch DNDolphins, and confirm every record persists.
-- [ ] Delete a middle item and middle spell, close/relaunch, and confirm the remaining records persist in order.
-- [ ] In Spell Filters, confirm Class defaults to **All Classes**; on a multiclass character it shows the union of eligible spells, and selecting a specific class restricts the catalog to that class.
+- [ ] After a successful Item/Spell save, add, catalog choice, Equip/Prepare action or grant/regrant, confirm the success notice is visible initially and clears on the next real input; force a write failure and confirm `UNSAVED`/error feedback does not clear as a routine success notice.
+- [ ] Add at least three items and three spells consecutively, close/relaunch the respective collection FAPs, and confirm every record persists.
+- [ ] Delete a middle item and middle spell, close/relaunch the respective collection FAPs, and confirm the remaining records persist in order.
+- [ ] In Spell Filters, confirm Spell Class defaults to **All Classes**; on a multiclass character it shows the union of eligible spells, and selecting a specific class restricts the catalog to that class.
+- [ ] In Add Spell, exercise Level, School, Ritual and Source filters separately and in combination; confirm each page is filled from matching streamed results rather than showing sparse rows from an already-selected page.
+- [ ] Cycle Source through Core, Xanathar, Forgotten Realms, Ravenloft and Other; select a spell and confirm its Source/School/Ritual metadata is copied into the owned Spell record and survives restart.
 - [ ] Hold OK on a known Spellbook row and confirm Prepared toggles immediately, the `S|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back; Always Prepared remains unchanged.
 - [ ] Hold OK on an Inventory row and confirm Equipped toggles immediately, the row marker updates, the `I|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back.
 - [ ] Simulate/retry after an SD write failure and confirm an interrupted append does not leave a partial spell/item record or permanently disable later Add/Delete attempts.
 - [ ] Exercise >8 items and >8 spells across page boundaries.
 - [ ] Verify spell attack/DC, slots/Pact/points and weapon attack/damage behavior.
+
+
+## Inventory tools / explicit initial grant
+
+- [ ] With no `inventory_{id}.txt`, open DNDInventory and confirm **no Inventory sidecar is created merely by opening the screen**.
+- [ ] Hold Up from the Inventory list and confirm the special menu contains Currency, Inventory Resources and Grant Initial Inventory.
+- [ ] Confirm existing Hold OK gestures still work: Inventory row = Equip/Unequip; + Add New = blank full editor; Item Catalog = category filter.
+- [ ] Exercise all five Currency fields with Left/Right and direct numeric entry, restart, and confirm values persisted.
+- [ ] Add a `Currency=` line to a character profile with no Inventory currency record and confirm DNDInventory ignores it; only `inventory_{id}.txt` may supply persisted currency.
+- [ ] Exercise Inventory Resources: encumbrance toggle, capacity override, armor/shield AC application and coin normalization.
+- [ ] Select Grant Initial Inventory on an absent sidecar and confirm Short OK grants defaults once, returns directly to the populated Inventory list and writes `InitialInventory=1`. Re-enter Inventory Tools and confirm the row reports Granted; Short OK again must not duplicate equipment/currency. Then Hold OK on that same row once: confirm existing Items are preserved, starting equipment/currency are appended again, the file now contains `InitialInventory=2`, and the app reports Regranted. Hold OK a second time and confirm no additional records/currency are added. With manual Item rows but no grant marker, confirm the normal grant remains blocked rather than silently doing nothing.
 
 ## Adventure
 
@@ -51,6 +90,7 @@
 ## Stress
 
 - [ ] Repeated launch/back cycles without heap growth or crash.
+- [ ] Alternate DNDInventory and DNDSpellbook launches for at least 25 handoff cycles and confirm DNDolphins continues to load each time.
 - [ ] Large profile and Journal counts.
 - [ ] Large monster/campaign indexes.
 - [ ] Maximum-size encounter save/rename/delete paths.
@@ -66,6 +106,11 @@
 - [ ] Adventure campaign selection shows campaign names, falling back to campaign ID only when a name is absent.
 
 ## Adventure campaign selection
+
+- [ ] Put a valid campaign pack in the inbox and confirm Preview shows name, pack/app compatibility and entry scene before installation; Hold OK installs only when validation passes.
+- [ ] Test malformed index, missing `scenes.txt`, missing declared entry scene, incompatible min/max app range and duplicate campaign ID; each must refuse installation without deleting existing campaign content.
+- [ ] With a large campaign index, navigate rows before and beyond the sparse-hint window and confirm names remain correct without a campaign-sized heap allocation.
+- [ ] From a Journal milestone entry choose **Continue active Adventure** and confirm Adventure opens the persisted active campaign/current scene directly; if no valid active campaign exists, confirm it falls back safely without creating progress.
 
 - Open DNDAdventure with the bundled campaigns present and confirm **Reef Wardens** and **Ghost Protocol** are visible immediately in the campaign list.
 - Scroll/wrap through campaign rows and confirm labels remain visible while selected and unselected.
@@ -84,9 +129,12 @@
 ### Initiative no-character / profile resolution
 
 - With no DNDolphins character files present, launch DNDInitiative directly: confirm the no-character screen appears, **Launch DNDolphins** launches the main app, **Exit Initiative** exits, and no Initiative `ch_0.txt` sidecar is created.
-- Create character ID 0, plus its Inventory and Spellbook sidecars, then launch Initiative: confirm ID 0 refreshes from the primary character file and the sidecars are never selected as the profile.
+- With no `custom_active_profile.txt`, create character ID 0 plus its Inventory and Spellbook sidecars, then launch Initiative and Bestiary: confirm both select ID 0 as the default metadata ID; Initiative validates only the primary character file and the sidecars are never selected as the profile.
 - Change the active character's Dexterity, Initiative Misc, exhaustion, HP, AC, and name; reopen Initiative and confirm only changed values are persisted. Reopen again without changes and confirm behavior is unchanged.
-- Repeat direct launches and DNDolphins/Bestiary handoffs with a nonzero active character ID.
+- Repeat direct launches and DNDolphins/Bestiary handoffs with a nonzero active character ID; confirm both apps select that exact ID.
+- Set `Active=7` while removing canonical character 7 but leaving character 0 present; confirm Initiative reports no character rather than switching to 0, and Bestiary continues to show/use `[7]`.
+- Give the Bestiary-to-Initiative payload a different leading ID than `Active`; confirm Initiative keeps the persisted active profile while importing the transferred monsters.
+- Remove `custom_active_profile.txt` or make its `Active` value unreadable, leave profiles 0 and 1 present, and confirm Initiative and Bestiary select only ID 0 rather than discovering ID 1.
 
 ### Startup-order stress
 
@@ -103,3 +151,38 @@
 
 - [ ] Bestiary Monster Packs: short OK on an existing pack does nothing; Hold OK toggles Active/Inactive in both directions; confirm the registry row and installed monster pack files remain present.
 - [ ] Bestiary Monster Packs: short OK on the inbox/install row still installs a valid inbox pack.
+## Lazy progression sidecars
+
+- [ ] On an older character containing embedded Features/Grants but no progression sidecars, launch repeatedly and confirm Home opens without OOM, no `feats_{id}.txt` / `appliedgrants_{id}.txt` is created merely by loading, and the embedded rows are ignored. Then apply a new deterministic grant and confirm only the required current-format sidecar(s) are created.
+- [ ] Open a character with more than eight Features and page through the Features list; confirm only the visible eight-record page is required and edits persist after relaunch.
+- [ ] Spend a Feature, then Short/Long Rest as appropriate; confirm `feats_{id}.txt` updates and the use count survives relaunch.
+- [ ] In Initiative, advance a Turn and start/end encounters with Turn/Encounter-recharge Features; confirm the Feature sidecar recharges without requiring DNDolphins to remain open.
+- [ ] Level a High Elf through total character levels 1/3/5 and confirm Prestidigitation, Detect Magic and Misty Step are granted once at the appropriate gates. Repeat representative Drow/Wood Elf, Tiefling, Aasimar, Dragonborn and Goliath checks.
+- [ ] On a multiclass character, confirm species progression follows total character level rather than the level of any individual class.
+- [ ] Re-run progression checks after the grants are applied and confirm `appliedgrants_{id}.txt` prevents duplicates.
+- [ ] In Item Catalog, Hold OK cycles All → Weapons → Armor → Ammunition → Gear → Tools → Magic → All and each filter restricts the visible catalog without changing Inventory-list Hold OK = Equip/Unequip.
+### Stack-reservation validation
+
+- [ ] Stress DNDInventory Add/Edit/Delete, Currency/Resources, Grant Initial Inventory and multi-page catalog navigation under the restored 4 KB stack reservation; confirm no stack overflow/MPU fault.
+- [ ] Stress DNDSpellbook Add/Edit/Delete, all catalog filters, Hold-OK Prepare and multi-page navigation under the restored 4 KB stack reservation; confirm no stack overflow/MPU fault.
+- [ ] From DNDolphins, switch to a non-first character and launch DNDInventory; confirm the main header shows that exact active character ID and the matching `inventory_{id}.txt` contents.
+- [ ] From DNDolphins, switch to a non-first character and launch DNDSpellbook; confirm the main header shows that exact active character ID and the matching `spellbook_{id}.txt` contents/class filters.
+- [ ] Launch every companion directly from Apps; confirm each reads `custom_active_profile.txt` without directory discovery or launch-argument override. With a valid `Active=<id>`, confirm the exact ID is used. With metadata absent/unreadable, confirm Inventory/Spellbook/Journal/Adventure show no character and Initiative/Bestiary select ID 0. With metadata present but pointing to a missing character, confirm Inventory/Spellbook/Journal/Adventure/Initiative do **not** switch to ID 0 or another character, while Bestiary keeps the persisted ID and remains usable.
+- [ ] Stress DNDInitiative full participant editing, reorder, repeated Turn/Encounter recharge, save/reload and combat navigation under the 3 KB stack reservation; confirm no stack overflow/MPU fault.
+- [ ] Leave DNDAdventure/DNDJournal/DNDolphins/DNDBestiary at their larger reservations unless device high-water measurements demonstrate additional safe margin.
+
+### Inventory / Spellbook direct-entry checks
+
+- Launch DNDInventory from DNDolphins with a populated Inventory: the first frame is the Item list, `+ Add New` is row zero, and Hold Up opens Inventory Tools.
+- Launch DNDInventory with no Inventory sidecar: the first frame is an empty Item list with `+ Add New`; opening alone does not create the sidecar. Adding the first Item creates Inventory-owned `Currency=0,0,0,0,0`.
+- Launch DNDSpellbook from DNDolphins with a populated Spellbook: the first frame is the Spell list with `+ Add New` row zero.
+- Launch DNDSpellbook with no Spellbook sidecar: the first frame is an empty Spell list with `+ Add New`; opening alone does not create the sidecar, and the first saved Spell creates it.
+
+### Inventory / Spellbook parity regression
+
+- Add a new Item and Spell. Confirm `Item added` / `Spell added` appears once in the editor header and clears on the next Short/Repeat/Long input without a timer or background worker; an UNSAVED/error notice must not be auto-cleared as a success notice.
+- Spellbook main list: Hold Up opens Spell Filters. Confirm `Spell Class: All Classes` is the default, Left/Right cycles All Classes and each character class, and All Classes returns the union of currently eligible multiclass spells.
+- Spell Filters: confirm `Eligibility: Allowed` is default and `All Spells` is opt-in; All Spells bypasses class/level eligibility only and still honors explicit Level/Ritual/School/Source/Status filters.
+- Spell and Item Catalogs: confirm page number plus `<>` is visible; Left/Right changes catalog pages; Item rows retain category markers and append `*` for magic entries.
+- Hold OK on a known non-always-prepared Spell and on an Item: confirm immediate persistence and a temporary `[X]` prefix on the affected row; the acknowledgement clears on the next input.
+- Reconfirm full editor parity against the recovery baseline: 17 Spell fields and 36 Item fields, Name-field catalog, Hold-OK custom name, Delete, free-cast controls, Equip/Prepare quick actions and A/P/K/F Spell list marks.

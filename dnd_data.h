@@ -335,14 +335,14 @@ typedef struct {
     PocketCharacter character;
 } PocketSaveData;
 
-void pocket_d20_data_set_defaults(PocketSaveData* data);
-void pocket_d20_data_clear(PocketSaveData* data);
-void pocket_d20_data_sanitize(PocketSaveData* data);
-bool pocket_d20_data_reserve_spells(PocketCharacter* character, uint8_t required);
-void pocket_d20_data_clear_spells(PocketCharacter* character);
-bool pocket_d20_data_reserve_features(PocketCharacter* character, uint8_t required);
-bool pocket_d20_data_reserve_features_exact(PocketCharacter* character, uint8_t required);
-bool pocket_d20_data_reserve_items(PocketCharacter* character, uint8_t required);
-void pocket_d20_data_clear_items(PocketCharacter* character);
-bool pocket_d20_data_reserve_grants(PocketCharacter* character, uint8_t required);
-bool pocket_d20_data_reserve_grants_exact(PocketCharacter* character, uint8_t required);
+void dnd_data_set_defaults(PocketSaveData* data);
+void dnd_data_clear(PocketSaveData* data);
+void dnd_data_sanitize(PocketSaveData* data);
+bool dnd_data_reserve_spells(PocketCharacter* character, uint8_t required);
+void dnd_data_clear_spells(PocketCharacter* character);
+bool dnd_data_reserve_features(PocketCharacter* character, uint8_t required);
+bool dnd_data_reserve_features_exact(PocketCharacter* character, uint8_t required);
+bool dnd_data_reserve_items(PocketCharacter* character, uint8_t required);
+void dnd_data_clear_items(PocketCharacter* character);
+bool dnd_data_reserve_grants(PocketCharacter* character, uint8_t required);
+bool dnd_data_reserve_grants_exact(PocketCharacter* character, uint8_t required);

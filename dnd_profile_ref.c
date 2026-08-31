@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DND_ACTIVE_PROFILE_PATH "/ext/apps_data/dndolphins/custom_active_profile.txt"
+#define DND_ACTIVE_PROFILE_PATH POCKET_D20_CHARACTER_DATA_ROOT "/custom_active_profile.txt"
 
 static bool dnd_profile_ref_parse_u32(const char* text, uint32_t* output) {
     if(!text || !*text || !output) return false;
@@ -24,7 +24,6 @@ static bool dnd_profile_ref_parse_u32(const char* text, uint32_t* output) {
     return true;
 }
 
-
 static bool dnd_profile_ref_filename_is_primary(const char* filename, const char* prefix, size_t prefix_length) {
     if(!filename || !prefix) return false;
     size_t length = strlen(filename);
@@ -39,62 +38,6 @@ static bool dnd_profile_ref_filename_is_primary(const char* filename, const char
     for(const char* p = level; p < extension; ++p)
         if(*p < '0' || *p > '9') return false;
     return true;
-}
-
-
-static bool dnd_profile_ref_filename_id(const char* filename, uint32_t* output) {
-    if(!filename || !output || strncmp(filename, "ch_", 3U) != 0) return false;
-    const char* id_begin = filename + 3U;
-    const char* id_end = strchr(id_begin, '_');
-    if(!id_end || id_end == id_begin) return false;
-    char text[16];
-    size_t length = (size_t)(id_end - id_begin);
-    if(length >= sizeof(text)) return false;
-    memcpy(text, id_begin, length);
-    text[length] = '\0';
-    return dnd_profile_ref_parse_u32(text, output);
-}
-
-static bool dnd_profile_ref_fallback(Storage* storage, uint32_t after, bool have_after, uint32_t* profile) {
-    if(!storage || !profile) return false;
-    File* directory = storage_file_alloc(storage);
-    if(!directory) return false;
-    if(!storage_dir_open(directory, POCKET_D20_CHARACTER_DATA_ROOT)) {
-        storage_file_free(directory);
-        return false;
-    }
-    bool have_first = false, have_next = false;
-    uint32_t first = UINT32_MAX, next = UINT32_MAX;
-    FileInfo info;
-    char filename[128];
-    while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        if(file_info_is_dir(&info)) continue;
-        uint32_t id = 0U;
-        char prefix[32];
-        if(!dnd_profile_ref_filename_id(filename, &id)) continue;
-        int prefix_length = snprintf(prefix, sizeof(prefix), "ch_%lu_", (unsigned long)id);
-        if(prefix_length <= 0 || (size_t)prefix_length >= sizeof(prefix)) continue;
-        if(!dnd_profile_ref_filename_is_primary(filename, prefix, (size_t)prefix_length)) continue;
-        if(!have_first || id < first) {
-            first = id;
-            have_first = true;
-        }
-        if(have_after && id > after && (!have_next || id < next)) {
-            next = id;
-            have_next = true;
-        }
-    }
-    storage_dir_close(directory);
-    storage_file_free(directory);
-    if(have_next) {
-        *profile = next;
-        return true;
-    }
-    if(have_first) {
-        *profile = first;
-        return true;
-    }
-    return false;
 }
 
 bool dnd_profile_ref_path(Storage* storage, uint32_t profile, char* output, size_t size) {
@@ -115,7 +58,7 @@ bool dnd_profile_ref_path(Storage* storage, uint32_t profile, char* output, size
         while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
             if(file_info_is_dir(&info)) continue;
             if(!dnd_profile_ref_filename_is_primary(filename, prefix, (size_t)prefix_length)) continue;
-            if(pocket_d20_child_path(output, size, POCKET_D20_CHARACTER_DATA_ROOT, NULL, filename)) {
+            if(dnd_fs_child_path(output, size, POCKET_D20_CHARACTER_DATA_ROOT, NULL, filename)) {
                 found = true;
                 break;
             }
@@ -126,17 +69,19 @@ bool dnd_profile_ref_path(Storage* storage, uint32_t profile, char* output, size
     return found;
 }
 
-static bool dnd_profile_ref_primary_exists(Storage* storage, uint32_t profile) {
+bool dnd_profile_ref_exists(Storage* storage, uint32_t profile) {
     char path[160];
     return dnd_profile_ref_path(storage, profile, path, sizeof(path));
 }
-bool dnd_profile_ref_active(Storage* storage, uint32_t* profile) {
+
+bool dnd_profile_ref_active_id(Storage* storage, uint32_t* profile) {
     if(!storage || !profile) return false;
 
     bool found = false;
-    bool io_ok = true;
     File* file = storage_file_alloc(storage);
-    if(file && storage_file_open(file, DND_ACTIVE_PROFILE_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
+    if(!file) return false;
+
+    if(storage_file_open(file, DND_ACTIVE_PROFILE_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
         char line[96];
         size_t used = 0U;
         while(true) {
@@ -149,8 +94,7 @@ bool dnd_profile_ref_active(Storage* storage, uint32_t* profile) {
                     if(equal) {
                         *equal++ = '\0';
                         uint32_t parsed = 0U;
-                        if(strcmp(line, "Active") == 0 &&
-                           dnd_profile_ref_parse_u32(equal, &parsed)) {
+                        if(strcmp(line, "Active") == 0 && dnd_profile_ref_parse_u32(equal, &parsed)) {
                             *profile = parsed;
                             found = true;
                         }
@@ -165,8 +109,7 @@ bool dnd_profile_ref_active(Storage* storage, uint32_t* profile) {
                 if(equal) {
                     *equal++ = '\0';
                     uint32_t parsed = 0U;
-                    if(strcmp(line, "Active") == 0 &&
-                       dnd_profile_ref_parse_u32(equal, &parsed)) {
+                    if(strcmp(line, "Active") == 0 && dnd_profile_ref_parse_u32(equal, &parsed)) {
                         *profile = parsed;
                         found = true;
                     }
@@ -176,12 +119,13 @@ bool dnd_profile_ref_active(Storage* storage, uint32_t* profile) {
             }
             if(used + 1U < sizeof(line)) line[used++] = ch;
         }
-        io_ok = storage_file_get_error(file) == FSE_OK;
         storage_file_close(file);
     }
-    if(file) storage_file_free(file);
+    storage_file_free(file);
+    return found;
+}
 
-    if(io_ok && found && dnd_profile_ref_primary_exists(storage, *profile)) return true;
-    uint32_t after = found ? *profile : 0U;
-    return dnd_profile_ref_fallback(storage, after, found, profile);
+bool dnd_profile_ref_active_exact(Storage* storage, uint32_t* profile) {
+    if(!dnd_profile_ref_active_id(storage, profile)) return false;
+    return dnd_profile_ref_exists(storage, *profile);
 }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dndolphins.h"
+#include "dnd_data.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -42,32 +42,32 @@ typedef struct {
     char problem[48];
 } PocketCampaignDiagnostics;
 
-uint16_t pocket_campaign_count(Storage* storage);
-bool pocket_campaign_at(Storage* storage, uint16_t index, PocketCampaignSummary* output);
-bool pocket_campaign_find(Storage* storage, const char* id, PocketCampaignSummary* output);
-bool pocket_campaign_scene_path(
+uint16_t dndadventure_campaigns_count(Storage* storage);
+bool dndadventure_campaigns_at(Storage* storage, uint16_t index, PocketCampaignSummary* output);
+bool dndadventure_campaigns_find(Storage* storage, const char* id, PocketCampaignSummary* output);
+bool dndadventure_campaigns_scene_path(
     Storage* storage,
     const PocketCampaignSummary* campaign,
     char* output,
     size_t size);
-bool pocket_campaign_active_load(
+bool dndadventure_campaigns_active_load(
     Storage* storage,
     uint32_t profile_id,
     char* campaign_id,
     size_t campaign_id_size);
-bool pocket_campaign_active_save(
+bool dndadventure_campaigns_active_save(
     Storage* storage,
     uint32_t profile_id,
     const char* campaign_id);
-bool pocket_campaign_progress_load(
+bool dndadventure_campaigns_progress_load(
     Storage* storage,
     uint32_t profile_id,
     const PocketCampaignSummary* campaign,
     PocketCampaignProgress* progress);
-bool pocket_campaign_progress_save(
+bool dndadventure_campaigns_progress_save(
     Storage* storage,
     uint32_t profile_id,
     const PocketCampaignSummary* campaign,
     const PocketCampaignProgress* progress);
-void pocket_campaign_diagnose(Storage* storage, PocketCampaignDiagnostics* output);
-void pocket_campaign_cache_reset(void);
+void dndadventure_campaigns_diagnose(Storage* storage, PocketCampaignDiagnostics* output);
+void dndadventure_campaigns_cache_reset(void);

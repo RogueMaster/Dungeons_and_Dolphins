@@ -37,7 +37,7 @@ typedef struct {
  * Distinct spell components use secondary_relation so the UI never collapses attack,
  * save, delayed, healing, temporary-HP, or mitigation rolls into a misleading total.
  */
-static const PocketSpellDamageMap pocket_spell_damage_map[] = {
+static const PocketSpellDamageMap dndolphins_spell_combat_damage_map[] = {
     {"Acid Splash", 1, 6, 0, 0, 0, 0, 0, 0, 1, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Chill Touch", 1, 10, 0, 0, 0, 0, 0, 0, 1, 0, PocketSpellResolutionAttack, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Eldritch Blast", 1, 10, 0, 0, 0, 0, 0, 0, 0, 0, PocketSpellResolutionAttack, 1, 0, 1, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
@@ -215,27 +215,27 @@ static const PocketSpellDamageMap pocket_spell_damage_map[] = {
     {"Holy Star of Mystra", 4, 10, 0, 0, 0, 0, 0, 0, 0, 1, PocketSpellResolutionAttack, 1, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
 };
 
-static uint8_t pocket_saturating_dice_count(uint16_t value) {
+static uint8_t dndolphins_spell_combat_saturating_dice_count(uint16_t value) {
     return value > 80U ? 80U : (uint8_t)value;
 }
 
-static size_t pocket_bounded_strlen(const char* text, size_t capacity) {
+static size_t dndolphins_spell_combat_bounded_strlen(const char* text, size_t capacity) {
     if(!text) return 0U;
     size_t length = 0U;
     while(length < capacity && text[length]) ++length;
     return length;
 }
 
-static uint8_t pocket_cantrip_multiplier(uint8_t character_level) {
+static uint8_t dndolphins_spell_combat_cantrip_multiplier(uint8_t character_level) {
     if(character_level >= 17U) return 4U;
     if(character_level >= 11U) return 3U;
     if(character_level >= 5U) return 2U;
     return 1U;
 }
 
-static bool pocket_contains_ci(const char* text, const char* needle) {
+static bool dndolphins_spell_combat_contains_ci(const char* text, const char* needle) {
     if(!text || !needle || !*needle) return false;
-    size_t text_len = pocket_bounded_strlen(text, POCKET_D20_DETAIL_LEN);
+    size_t text_len = dndolphins_spell_combat_bounded_strlen(text, POCKET_D20_DETAIL_LEN);
     size_t needle_len = strlen(needle);
     if(!needle_len || needle_len > text_len) return false;
     for(size_t cursor = 0U; cursor + needle_len <= text_len; ++cursor) {
@@ -249,13 +249,13 @@ static bool pocket_contains_ci(const char* text, const char* needle) {
     return false;
 }
 
-static bool pocket_parse_damage_dice(
+static bool dndolphins_spell_combat_parse_damage_dice(
     const char* text,
     uint8_t* dice,
     uint8_t* die,
     int16_t* flat_bonus) {
     if(!text || !dice || !die || !flat_bonus) return false;
-    size_t text_len = pocket_bounded_strlen(text, POCKET_D20_DETAIL_LEN);
+    size_t text_len = dndolphins_spell_combat_bounded_strlen(text, POCKET_D20_DETAIL_LEN);
     for(size_t cursor_index = 0U; cursor_index < text_len; ++cursor_index) {
         const char* cursor = text + cursor_index;
         if(!isdigit((unsigned char)*cursor)) continue;
@@ -322,7 +322,7 @@ static bool pocket_parse_damage_dice(
     return false;
 }
 
-bool pocket_d20_spell_damage_spec(
+bool dndolphins_spell_combat_damage_spec(
     const PocketSpell* spell,
     uint8_t cast_level,
     uint8_t character_level,
@@ -331,22 +331,22 @@ bool pocket_d20_spell_damage_spec(
     if(!spell || !output) return false;
     memset(output, 0, sizeof(*output));
 
-    for(size_t index = 0U; index < sizeof(pocket_spell_damage_map) / sizeof(pocket_spell_damage_map[0]);
+    for(size_t index = 0U; index < sizeof(dndolphins_spell_combat_damage_map) / sizeof(dndolphins_spell_combat_damage_map[0]);
         ++index) {
-        const PocketSpellDamageMap* mapped = &pocket_spell_damage_map[index];
+        const PocketSpellDamageMap* mapped = &dndolphins_spell_combat_damage_map[index];
         if(strncmp(mapped->name, spell->name, POCKET_D20_SPELL_NAME_LEN) != 0) continue;
         uint8_t multiplier =
-            mapped->cantrip_scale ? pocket_cantrip_multiplier(character_level) : 1U;
+            mapped->cantrip_scale ? dndolphins_spell_combat_cantrip_multiplier(character_level) : 1U;
         uint8_t safe_cast_level = cast_level < POCKET_D20_SLOT_COUNT ? cast_level : 9U;
         uint8_t safe_spell_level = spell->level < POCKET_D20_SLOT_COUNT ? spell->level : 9U;
         uint8_t upcast = safe_cast_level > safe_spell_level ?
                              (uint8_t)(safe_cast_level - safe_spell_level) :
                              0U;
-        output->primary_dice = pocket_saturating_dice_count(
+        output->primary_dice = dndolphins_spell_combat_saturating_dice_count(
             (uint16_t)mapped->primary_dice * multiplier +
             (uint16_t)mapped->primary_upcast * upcast);
         output->primary_die = mapped->primary_die;
-        output->secondary_dice = pocket_saturating_dice_count(
+        output->secondary_dice = dndolphins_spell_combat_saturating_dice_count(
             (uint16_t)mapped->secondary_dice * multiplier +
             (uint16_t)mapped->secondary_upcast * upcast);
         output->secondary_die = mapped->secondary_die;
@@ -366,7 +366,7 @@ bool pocket_d20_spell_damage_spec(
                 PocketSpellSpecialSorcerousBurst :
                 PocketSpellSpecialNone;
         if(mapped->cantrip_attack_scale)
-            output->attack_rolls = pocket_cantrip_multiplier(character_level);
+            output->attack_rolls = dndolphins_spell_combat_cantrip_multiplier(character_level);
         else {
             uint16_t attacks =
                 (uint16_t)mapped->attack_rolls + (uint16_t)mapped->attack_rolls_upcast * upcast;
@@ -380,12 +380,12 @@ bool pocket_d20_spell_damage_spec(
         return true;
     }
 
-    if(pocket_parse_damage_dice(
+    if(dndolphins_spell_combat_parse_damage_dice(
            spell->detail, &output->primary_dice, &output->primary_die, &output->flat_bonus)) {
         /* A plain XdY note is treated as spell-attack damage. Authors can include
          * "save" or "DC" in the note to make the fallback use the spell save DC instead. */
         output->resolution =
-            (pocket_contains_ci(spell->detail, "save") || pocket_contains_ci(spell->detail, "dc")) ?
+            (dndolphins_spell_combat_contains_ci(spell->detail, "save") || dndolphins_spell_combat_contains_ci(spell->detail, "dc")) ?
                 PocketSpellResolutionSave :
                 PocketSpellResolutionAttack;
         output->attack_rolls = output->resolution == PocketSpellResolutionAttack ? 1U : 0U;

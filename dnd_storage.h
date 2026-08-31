@@ -1,6 +1,6 @@
 #pragma once
 
-#include "dndolphins.h"
+#include "dnd_data.h"
 
 #include <storage/storage.h>
 
@@ -27,29 +27,33 @@ typedef struct {
     uint8_t scan_succeeded;
 } PocketProfileState;
 
-bool pocket_d20_storage_move_legacy_profiles(Storage* storage);
-void pocket_d20_profiles_set_defaults(PocketProfileState* profiles);
-void pocket_d20_profiles_free(PocketProfileState* profiles);
-bool pocket_d20_profiles_load(Storage* storage, PocketProfileState* profiles);
-bool pocket_d20_profiles_save(Storage* storage, const PocketProfileState* profiles);
-bool pocket_d20_profiles_refresh(Storage* storage, PocketProfileState* profiles);
-const PocketProfileEntry* pocket_d20_profiles_entry_at(
+bool dnd_storage_move_legacy_profiles(Storage* storage);
+void dnd_storage_profiles_set_defaults(PocketProfileState* profiles);
+void dnd_storage_profiles_free(PocketProfileState* profiles);
+bool dnd_storage_profiles_load(Storage* storage, PocketProfileState* profiles);
+bool dnd_storage_profiles_save(Storage* storage, const PocketProfileState* profiles);
+bool dnd_storage_profiles_refresh(Storage* storage, PocketProfileState* profiles);
+const PocketProfileEntry* dnd_storage_profiles_entry_at(
     Storage* storage,
     PocketProfileState* profiles,
     uint16_t index);
-bool pocket_d20_profiles_window(
+bool dnd_storage_profiles_window(
     Storage* storage,
     PocketProfileState* profiles,
     uint16_t start);
-bool pocket_d20_profiles_find(
+bool dnd_storage_profiles_find(
     Storage* storage,
     uint32_t profile,
     PocketProfileEntry* entry);
-bool pocket_d20_profiles_next_after(
+bool dnd_storage_profiles_next_after(
     Storage* storage,
     uint32_t profile,
     PocketProfileEntry* entry);
-uint32_t pocket_d20_profiles_next_id(const PocketProfileState* profiles);
+uint32_t dnd_storage_profiles_next_id(const PocketProfileState* profiles);
+
+/* Read only the persisted Active=<id> metadata. This never scans for,
+   substitutes, or activates another character. */
+bool dnd_storage_load_active_profile_id(Storage* storage, uint32_t* profile);
 
 /* Character-owned spell/item collections. These files are authoritative for owned
    records; the main character save does not contain spell/item rows. */
@@ -79,32 +83,52 @@ typedef struct {
     uint8_t shield_bonus;
 } PocketD20ItemAggregate;
 
-bool pocket_d20_storage_visit_spells(
+bool dnd_storage_visit_spells(
     Storage* storage,
     uint32_t profile,
     PocketD20SpellRecordVisitor visitor,
     void* context,
     uint8_t* total_count);
-bool pocket_d20_storage_visit_items(
+bool dnd_storage_visit_items(
     Storage* storage,
     uint32_t profile,
     PocketD20ItemRecordVisitor visitor,
     void* context,
     uint8_t* total_count);
-bool pocket_d20_storage_spell_class_counts(
+bool dnd_storage_spell_class_counts(
     Storage* storage,
     uint32_t profile,
     PocketD20SpellClassCounts* counts,
     uint8_t* total_count);
-bool pocket_d20_storage_item_aggregate(
+bool dnd_storage_item_aggregate(
     Storage* storage,
     uint32_t profile,
     PocketD20ItemAggregate* aggregate,
     uint8_t* total_count);
-bool pocket_d20_storage_items_exist(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_ensure_items_sidecar(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_remove_live_items(Storage* storage, uint32_t profile);
+bool dnd_storage_items_exist(Storage* storage, uint32_t profile);
+bool dnd_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile);
+bool dnd_storage_ensure_items_sidecar(Storage* storage, uint32_t profile);
+bool dnd_storage_remove_live_items(Storage* storage, uint32_t profile);
+/* Currency is owned exclusively by the Inventory sidecar. Character profile
+   Currency= fields are neither loaded nor serialized. */
+bool dnd_storage_load_inventory_currency(
+    Storage* storage,
+    uint32_t profile,
+    int32_t currency[5],
+    bool* found);
+bool dnd_storage_inventory_initial_grant_state(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t* state);
+bool dnd_storage_inventory_initial_granted(
+    Storage* storage,
+    uint32_t profile,
+    bool* granted);
+bool dnd_storage_save_inventory_currency(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* owner,
+    const int32_t currency[5]);
 
 typedef struct {
     const char* path;
@@ -113,7 +137,7 @@ typedef struct {
 
 /* Low-level item-sidecar composition. Feature policy (which assets/keys to use,
    when initialization occurs, and how currency is applied) belongs to items.c. */
-bool pocket_d20_storage_create_items_from_assets(
+bool dnd_storage_create_items_from_assets(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
@@ -121,19 +145,31 @@ bool pocket_d20_storage_create_items_from_assets(
     uint8_t asset_count,
     int32_t currency[5],
     bool* created);
+/* Explicit one-time Inventory override helper. Existing records are preserved,
+   matching seed records are appended, Currency= is increased, and a successful
+   publish writes InitialInventory=2 so the override cannot be repeated. */
+bool dnd_storage_regrant_items_from_assets(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* owner,
+    const PocketD20ItemSeedAsset* assets,
+    uint8_t asset_count,
+    const PocketD20ItemSeedAsset* fallback_asset,
+    int32_t currency_added[5],
+    bool* applied);
 
-bool pocket_d20_storage_load_spellbook_window(
+bool dnd_storage_load_spellbook_window(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     PocketCharacter* character,
     uint8_t* total_count);
-bool pocket_d20_storage_save_spellbook_window(
+bool dnd_storage_save_spellbook_window(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     const PocketCharacter* character);
-bool pocket_d20_storage_append_spell(
+bool dnd_storage_append_spell(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
@@ -142,55 +178,64 @@ bool pocket_d20_storage_append_spell(
     uint8_t always_prepared,
     uint8_t free_casts_current,
     uint8_t free_casts_max);
-bool pocket_d20_storage_delete_spell(
+bool dnd_storage_delete_spell(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
     uint8_t index);
+bool dnd_storage_reset_spell_free_casts(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* owner);
+bool dnd_storage_remap_spell_classes(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* owner,
+    uint8_t removed_class);
 
-bool pocket_d20_storage_load_items_window(
+bool dnd_storage_load_items_window(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     PocketCharacter* character,
     uint8_t* total_count);
-bool pocket_d20_storage_save_items_window(
+bool dnd_storage_save_items_window(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     const PocketCharacter* character);
-bool pocket_d20_storage_append_item(
+bool dnd_storage_append_item(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
     const PocketItem* item);
-bool pocket_d20_storage_delete_item(
+bool dnd_storage_delete_item(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
     uint8_t index);
 
-bool pocket_d20_storage_load_profile(
+bool dnd_storage_load_profile(
     Storage* storage,
     uint32_t profile,
     PocketSaveData* data,
     bool* recovered_backup);
-bool pocket_d20_storage_save_profile(
+bool dnd_storage_save_profile(
     Storage* storage,
     uint32_t profile,
     const PocketSaveData* data);
-bool pocket_d20_storage_save_profile_updated(
+bool dnd_storage_save_profile_updated(
     Storage* storage,
     uint32_t profile,
     const PocketSaveData* data);
-bool pocket_d20_storage_save_profile_known_updated(
+bool dnd_storage_save_profile_known_updated(
     Storage* storage,
     const PocketProfileEntry* current_entry,
     const PocketSaveData* data);
-bool pocket_d20_storage_delete_profile(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t destination);
-bool pocket_d20_storage_export_profile(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_archive_profile(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_verify_profile(Storage* storage, uint32_t profile);
-bool pocket_d20_storage_restore_backup(Storage* storage, uint32_t profile, PocketSaveData* data);
-bool pocket_d20_storage_import_first(Storage* storage, uint32_t destination, PocketSaveData* data);
+bool dnd_storage_delete_profile(Storage* storage, uint32_t profile);
+bool dnd_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t destination);
+bool dnd_storage_export_profile(Storage* storage, uint32_t profile);
+bool dnd_storage_archive_profile(Storage* storage, uint32_t profile);
+bool dnd_storage_verify_profile(Storage* storage, uint32_t profile);
+bool dnd_storage_restore_backup(Storage* storage, uint32_t profile, PocketSaveData* data);
+bool dnd_storage_import_first(Storage* storage, uint32_t destination, PocketSaveData* data);
