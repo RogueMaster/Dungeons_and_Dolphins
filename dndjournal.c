@@ -23,6 +23,8 @@
 #define JOURNAL_CACHE_SIZE 8U
 #define JOURNAL_READ_BUFFER 256U
 #define JOURNAL_PROFILE_PATH APP_DATA_PATH("ch_%lu")
+#define JOURNAL_CLASS_MAX 4U
+#define JOURNAL_ITEM_PATH POCKET_D20_CHARACTER_DATA_ROOT "/inventory_%lu.txt"
 
 typedef enum {
     JournalCategoryQuick,
@@ -82,14 +84,21 @@ typedef struct {
     uint8_t cache_count;
     uint8_t current_loaded;
     uint8_t detail_field;
+    uint8_t detail_scroll;
+    char class_names[JOURNAL_CLASS_MAX][JOURNAL_NAME_LEN];
+    uint8_t class_levels[JOURNAL_CLASS_MAX];
+    uint8_t class_count;
     uint8_t return_to_dnd;
     uint8_t launch_adventure;
+    uint8_t have_profile;
     uint32_t profile;
     JournalScreen screen;
     JournalEdit edit;
     char edit_buffer[JOURNAL_BODY_LEN];
     char status[32];
 } JournalApp;
+
+static void journal_set_status(JournalApp* app, const char* status);
 
 static const char* const journal_category_names[JournalCategoryCount] = {
     "Quick",
@@ -280,6 +289,109 @@ static void journal_skip_field_value(JournalReader* reader) {
         if(character == '\n') break;
 }
 
+static bool journal_parse_i32(const char* text, int32_t* output) {
+    if(!text || !text[0] || !output) return false;
+    bool negative = false;
+    if(*text == '-' || *text == '+') {
+        negative = *text == '-';
+        ++text;
+    }
+    if(*text < '0' || *text > '9') return false;
+    int32_t value = 0;
+    while(*text) {
+        if(*text < '0' || *text > '9') return false;
+        int32_t digit = (int32_t)(*text - '0');
+        if(value > (INT32_MAX - digit) / 10) return false;
+        value = value * 10 + digit;
+        ++text;
+    }
+    *output = negative ? -value : value;
+    return true;
+}
+
+static uint8_t journal_parse_csv_i32(char* text, int32_t* values, uint8_t capacity) {
+    if(!text || !values || !capacity) return 0U;
+    uint8_t count = 0U;
+    char* cursor = text;
+    while(count < capacity && *cursor) {
+        char* comma = strchr(cursor, ',');
+        if(comma) *comma = '\0';
+        if(!journal_parse_i32(cursor, &values[count])) return count;
+        ++count;
+        if(!comma) break;
+        cursor = comma + 1U;
+    }
+    return count;
+}
+
+static bool journal_class_key(const char* key, const char* suffix, uint8_t* index) {
+    if(!key || !suffix || strncmp(key, "Class", 5U)) return false;
+    const char* cursor = key + 5U;
+    if(*cursor < '0' || *cursor > '9') return false;
+    uint32_t value = 0U;
+    while(*cursor >= '0' && *cursor <= '9') {
+        uint32_t digit = (uint32_t)(*cursor - '0');
+        if(value > (UINT32_MAX - digit) / 10U) return false;
+        value = value * 10U + digit;
+        ++cursor;
+    }
+    if(value >= JOURNAL_CLASS_MAX || strcmp(cursor, suffix)) return false;
+    *index = (uint8_t)value;
+    return true;
+}
+
+static bool journal_load_classes(JournalApp* app) {
+    if(!app || !app->storage || !app->have_profile) return false;
+    memset(app->class_names, 0, sizeof(app->class_names));
+    memset(app->class_levels, 0, sizeof(app->class_levels));
+    app->class_count = 0U;
+    char path[JOURNAL_PATH_LEN];
+    if(!dnd_profile_ref_path(app->storage, app->profile, path, sizeof(path))) return false;
+    File* file = storage_file_alloc(app->storage);
+    if(!file || !storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        if(file) storage_file_free(file);
+        return false;
+    }
+    JournalReader reader = {.file = file};
+    char key[32];
+    char value[192];
+    while(journal_read_field_key(&reader, key, sizeof(key))) {
+        uint8_t index = 0U;
+        if(journal_class_key(key, "Name", &index)) {
+            if(journal_read_decoded_field_value(
+                   &reader, app->class_names[index], sizeof(app->class_names[index]))) {
+                if(index + 1U > app->class_count) app->class_count = (uint8_t)(index + 1U);
+            }
+        } else if(journal_class_key(key, "Data", &index)) {
+            if(journal_read_raw_field_value(&reader, value, sizeof(value))) {
+                char* comma = strchr(value, ',');
+                if(comma) *comma = '\0';
+                uint32_t level = 0U;
+                if(journal_parse_u32(value, &level) && level <= 20U) {
+                    app->class_levels[index] = (uint8_t)level;
+                    if(index + 1U > app->class_count) app->class_count = (uint8_t)(index + 1U);
+                }
+            }
+        } else {
+            journal_skip_field_value(&reader);
+        }
+    }
+    bool ok = storage_file_get_error(file) == FSE_OK;
+    storage_file_close(file);
+    storage_file_free(file);
+    while(app->class_count && !app->class_levels[app->class_count - 1U] &&
+          !app->class_names[app->class_count - 1U][0])
+        --app->class_count;
+    return ok && app->class_count;
+}
+
+static uint8_t journal_total_level(const JournalApp* app) {
+    uint16_t total = 0U;
+    if(!app) return 0U;
+    for(uint8_t i = 0U; i < app->class_count; ++i) total += app->class_levels[i];
+    return (uint8_t)(total > 20U ? 20U : total);
+}
+
 static bool journal_profile_dir(char* output, size_t size, uint32_t profile) {
     int length = snprintf(output, size, JOURNAL_PROFILE_PATH, (unsigned long)profile);
     return length > 0 && (size_t)length < size;
@@ -335,6 +447,205 @@ static bool journal_publish_temp(
     if(had_destination) storage_common_rename(storage, backup, destination);
     storage_common_remove(storage, temporary);
     return false;
+}
+
+static bool journal_read_line(
+    JournalReader* reader,
+    char* line,
+    size_t size,
+    bool* overflow) {
+    if(!reader || !line || size < 2U) return false;
+    size_t used = 0U;
+    bool consumed = false;
+    bool too_long = false;
+    char ch = '\0';
+    while(journal_reader_next(reader, &ch)) {
+        consumed = true;
+        if(ch == '\n') break;
+        if(ch == '\r') continue;
+        if(used + 1U < size)
+            line[used++] = ch;
+        else
+            too_long = true;
+    }
+    line[used] = '\0';
+    if(overflow) *overflow = too_long;
+    return consumed;
+}
+
+static bool journal_write_line(File* file, const char* line) {
+    if(!file || !line) return false;
+    size_t length = strlen(line);
+    return storage_file_write(file, line, length) == length &&
+           storage_file_write(file, "\n", 1U) == 1U;
+}
+
+static bool journal_patch_milestone_class(JournalApp* app, uint8_t class_index) {
+    if(!app || !app->storage || !app->have_profile || class_index >= JOURNAL_CLASS_MAX)
+        return false;
+    char path[JOURNAL_PATH_LEN];
+    if(!dnd_profile_ref_path(app->storage, app->profile, path, sizeof(path))) return false;
+    char temporary[JOURNAL_PATH_LEN], backup[JOURNAL_PATH_LEN];
+    int tn = snprintf(temporary, sizeof(temporary), "%s.jtmp", path);
+    int bn = snprintf(backup, sizeof(backup), "%s.jbak", path);
+    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) || (size_t)bn >= sizeof(backup))
+        return false;
+
+    File* input = storage_file_alloc(app->storage);
+    File* output = storage_file_alloc(app->storage);
+    char* line = malloc(768U);
+    char* parse = malloc(768U);
+    if(!input || !output || !line || !parse) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        free(line);
+        free(parse);
+        return false;
+    }
+    bool ok = storage_file_open(input, path, FSAM_READ, FSOM_OPEN_EXISTING) &&
+              storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool class_touched = false;
+    if(ok) {
+        JournalReader reader = {.file = input};
+        char target[24];
+        snprintf(target, sizeof(target), "Class%uData", class_index);
+        bool overflow = false;
+        while(ok && journal_read_line(&reader, line, 768U, &overflow)) {
+            if(overflow) { ok = false; break; }
+            char replacement[256];
+            const char* out_line = line;
+            journal_copy(parse, 768U, line);
+            char* value = strchr(parse, '=');
+            if(value) {
+                *value++ = '\0';
+                if(!strcmp(parse, target)) {
+                    int32_t values[16] = {0};
+                    if(journal_parse_csv_i32(value, values, 16U) == 16U && values[0] < 20) {
+                        ++values[0];
+                        if(values[2] < 20) ++values[2];
+                        if(values[3] < 20) ++values[3];
+                        int n = snprintf(
+                            replacement,
+                            sizeof(replacement),
+                            "%s=%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+                            target,
+                            (long)values[0], (long)values[1], (long)values[2], (long)values[3],
+                            (long)values[4], (long)values[5], (long)values[6], (long)values[7],
+                            (long)values[8], (long)values[9], (long)values[10], (long)values[11],
+                            (long)values[12], (long)values[13], (long)values[14], (long)values[15]);
+                        if(n > 0 && (size_t)n < sizeof(replacement)) {
+                            out_line = replacement;
+                            class_touched = true;
+                        }
+                    }
+                } else if(!strcmp(parse, "Vitals")) {
+                    int32_t values[12] = {0};
+                    if(journal_parse_csv_i32(value, values, 12U) == 12U) {
+                        if(values[11] < 20) ++values[11];
+                        int n = snprintf(
+                            replacement,
+                            sizeof(replacement),
+                            "Vitals=%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+                            (long)values[0], (long)values[1], (long)values[2], (long)values[3],
+                            (long)values[4], (long)values[5], (long)values[6], (long)values[7],
+                            (long)values[8], (long)values[9], (long)values[10], (long)values[11]);
+                        if(n > 0 && (size_t)n < sizeof(replacement)) out_line = replacement;
+                    }
+                }
+            }
+            ok = journal_write_line(output, out_line);
+        }
+        if(ok) ok = storage_file_sync(output);
+    }
+    storage_file_close(input);
+    storage_file_close(output);
+    storage_file_free(input);
+    storage_file_free(output);
+    free(line);
+    free(parse);
+    if(!ok || !class_touched) {
+        storage_common_remove(app->storage, temporary);
+        return false;
+    }
+    return journal_publish_temp(app->storage, temporary, path, backup);
+}
+
+static bool journal_write_collection_field(File* file, const char* value) {
+    if(!file || !value) return false;
+    static const char digits[] = "0123456789ABCDEF";
+    char chunk[64];
+    size_t used = 0U;
+    for(size_t i = 0U; value[i]; ++i) {
+        uint8_t byte = (uint8_t)value[i];
+        bool escape = byte == '%' || byte == '|' || byte == '\n' || byte == '\r' || byte < 0x20U;
+        size_t needed = escape ? 3U : 1U;
+        if(used + needed > sizeof(chunk)) {
+            if(storage_file_write(file, chunk, used) != used) return false;
+            used = 0U;
+        }
+        if(escape) {
+            chunk[used++] = '%';
+            chunk[used++] = digits[byte >> 4U];
+            chunk[used++] = digits[byte & 0x0FU];
+        } else {
+            chunk[used++] = (char)byte;
+        }
+    }
+    return !used || storage_file_write(file, chunk, used) == used;
+}
+
+static bool journal_ensure_item_sidecar(JournalApp* app, char* path, size_t size) {
+    if(!app || !path || !size) return false;
+    int n = snprintf(path, size, JOURNAL_ITEM_PATH, (unsigned long)app->profile);
+    if(n <= 0 || (size_t)n >= size) return false;
+    storage_common_mkdir(app->storage, POCKET_D20_CHARACTER_DATA_ROOT);
+    bool needs_header = !storage_file_exists(app->storage, path);
+    if(!needs_header) {
+        File* existing = storage_file_alloc(app->storage);
+        if(!existing) return false;
+        bool opened = storage_file_open(existing, path, FSAM_READ, FSOM_OPEN_EXISTING);
+        uint64_t file_size = opened ? storage_file_size(existing) : 0U;
+        if(opened) storage_file_close(existing);
+        storage_file_free(existing);
+        if(!opened) return false;
+        needs_header = file_size == 0U;
+    }
+    if(!needs_header) return true;
+    File* file = storage_file_alloc(app->storage);
+    if(!file) return false;
+    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+              storage_file_write(file, "DNDItems=1\n", 11U) == 11U && storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
+static bool journal_create_inventory_item(JournalApp* app) {
+    if(!app || !app->current_loaded || app->current_entry.category != JournalCategoryItem)
+        return false;
+    char path[JOURNAL_PATH_LEN];
+    if(!journal_ensure_item_sidecar(app, path, sizeof(path))) return false;
+    File* file = storage_file_alloc(app->storage);
+    if(!file) return false;
+    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_OPEN_EXISTING);
+    if(ok) {
+        uint64_t end = storage_file_size(file);
+        ok = end <= UINT32_MAX && storage_file_seek(file, (uint32_t)end, true);
+    }
+    if(ok) ok = storage_file_write(file, "I|", 2U) == 2U;
+    if(ok) ok = journal_write_collection_field(file, app->current_entry.title);
+    if(ok) ok = storage_file_write(file, "|", 1U) == 1U;
+    if(ok) ok = journal_write_collection_field(file, app->current_entry.body);
+    if(ok) ok = storage_file_write(file, "||", 2U) == 2U;
+    if(ok) {
+        const char* numeric =
+            "1,0,0,0,0,0,0,0,1,6,0,0,0,1,0,6,0,0,0,-1,0,0,0,-1,0\n";
+        size_t length = strlen(numeric);
+        ok = storage_file_write(file, numeric, length) == length && storage_file_sync(file);
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
 }
 
 static bool journal_read_entry(
@@ -659,6 +970,8 @@ static bool journal_open_detail(JournalApp* app, uint16_t index) {
     app->current_loaded = 1U;
     app->screen = JournalScreenDetail;
     app->detail_field = 0U;
+    app->detail_scroll = 0U;
+    (void)journal_load_classes(app);
     return true;
 }
 
@@ -677,6 +990,7 @@ static void journal_update_cached_current(JournalApp* app) {
 }
 
 static bool journal_save_entry(JournalApp* app, JournalEntry* entry) {
+    if(!app->have_profile) return false;
     if(!journal_file_name_valid(entry->file_name) || entry->category >= JournalCategoryCount)
         return false;
     char path[JOURNAL_PATH_LEN];
@@ -711,7 +1025,59 @@ static bool journal_save_entry(JournalApp* app, JournalEntry* entry) {
     return journal_publish_temp(app->storage, temporary, path, backup);
 }
 
+static bool journal_apply_milestone_level(JournalApp* app) {
+    if(!app || !app->current_loaded) return false;
+    JournalEntry* entry = &app->current_entry;
+    if(entry->category != JournalCategoryMilestone) {
+        journal_set_status(app, "Set category Milestone");
+        return false;
+    }
+    if(entry->level_granted) {
+        journal_set_status(app, "Level already applied");
+        return false;
+    }
+    if(!journal_load_classes(app) || !app->class_count) {
+        journal_set_status(app, "No class found");
+        return false;
+    }
+    if(journal_total_level(app) >= 20U) {
+        journal_set_status(app, "Maximum total level");
+        return false;
+    }
+    if(entry->class_index >= app->class_count || !app->class_levels[entry->class_index])
+        entry->class_index = 0U;
+    if(entry->class_index >= app->class_count || !app->class_levels[entry->class_index]) {
+        journal_set_status(app, "Class unavailable");
+        return false;
+    }
+
+    uint8_t prior_completed = entry->completed;
+    uint8_t prior_granted = entry->level_granted;
+    entry->completed = 1U;
+    entry->level_granted = 1U;
+    /* Persist the one-shot gate before changing the character. A write/power failure
+       can therefore never turn a single milestone into two class levels. */
+    if(!journal_save_entry(app, entry)) {
+        entry->completed = prior_completed;
+        entry->level_granted = prior_granted;
+        journal_set_status(app, "Milestone save failed");
+        return false;
+    }
+    if(!journal_patch_milestone_class(app, entry->class_index)) {
+        entry->completed = prior_completed;
+        entry->level_granted = prior_granted;
+        (void)journal_save_entry(app, entry);
+        journal_set_status(app, "Level update failed");
+        return false;
+    }
+    journal_update_cached_current(app);
+    (void)journal_load_classes(app);
+    journal_set_status(app, "Class level increased");
+    return true;
+}
+
 static bool journal_create_entry(JournalApp* app, JournalEntry* entry) {
+    if(!app->have_profile) return false;
     if(!journal_ensure_directory(app->storage, app->profile)) return false;
     DateTime now;
     furi_hal_rtc_get_datetime(&now);
@@ -814,17 +1180,28 @@ static void journal_draw_detail(Canvas* canvas, JournalApp* app) {
     journal_draw_header(canvas, app, "Journal Entry");
     if(!app->current_loaded) return;
     const JournalEntry* entry = &app->current_entry;
-    char rows[5][48];
+    char rows[9][48];
     snprintf(rows[0], sizeof(rows[0]), "Category: %s", journal_category_names[entry->category]);
     snprintf(rows[1], sizeof(rows[1]), "Title: %.32s", entry->title);
     snprintf(rows[2], sizeof(rows[2]), "Body: %.32s", entry->body);
     snprintf(rows[3], sizeof(rows[3]), "Complete: %s", entry->completed ? "Yes" : "No");
-    journal_copy(
-        rows[4],
-        sizeof(rows[4]),
-        entry->category == JournalCategoryMilestone ? "Continue Adventure" : "Delete Entry");
-    for(uint8_t row = 0U; row < 5U; ++row)
-        journal_draw_row(canvas, row, row == app->detail_field, rows[row]);
+    if(entry->category == JournalCategoryMilestone) {
+        const char* class_name = entry->class_index < app->class_count && app->class_names[entry->class_index][0] ? app->class_names[entry->class_index] : "Primary";
+        snprintf(rows[4], sizeof(rows[4]), "Level class: %.24s", class_name);
+        journal_copy(rows[5], sizeof(rows[5]), entry->level_granted ? "Level already applied" : "Apply milestone level");
+        journal_copy(rows[7], sizeof(rows[7]), "Continue Adventure");
+    } else {
+        journal_copy(rows[4], sizeof(rows[4]), "Level class: --");
+        journal_copy(rows[5], sizeof(rows[5]), "Milestone level: --");
+        journal_copy(rows[7], sizeof(rows[7]), "Adventure: --");
+    }
+    journal_copy(rows[6], sizeof(rows[6]), entry->category == JournalCategoryItem ? "Create inventory item" : "Inventory item: --");
+    journal_copy(rows[8], sizeof(rows[8]), "Delete Entry");
+    for(uint8_t row = 0U; row < 5U; ++row) {
+        uint8_t index = (uint8_t)(app->detail_scroll + row);
+        if(index >= 9U) break;
+        journal_draw_row(canvas, row, index == app->detail_field, rows[index]);
+    }
 }
 
 static void journal_draw(Canvas* canvas, void* model) {
@@ -932,7 +1309,9 @@ static bool journal_input(InputEvent* event, void* context) {
             journal_return_to_dnd(app);
         else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == app->count) {
-                if(app->count >= UINT16_MAX - 1U) {
+                if(!app->have_profile) {
+                    journal_set_status(app, "Create character in DNDolphins");
+                } else if(app->count >= UINT16_MAX - 1U) {
                     journal_set_status(app, "Journal index full");
                 } else {
                     JournalEntry entry;
@@ -947,6 +1326,8 @@ static bool journal_input(InputEvent* event, void* context) {
                         app->current_loaded = 1U;
                         app->screen = JournalScreenDetail;
                         app->detail_field = 0U;
+                        app->detail_scroll = 0U;
+                        (void)journal_load_classes(app);
                         journal_set_status(app, indexed ? "Created" : "Created; index partial");
                     } else {
                         journal_set_status(app, "Create failed");
@@ -961,10 +1342,10 @@ static bool journal_input(InputEvent* event, void* context) {
     } else {
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
            event->key == InputKeyUp) {
-            app->detail_field = app->detail_field ? (uint8_t)(app->detail_field - 1U) : 4U;
+            app->detail_field = app->detail_field ? (uint8_t)(app->detail_field - 1U) : 8U;
         } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
                   event->key == InputKeyDown) {
-            app->detail_field = (uint8_t)((app->detail_field + 1U) % 5U);
+            app->detail_field = (uint8_t)((app->detail_field + 1U) % 9U);
         } else if(event->type == InputTypeShort && event->key == InputKeyBack) {
             app->screen = JournalScreenList;
             app->current_loaded = 0U;
@@ -979,9 +1360,18 @@ static bool journal_input(InputEvent* event, void* context) {
                 if(category < 0) category = JournalCategoryCount - 1;
                 if(category >= JournalCategoryCount) category = 0;
                 entry->category = (uint8_t)category;
+                if(entry->category == JournalCategoryMilestone) (void)journal_load_classes(app);
                 changed = true;
             } else if(app->detail_field == 3U) {
                 entry->completed = !entry->completed;
+                changed = true;
+            } else if(app->detail_field == 4U &&
+                      entry->category == JournalCategoryMilestone && app->class_count) {
+                int16_t index = (int16_t)entry->class_index +
+                                (event->key == InputKeyRight ? 1 : -1);
+                if(index < 0) index = (int16_t)app->class_count - 1;
+                if(index >= app->class_count) index = 0;
+                entry->class_index = (uint8_t)index;
                 changed = true;
             }
             if(changed) {
@@ -989,33 +1379,51 @@ static bool journal_input(InputEvent* event, void* context) {
                 if(saved) journal_update_cached_current(app);
                 journal_set_status(app, saved ? "Saved" : "Save failed");
             }
-        } else if(event->type == InputTypeLong && event->key == InputKeyOk &&
-                  app->current_loaded && app->detail_field == 4U &&
-                  app->current_entry.category == JournalCategoryMilestone) {
-            journal_delete_current(app);
         } else if(event->type == InputTypeShort && event->key == InputKeyOk &&
                   app->current_loaded) {
-            if(app->detail_field == 1U)
+            JournalEntry* entry = &app->current_entry;
+            if(app->detail_field == 1U) {
                 journal_begin_text(app, JournalEditTitle);
-            else if(app->detail_field == 2U)
+            } else if(app->detail_field == 2U) {
                 journal_begin_text(app, JournalEditBody);
-            else if(app->detail_field == 0U || app->detail_field == 3U) {
-                JournalEntry* entry = &app->current_entry;
-                if(app->detail_field == 0U)
+            } else if(app->detail_field == 0U || app->detail_field == 3U) {
+                if(app->detail_field == 0U) {
                     entry->category = (uint8_t)((entry->category + 1U) % JournalCategoryCount);
-                else
+                    if(entry->category == JournalCategoryMilestone) (void)journal_load_classes(app);
+                } else {
                     entry->completed = !entry->completed;
+                }
                 bool saved = journal_save_entry(app, entry);
                 if(saved) journal_update_cached_current(app);
                 journal_set_status(app, saved ? "Saved" : "Save failed");
-            } else if(app->detail_field == 4U) {
-                if(app->current_entry.category == JournalCategoryMilestone) {
-                    app->launch_adventure = 1U;
-                    view_dispatcher_stop(app->dispatcher);
+            } else if(app->detail_field == 4U && entry->category == JournalCategoryMilestone) {
+                if(app->class_count) {
+                    entry->class_index = (uint8_t)((entry->class_index + 1U) % app->class_count);
+                    bool saved = journal_save_entry(app, entry);
+                    if(saved) journal_update_cached_current(app);
+                    journal_set_status(app, saved ? "Saved" : "Save failed");
                 } else {
-                    journal_delete_current(app);
+                    journal_set_status(app, "No class found");
                 }
+            } else if(app->detail_field == 5U && entry->category == JournalCategoryMilestone) {
+                (void)journal_apply_milestone_level(app);
+            } else if(app->detail_field == 6U && entry->category == JournalCategoryItem) {
+                journal_set_status(
+                    app,
+                    journal_create_inventory_item(app) ? "Inventory item created" :
+                                                         "Inventory add failed");
+            } else if(app->detail_field == 7U && entry->category == JournalCategoryMilestone) {
+                app->launch_adventure = 1U;
+                view_dispatcher_stop(app->dispatcher);
+                return true;
+            } else if(app->detail_field == 8U) {
+                journal_delete_current(app);
             }
+        }
+        if(app->screen == JournalScreenDetail) {
+            if(app->detail_field < app->detail_scroll) app->detail_scroll = app->detail_field;
+            if(app->detail_field >= app->detail_scroll + 5U)
+                app->detail_scroll = (uint8_t)(app->detail_field - 4U);
         }
     }
     journal_refresh(app);
@@ -1045,11 +1453,18 @@ static JournalApp* journal_app_alloc(const char* args) {
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
     if(!app->gui || !app->storage) goto fail;
-    /* Explicit handoff ID wins. A direct launch uses DNDolphins' persisted
-       active character when available, otherwise character 0. */
-    if(!(args && journal_parse_u32(args, &app->profile)) &&
-       !dnd_profile_ref_active(app->storage, &app->profile))
-        app->profile = 0U;
+    /* Explicit handoff ID wins only when it resolves to a real primary
+       character. Otherwise use DNDolphins' active character, with the shared
+       resolver falling back to the first canonical character if Active is stale. */
+    bool have_profile = false;
+    if(args && journal_parse_u32(args, &app->profile)) {
+        char profile_path[JOURNAL_PATH_LEN];
+        have_profile =
+            dnd_profile_ref_path(app->storage, app->profile, profile_path, sizeof(profile_path));
+    }
+    if(!have_profile) have_profile = dnd_profile_ref_active(app->storage, &app->profile);
+    app->have_profile = have_profile ? 1U : 0U;
+    if(!have_profile) app->profile = 0U;
     app->dispatcher = view_dispatcher_alloc();
     app->view = view_alloc();
     if(!app->dispatcher || !app->view) goto fail;
@@ -1063,7 +1478,10 @@ static JournalApp* journal_app_alloc(const char* args) {
     view_set_context(app->view, app);
     view_set_draw_callback(app->view, journal_draw);
     view_set_input_callback(app->view, journal_input);
-    if(!journal_load(app)) journal_set_status(app, "Partial load/memory");
+    if(!app->have_profile)
+        journal_set_status(app, "No character; Back to DNDolphins");
+    else if(!journal_load(app))
+        journal_set_status(app, "Partial load/memory");
     app->screen = JournalScreenList;
     view_dispatcher_add_view(app->dispatcher, JournalViewMain, app->view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);

@@ -9,30 +9,26 @@
 
 ## Character / Inventory / Spells
 
-- [ ] Create a character and confirm STR/DEX/CON/INT/WIS/CHA start at 15/14/13/12/10/8; edit them and confirm existing/save-loaded scores are not overwritten by defaults.
-- [ ] On both first launch with no characters and **Create Character**, confirm Class and Species start unconfirmed and no fixed features/spells are granted. Rename the character, choose Species and choose Wizard; confirm no Fighter traits appear.
-- [ ] Select **Grant Initial Traits** at level 1 and confirm the chosen class/species deterministic traits are added. Select it again and confirm no duplicates. Verify it refuses default names, unconfirmed Class/Species and characters above level 1.
-- [ ] Increase total level across proficiency thresholds and confirm PB changes at 5/9/13/17 while multiclass levels contribute to the same total.
-- [ ] Increase/decrease class levels and confirm per-class Hit Dice maxima follow class level while already-spent Hit Dice are preserved.
-- [ ] Test full-caster and Paladin/Ranger multiclass combinations: shared slot maxima follow combined caster level while each class keeps its own cantrip/prepared limit.
-- [ ] Test Warlock level thresholds for Pact slot count/level and Mystic Arcanum availability; test Sorcerer level 2+ for Sorcery Point maximum.
-- [ ] Test Wizard level increases: minimum spellbook capacity rises by two per Wizard level after 1 and never deletes/copied extra spells when the level is reduced.
-- [ ] Cross fixed class-feature progression thresholds and confirm grants are added once with no duplicates; reload the same profile repeatedly and confirm ordinary loads do not rescan or mutate progression state.
-- [ ] Exercise ordinary non-progression screens, profile switches and repeated saves after a successful level-up; confirm none opens progression metadata. Increase a class level and confirm the bounded eight-line scan reconciles every fixed class/species grant currently due.
-- [ ] Verify fixed grant spells such as Divine Smite/Find Steed/Hunter's Mark update the existing spell record rather than duplicating it; Hunter's Mark free-cast maximum scales at its configured Ranger thresholds and Long Rest restores current free casts.
-- [ ] For a supported level-gated species spell lineage, cross total-character-level 3 and 5 using both single-class and multiclass characters; confirm fixed spells/features grant once and Long Rest restores configured free casts.
-- [ ] Confirm progression never auto-selects a subclass, ASI/feat, learned-spell choice, Fighting Style option, invocation, metamagic option or other player choice.
-- [ ] Load a readable character file containing only unknown/future body fields and confirm the profile remains usable with filename/default fallback rather than being rejected wholesale.
 - [ ] Create a character and confirm no inventory exists until Inventory is opened.
-- [ ] Inventory opened before Class/Species confirmation remains usable but does not seed defaults. After both choices are confirmed, first Inventory open seeds class/species/background equipment plus exactly one hidden d100 trinket; repeat with a header-only/record-empty item sidecar and confirm it is repaired instead of opening empty.
+- [ ] First Inventory open seeds class/species/background equipment plus exactly one hidden d100 trinket.
 - [ ] Reopen Inventory and confirm no duplicate starting items/currency.
 - [ ] Resources and Weapon Attacks do not create missing inventory.
-- [ ] In Spellbook, OK on **+ Add New** opens a blank spell editor; OK on **Name** opens allowed spells, selecting a name updates that same record, and the spell remains after reopening the app.
-- [ ] For a multiclass character, the default allowed-spell catalog is the union of eligible spells for every class at each class's own level; the Class filter narrows to one class and selected spells get an eligible Source class.
-- [ ] In Inventory, OK on **+ Add New** opens a blank item editor; OK on **Name** opens the item catalog, selecting a name updates that same record, and the item remains after reopening the app.
-- [ ] Repeat both Add tests with a sidecar containing valid records followed by a malformed/truncated trailing line; valid records remain visible and the newly appended record opens directly in its editor without a post-append reread.
-- [ ] Hold OK on the **Name** row in Spellbook/Inventory opens custom text entry.
-- [ ] Simulate/retry after an SD write failure and confirm an interrupted append does not leave a partial spell/item record.
+- [ ] In Spellbook, short OK on **+ Add New** creates a blank spell and immediately opens its full editor; short OK on the Name field opens the spell catalog and hold OK on Name allows a custom name.
+- [ ] In Inventory, short OK on **+ Add New** creates a blank item and immediately opens its full editor; short OK on the Name field opens the item catalog and hold OK on Name allows a custom name.
+- [ ] Hold OK on **+ Add New** in Spellbook/Inventory follows the same blank-record/full-editor path rather than becoming a no-op.
+- [ ] After first Inventory/Spellbook open, confirm `/ext/apps_data/dndolphins/inventory_{id}.txt` and `/ext/apps_data/dndolphins/spellbook_{id}.txt` are created and remain distinct from `ch_{id}_{name}_{level}.txt` profiles.
+- [ ] Add three Items consecutively without leaving Inventory; confirm all three appear, the file contains three valid `I|` records, then delete the middle item and confirm it stays deleted after app restart.
+- [ ] Add three Spells consecutively without leaving Spellbook; confirm all three appear, the file contains three valid `S|` records, then delete the middle spell and confirm it stays deleted after app restart.
+- [ ] Exercise the 8→9 Item and Spell boundary; confirm the first eight records persist before the next resident page is opened and the ninth record survives restart.
+- [ ] With generated starting equipment already present, add three Items in succession. After each Add New, load a catalog item, Back to Inventory, confirm the new item remains visible/focused without restarting, and verify the live inventory file already contains the final catalog-populated record.
+- [ ] Exercise starting-equipment tail sizes around an eight-record boundary (especially 7→8→9 and 15→16→17). Confirm no MPU fault, no `<read error>` rows, and no render-time pause/storage access while scrolling between pages.
+- [ ] After editing an existing Item/Spell by catalog, text input, numeric input, or left/right adjustment, inspect the live sidecar before leaving the app and confirm the change is already present.
+- [ ] Add at least three items and three spells consecutively, close/relaunch DNDolphins, and confirm every record persists.
+- [ ] Delete a middle item and middle spell, close/relaunch, and confirm the remaining records persist in order.
+- [ ] In Spell Filters, confirm Class defaults to **All Classes**; on a multiclass character it shows the union of eligible spells, and selecting a specific class restricts the catalog to that class.
+- [ ] Hold OK on a known Spellbook row and confirm Prepared toggles immediately, the `S|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back; Always Prepared remains unchanged.
+- [ ] Hold OK on an Inventory row and confirm Equipped toggles immediately, the row marker updates, the `I|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back.
+- [ ] Simulate/retry after an SD write failure and confirm an interrupted append does not leave a partial spell/item record or permanently disable later Add/Delete attempts.
 - [ ] Exercise >8 items and >8 spells across page boundaries.
 - [ ] Verify spell attack/DC, slots/Pact/points and weapon attack/damage behavior.
 
@@ -50,13 +46,60 @@
 - [ ] Existing custom pack: launch does not replace or merge the default seed.
 - [ ] Partial custom files: launch preserves them for existing recovery/manual repair behavior.
 - [ ] View/edit/delete custom monsters, install/enable packs and generate encounters.
-- [ ] Open every monster-stat field with OK and confirm the full-screen reader wraps at up to 26 characters without truncating text or miscounting scroll lines.
 - [ ] Send individual and generated monsters to Initiative.
 
 ## Stress
 
-- [ ] Inspect long selected/unselected rows in all five FAPs and confirm full-width rows display or marquee exactly 26 characters without drawing beyond the screen; verify compact sprite/numeric layouts remain intact.
 - [ ] Repeated launch/back cycles without heap growth or crash.
 - [ ] Large profile and Journal counts.
 - [ ] Large monster/campaign indexes.
 - [ ] Maximum-size encounter save/rename/delete paths.
+
+- [ ] New character starts STR 15 / DEX 14 / CON 13 / INT 12 / WIS 10 / CHA 8; existing profiles retain their saved ability scores.
+- [ ] Selecting class/species/background at level 1 does not auto-grant traits; Character > **Grant Initial Traits** applies the selected deterministic initial traits once.
+- [ ] Increasing a class level updates Hit Dice and applicable spell/resource progression, XP floor, and deterministic class features without rereading progression metadata outside that action.
+- [ ] Initiative Start New Combat opens setup with Roll for All, per-member roll, short/repeat left-right roll adjustment, hold-OK full participant editing, hold left/right participant reordering, + Temporary Member, and Begin Combat.
+- [ ] Change the active character's Dexterity, Initiative Misc, exhaustion, name, HP and AC in DNDolphins; launch Initiative and verify the existing main-character roster/combat entry refreshes without duplicating or changing monster/temp modifiers.
+- [ ] Set Initiative Roll to Normal, Advantage and Disadvantage; verify Roll for All and individual automatic rolls use the selected mode, while a directly edited Initiative total remains unchanged until that participant is rolled again.
+- [ ] Initiative hold OK in combat opens participant editing including name, roll/modifier, AC, HP, conditions and delete; short Back moves to the previous turn.
+- [ ] Bestiary full-stat-line view wraps at up to 26 characters without the old 20-character buffer truncation.
+- [ ] Adventure campaign selection shows campaign names, falling back to campaign ID only when a name is absent.
+
+## Adventure campaign selection
+
+- Open DNDAdventure with the bundled campaigns present and confirm **Reef Wardens** and **Ghost Protocol** are visible immediately in the campaign list.
+- Scroll/wrap through campaign rows and confirm labels remain visible while selected and unselected.
+- Enter a campaign, return to the campaign list, and confirm names remain visible without an SD-read/render stall.
+- Toggle/install campaign packs and confirm the visible campaign rows refresh after the campaign index changes.
+
+## Initiative / progression additions
+
+- Change the active character Dexterity, Initiative Misc, exhaustion, Alert/Jack-of-All-Trades state where applicable; relaunch Initiative and confirm the main-character modifier refreshes without changing monster/temp modifiers.
+- Give different participants Normal, Advantage and Disadvantage; verify Roll for All and single generated rolls use each participant's own mode.
+- Hold OK to open full participant editing and enter a numeric Initiative total; confirm that total is preserved until the participant is rolled again.
+- Create tied initiative totals with different modifiers and confirm the higher modifier sorts first.
+- On a fresh level-1 character, use Grant Initial Traits and confirm Grant Review appears before any pending initial grants are applied.
+- Increase a caster level across a cantrip/prepared allowance increase and confirm deterministic progression updates while the status asks the player to choose spells rather than adding arbitrary spells.
+
+### Initiative no-character / profile resolution
+
+- With no DNDolphins character files present, launch DNDInitiative directly: confirm the no-character screen appears, **Launch DNDolphins** launches the main app, **Exit Initiative** exits, and no Initiative `ch_0.txt` sidecar is created.
+- Create character ID 0, plus its Inventory and Spellbook sidecars, then launch Initiative: confirm ID 0 refreshes from the primary character file and the sidecars are never selected as the profile.
+- Change the active character's Dexterity, Initiative Misc, exhaustion, HP, AC, and name; reopen Initiative and confirm only changed values are persisted. Reopen again without changes and confirm behavior is unchanged.
+- Repeat direct launches and DNDolphins/Bestiary handoffs with a nonzero active character ID.
+
+### Startup-order stress
+
+- Repeatedly launch Bestiary with fresh/default, existing, and partially populated custom-monster storage and confirm no startup OOM or callback-before-init behavior.
+- Repeatedly launch Adventure with multiple campaign packs enabled/disabled and large indexes; confirm campaign names remain visible and no startup OOM occurs.
+
+## Level choices / campaign packs
+
+- Level Fighter from 3→4 and verify Character > Level Choices offers ASI/Feat; apply +2 and confirm the score caps at 20 and the choice does not reappear.
+- Apply +1/+1 and verify the same ability cannot be selected twice. Back out before the second pick and verify no score changes were committed.
+- Choose Feat, back out of the catalog, and verify no blank feature remains and the choice stays pending. Then choose a feat and verify the choice is recorded once.
+- Verify Fighter 6/14 and Rogue 10 produce their additional choices; multi-level jumps expose each unclaimed choice sequentially.
+- On an installed Adventure pack row, verify short OK does nothing; Hold OK toggles Active/Inactive in both directions. Confirm the registry entry and all campaign content files remain present.
+
+- [ ] Bestiary Monster Packs: short OK on an existing pack does nothing; Hold OK toggles Active/Inactive in both directions; confirm the registry row and installed monster pack files remain present.
+- [ ] Bestiary Monster Packs: short OK on the inbox/install row still installs a valid inbox pack.

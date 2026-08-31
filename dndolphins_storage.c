@@ -331,7 +331,7 @@ static void pocket_d20_spellbook_path(char* output, size_t size, uint32_t profil
     snprintf(
         output,
         size,
-        "%s/ch_%lu_spellbook.txt",
+        "%s/spellbook_%lu.txt",
         POCKET_D20_DATA_DIR,
         (unsigned long)profile);
 }
@@ -340,9 +340,72 @@ static void pocket_d20_items_path(char* output, size_t size, uint32_t profile) {
     snprintf(
         output,
         size,
-        "%s/ch_%lu_items.txt",
+        "%s/inventory_%lu.txt",
         POCKET_D20_DATA_DIR,
         (unsigned long)profile);
+}
+
+/* Collection files are established when their screen is opened.  Appends then
+   operate only on an existing file, so Add New never depends on OPEN_ALWAYS
+   semantics or a post-append reread to create its backing store. */
+static bool pocket_d20_ensure_collection_sidecar(
+    Storage* storage, const char* path, const char* header) {
+    if(!storage || !path || !header) return false;
+
+    /* Match the proven character-save path used before collection sidecars:
+       ensure the known app-data directory, then let storage_file_open() be the
+       authority. Do not gate writes through recursive stat()/mkdir checks on
+       /ext; those checks can reject a valid mounted path before the file open is
+       ever attempted on some firmware builds. */
+    storage_common_mkdir(storage, POCKET_D20_DATA_DIR);
+
+    if(storage_file_exists(storage, path)) {
+        File* existing = storage_file_alloc(storage);
+        if(!existing) return false;
+        bool opened = storage_file_open(existing, path, FSAM_READ, FSOM_OPEN_EXISTING);
+        uint64_t size = opened ? storage_file_size(existing) : 0U;
+        if(opened) storage_file_close(existing);
+        storage_file_free(existing);
+        if(!opened) return false;
+        if(size) return true;
+
+        /* An empty interrupted file contains no user records, so repairing only
+           its collection header is safe. */
+        File* repair = storage_file_alloc(storage);
+        if(!repair) return false;
+        bool success = storage_file_open(repair, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+                       storage_file_write(repair, header, strlen(header)) == strlen(header) &&
+                       storage_file_sync(repair);
+        storage_file_close(repair);
+        storage_file_free(repair);
+        return success && storage_file_exists(storage, path);
+    }
+
+    /* Flipper storage writes throughout this project use CREATE_ALWAYS.
+       CREATE_NEW proved unreliable for these first-use collection files on
+       device, leaving the editor with a RAM-only record and no backing file.
+       We already established that the destination does not exist above, so
+       CREATE_ALWAYS cannot overwrite a live collection here. */
+    File* file = storage_file_alloc(storage);
+    if(!file) return false;
+    bool success = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+                   storage_file_write(file, header, strlen(header)) == strlen(header) &&
+                   storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    return success && storage_file_exists(storage, path);
+}
+
+bool pocket_d20_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile) {
+    char path[POCKET_D20_PATH_LEN];
+    pocket_d20_spellbook_path(path, sizeof(path), profile);
+    return pocket_d20_ensure_collection_sidecar(storage, path, "DNDSpellbook=1\n");
+}
+
+bool pocket_d20_storage_ensure_items_sidecar(Storage* storage, uint32_t profile) {
+    char path[POCKET_D20_PATH_LEN];
+    pocket_d20_items_path(path, sizeof(path), profile);
+    return pocket_d20_ensure_collection_sidecar(storage, path, "DNDItems=1\n");
 }
 
 static void pocket_d20_collection_snapshot_path(
@@ -422,8 +485,7 @@ static bool pocket_d20_close_synced_file(File* file, bool success) {
 
 static bool pocket_d20_copy_file_direct(
     Storage* storage, const char* source, const char* destination) {
-    if(!storage || !source || !destination || !pocket_d20_ensure_parent_dir(storage, destination))
-        return false;
+    if(!storage || !source || !destination) return false;
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
     if(!input || !output) {
@@ -444,7 +506,7 @@ static bool pocket_d20_copy_file_direct(
     storage_file_close(output);
     storage_file_free(input);
     storage_file_free(output);
-    return success;
+    return success && storage_file_exists(storage, destination);
 }
 
 static File* pocket_d20_open_collection_snapshot(
@@ -463,9 +525,10 @@ static File* pocket_d20_open_collection_snapshot(
         pocket_d20_items_path(live, live_size, profile);
     pocket_d20_collection_snapshot_path(
         snapshot, snapshot_size, profile, owner, collection);
-    if(!pocket_d20_ensure_parent_dir(storage, snapshot) ||
-       !pocket_d20_ensure_parent_dir(storage, live))
-        return NULL;
+    /* The collection and its SWD snapshot both live directly in the canonical
+       DNDolphins data directory. Use the same best-effort mkdir pattern as the
+       working character save path instead of the recursive parent validator. */
+    storage_common_mkdir(storage, POCKET_D20_DATA_DIR);
     File* file = storage_file_alloc(storage);
     if(!file) return NULL;
     if(!storage_file_open(file, snapshot, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
@@ -487,66 +550,36 @@ static bool pocket_d20_publish_collection_snapshot(
 }
 
 
-static File* pocket_d20_open_collection_append(
+static bool pocket_d20_copy_live_collection_to_snapshot(
     Storage* storage,
-    const char* path,
-    uint64_t* original_size,
+    const char* live,
+    File* output,
+    uint64_t* copied_size,
     bool* needs_separator) {
-    if(original_size) *original_size = 0U;
+    if(copied_size) *copied_size = 0U;
     if(needs_separator) *needs_separator = false;
-    if(!storage || !path || !original_size || !needs_separator ||
-       !pocket_d20_ensure_parent_dir(storage, path))
-        return NULL;
+    if(!storage || !live || !output || !copied_size || !needs_separator) return false;
+    if(!storage_file_exists(storage, live)) return true;
 
-    File* file = storage_file_alloc(storage);
-    if(!file) return NULL;
-    if(!storage_file_open(file, path, FSAM_READ_WRITE, FSOM_OPEN_ALWAYS)) {
-        storage_file_close(file);
-        storage_file_free(file);
-        return NULL;
-    }
-
-    uint64_t size = storage_file_size(file);
-    if(size > UINT32_MAX) {
-        storage_file_close(file);
-        storage_file_free(file);
-        return NULL;
-    }
-    *original_size = size;
-    if(size) {
-        char last = '\0';
-        if(!storage_file_seek(file, (uint32_t)(size - 1U), true) ||
-           storage_file_read(file, &last, 1U) != 1U ||
-           !storage_file_seek(file, (uint32_t)size, true)) {
-            storage_file_close(file);
-            storage_file_free(file);
-            return NULL;
+    File* input = storage_file_alloc(storage);
+    if(!input) return false;
+    bool success = storage_file_open(input, live, FSAM_READ, FSOM_OPEN_EXISTING);
+    uint8_t buffer[256];
+    char last = '\0';
+    while(success) {
+        size_t count = storage_file_read(input, buffer, sizeof(buffer));
+        if(!count) break;
+        if(storage_file_write(output, buffer, count) != count) {
+            success = false;
+            break;
         }
-        *needs_separator = last != '\n';
-    } else if(!storage_file_seek(file, 0U, true)) {
-        storage_file_close(file);
-        storage_file_free(file);
-        return NULL;
+        *copied_size += count;
+        last = (char)buffer[count - 1U];
     }
-    return file;
-}
-
-static bool pocket_d20_finish_collection_append(
-    Storage* storage,
-    File* file,
-    const char* path,
-    uint64_t original_size,
-    bool success) {
-    if(!file) return false;
-    if(success) success = storage_file_sync(file);
-    if(!success && original_size <= UINT32_MAX) {
-        if(storage_file_seek(file, (uint32_t)original_size, true))
-            storage_file_truncate(file);
-        storage_file_sync(file);
-    }
-    storage_file_close(file);
-    storage_file_free(file);
-    if(!success && original_size == 0U) storage_common_remove(storage, path);
+    if(success) success = storage_file_get_error(input) == FSE_OK;
+    storage_file_close(input);
+    storage_file_free(input);
+    if(success && *copied_size) *needs_separator = last != '\n';
     return success;
 }
 
@@ -722,9 +755,7 @@ bool pocket_d20_storage_visit_spells(
     if(!file) return false;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
-        /* Collection reads are best effort. Treat an unavailable sidecar as an
-           empty page so Add Spell remains available and can repair it. */
-        return true;
+        return false;
     }
     char* line = malloc(POCKET_D20_COLLECTION_LINE_LEN);
     if(!line) {
@@ -750,8 +781,7 @@ bool pocket_d20_storage_visit_spells(
         if(logical < POCKET_D20_MAX_SPELLS) ++logical;
         if(!keep_scanning) break;
     }
-    /* Keep every complete record already parsed. A trailing read error or a
-       malformed/manual line must not invalidate the usable portion of a page. */
+    if(storage_file_get_error(file) != FSE_OK) success = false;
     if(total_count) *total_count = logical;
     free(line);
     storage_file_close(file);
@@ -860,7 +890,7 @@ bool pocket_d20_storage_load_spellbook_window(
     free(line);
     storage_file_close(file);
     storage_file_free(file);
-    if(!success && character->spell_count == 0U) pocket_d20_data_clear_spells(character);
+    if(!success) pocket_d20_data_clear_spells(character);
     return success;
 }
 
@@ -960,6 +990,25 @@ static bool pocket_d20_rewrite_spellbook(
         storage_file_free(input);
     }
     free(line);
+    /* A staged UI record may extend the resident replacement window past the
+       current end of the live sidecar. Emit that tail here so an editor-first
+       Add New is persisted by the ordinary window-save path. */
+    if(success && replacement) {
+        uint16_t replacement_end = (uint16_t)replace_start + replacement->spell_count;
+        uint16_t append_from = logical > replace_start ? logical : replace_start;
+        for(uint16_t logical_index = append_from;
+            success && logical_index < replacement_end;
+            ++logical_index) {
+            uint8_t local = (uint8_t)(logical_index - replace_start);
+            success = pocket_d20_write_spell_record(
+                output,
+                &replacement->spells[local],
+                replacement->spell_known[local],
+                replacement->spell_always_prepared[local],
+                replacement->spell_free_casts_current[local],
+                replacement->spell_free_casts_max[local]);
+        }
+    }
     if(success && append_spell)
         success = pocket_d20_write_spell_record(
             output,
@@ -995,24 +1044,23 @@ bool pocket_d20_storage_append_spell(
     uint8_t free_casts_current,
     uint8_t free_casts_max) {
     if(!storage || !owner || !spell) return false;
-    char path[POCKET_D20_PATH_LEN];
-    pocket_d20_spellbook_path(path, sizeof(path), profile);
-    uint64_t original_size = 0U;
-    bool needs_separator = false;
-    File* file = pocket_d20_open_collection_append(
-        storage, path, &original_size, &needs_separator);
-    if(!file) return false;
+    if(!pocket_d20_storage_ensure_spellbook_sidecar(storage, profile)) return false;
 
-    bool success = true;
-    if(original_size == 0U)
-        success = pocket_d20_write_raw(file, "DNDSpellbook=1\n");
-    else if(needs_separator)
-        success = pocket_d20_write_raw(file, "\n");
+    char live[POCKET_D20_PATH_LEN], snapshot[POCKET_D20_PATH_LEN];
+    File* output = pocket_d20_open_collection_snapshot(
+        storage, profile, owner, "spellbook", snapshot, sizeof(snapshot), live, sizeof(live));
+    if(!output) return false;
+
+    uint64_t copied_size = 0U;
+    bool needs_separator = false;
+    bool success = pocket_d20_copy_live_collection_to_snapshot(
+        storage, live, output, &copied_size, &needs_separator);
+    if(success && !copied_size) success = pocket_d20_write_raw(output, "DNDSpellbook=1\n");
+    if(success && needs_separator) success = pocket_d20_write_raw(output, "\n");
     if(success)
         success = pocket_d20_write_spell_record(
-            file, spell, known, always_prepared, free_casts_current, free_casts_max);
-    return pocket_d20_finish_collection_append(
-        storage, file, path, original_size, success);
+            output, spell, known, always_prepared, free_casts_current, free_casts_max);
+    return pocket_d20_publish_collection_snapshot(storage, output, snapshot, live, success);
 }
 
 bool pocket_d20_storage_delete_spell(
@@ -1037,8 +1085,7 @@ bool pocket_d20_storage_visit_items(
     if(!file) return false;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
         storage_file_free(file);
-        /* Best effort matches spellbook loading and keeps Add Item reachable. */
-        return true;
+        return false;
     }
     char* line = malloc(POCKET_D20_COLLECTION_LINE_LEN);
     if(!line) {
@@ -1059,7 +1106,7 @@ bool pocket_d20_storage_visit_items(
         if(logical < POCKET_D20_MAX_ITEMS) ++logical;
         if(!keep_scanning) break;
     }
-    /* Preserve complete records parsed before any trailing storage error. */
+    if(storage_file_get_error(file) != FSE_OK) success = false;
     if(total_count) *total_count = logical;
     free(line);
     storage_file_close(file);
@@ -1202,15 +1249,15 @@ bool pocket_d20_storage_create_items_from_assets(
 
     char live[POCKET_D20_PATH_LEN];
     pocket_d20_items_path(live, sizeof(live), profile);
-    if(!pocket_d20_ensure_parent_dir(storage, live)) return false;
+    storage_common_mkdir(storage, POCKET_D20_DATA_DIR);
     File* output = storage_file_alloc(storage);
     if(!output) return false;
-    if(!storage_file_open(output, live, FSAM_WRITE, FSOM_CREATE_NEW)) {
-        storage_file_close(output);
+    /* items_exist() above is the ownership guard. Use the same proven create
+       mode as the rest of the app rather than CREATE_NEW, which can fail on
+       first use before inventory_<id>.txt ever appears on the SD card. */
+    if(!storage_file_open(output, live, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
         storage_file_free(output);
-        /* Another valid creator winning the race is equivalent to an already
-           initialized inventory; never overwrite it. */
-        return pocket_d20_storage_items_exist(storage, profile);
+        return false;
     }
 
     bool success = pocket_d20_write_raw(output, "DNDItems=1\n");
@@ -1291,7 +1338,7 @@ bool pocket_d20_storage_load_items_window(
     free(line);
     storage_file_close(file);
     storage_file_free(file);
-    if(!success && character->item_count == 0U) pocket_d20_data_clear_items(character);
+    if(!success) pocket_d20_data_clear_items(character);
     return success;
 }
 
@@ -1363,6 +1410,16 @@ static bool pocket_d20_rewrite_items(
         storage_file_free(input);
     }
     free(line);
+    if(success && replacement) {
+        uint16_t replacement_end = (uint16_t)replace_start + replacement->item_count;
+        uint16_t append_from = logical > replace_start ? logical : replace_start;
+        for(uint16_t logical_index = append_from;
+            success && logical_index < replacement_end;
+            ++logical_index) {
+            uint8_t local = (uint8_t)(logical_index - replace_start);
+            success = pocket_d20_write_item_record(output, &replacement->items[local]);
+        }
+    }
     if(success && append_item) success = pocket_d20_write_item_record(output, append_item);
     return pocket_d20_publish_collection_snapshot(storage, output, snapshot, path, success);
 }
@@ -1382,22 +1439,21 @@ bool pocket_d20_storage_append_item(
     const PocketCharacter* owner,
     const PocketItem* item) {
     if(!storage || !owner || !item) return false;
-    char path[POCKET_D20_PATH_LEN];
-    pocket_d20_items_path(path, sizeof(path), profile);
-    uint64_t original_size = 0U;
-    bool needs_separator = false;
-    File* file = pocket_d20_open_collection_append(
-        storage, path, &original_size, &needs_separator);
-    if(!file) return false;
+    if(!pocket_d20_storage_ensure_items_sidecar(storage, profile)) return false;
 
-    bool success = true;
-    if(original_size == 0U)
-        success = pocket_d20_write_raw(file, "DNDItems=1\n");
-    else if(needs_separator)
-        success = pocket_d20_write_raw(file, "\n");
-    if(success) success = pocket_d20_write_item_record(file, item);
-    return pocket_d20_finish_collection_append(
-        storage, file, path, original_size, success);
+    char live[POCKET_D20_PATH_LEN], snapshot[POCKET_D20_PATH_LEN];
+    File* output = pocket_d20_open_collection_snapshot(
+        storage, profile, owner, "items", snapshot, sizeof(snapshot), live, sizeof(live));
+    if(!output) return false;
+
+    uint64_t copied_size = 0U;
+    bool needs_separator = false;
+    bool success = pocket_d20_copy_live_collection_to_snapshot(
+        storage, live, output, &copied_size, &needs_separator);
+    if(success && !copied_size) success = pocket_d20_write_raw(output, "DNDItems=1\n");
+    if(success && needs_separator) success = pocket_d20_write_raw(output, "\n");
+    if(success) success = pocket_d20_write_item_record(output, item);
+    return pocket_d20_publish_collection_snapshot(storage, output, snapshot, live, success);
 }
 
 bool pocket_d20_storage_delete_item(
@@ -1642,6 +1698,7 @@ static bool pocket_d20_read_character(
     /* A valid primary filename is itself usable recovery metadata. Even if the
        body contains only unknown/future fields, keep the filename name/level
        fallback instead of treating the readable character as a failed load. */
+    bool recognized_data = fallback_entry != NULL;
     bool class_level_seen = false;
 
     while(pocket_d20_read_line(&reader, line, sizeof(line))) {
@@ -1657,7 +1714,7 @@ static bool pocket_d20_read_character(
         if(!strcmp(key, "PocketD20Character") || !strcmp(key, "End")) continue;
 
 #define LOAD_STRING(field, name) \
-        if(!strcmp(key, name)) { pocket_d20_decode_string((field), sizeof(field), value); continue; }
+        if(!strcmp(key, name)) { pocket_d20_decode_string((field), sizeof(field), value); recognized_data = true; continue; }
         LOAD_STRING(c->name, "Name")
         LOAD_STRING(c->player, "Player")
         LOAD_STRING(c->species, "Species")
@@ -1679,7 +1736,7 @@ static bool pocket_d20_read_character(
 #undef LOAD_STRING
 
         if(!strcmp(key, "IdentityRules")) {
-            if(pocket_d20_parse_numbers(value, n, 1U) == 1U) c->size = (uint8_t)n[0];
+            if(pocket_d20_parse_numbers(value, n, 1U) == 1U) { c->size = (uint8_t)n[0]; recognized_data = true; }
             continue;
         }
         if(!strcmp(key, "Progress")) {
@@ -1688,17 +1745,18 @@ static bool pocket_d20_read_character(
             if(count >= 2U && n[1] >= 0) c->experience = (uint32_t)n[1];
             if(count >= 3U) c->milestone_leveling = n[2] ? 1U : 0U;
             if(count >= 4U) c->inspiration = n[3] ? 1U : 0U;
+            if(count) recognized_data = true;
             continue;
         }
         if(pocket_d20_indexed_key(key, "Class", "Name", POCKET_D20_MAX_CLASSES, &index)) {
             pocket_d20_decode_string(c->classes[index].name, sizeof(c->classes[index].name), value);
             if(c->class_count <= index) c->class_count = (uint8_t)(index + 1U);
-            continue;
+            recognized_data = true; continue;
         }
         if(pocket_d20_indexed_key(key, "Class", "Subclass", POCKET_D20_MAX_CLASSES, &index)) {
             pocket_d20_decode_string(c->classes[index].subclass, sizeof(c->classes[index].subclass), value);
             if(c->class_count <= index) c->class_count = (uint8_t)(index + 1U);
-            continue;
+            recognized_data = true; continue;
         }
         if(pocket_d20_indexed_key(key, "Class", "Data", POCKET_D20_MAX_CLASSES, &index)) {
             size_t count = pocket_d20_parse_numbers(value, n, 16U);
@@ -1718,14 +1776,14 @@ static bool pocket_d20_read_character(
             if(count >= 13U) cl->mystic_arcanum_mask = (uint16_t)n[12];
             if(count >= 14U) cl->spell_points_current = (uint16_t)n[13];
             if(count >= 15U) cl->spell_points_max = (uint16_t)n[14];
-            if(count && c->class_count <= index) c->class_count = (uint8_t)(index + 1U);
+            if(count) { if(c->class_count <= index) c->class_count = (uint8_t)(index + 1U); recognized_data = true; }
             continue;
         }
 
 #define LOAD_ARRAY(key_name, target, expected, cast_type) \
         if(!strcmp(key, key_name)) { \
             size_t count = pocket_d20_parse_numbers(value, n, expected); \
-            if(count) { for(size_t i = 0U; i < count && i < expected; ++i) (target)[i] = (cast_type)n[i]; } \
+            if(count) { for(size_t i = 0U; i < count && i < expected; ++i) (target)[i] = (cast_type)n[i]; recognized_data = true; } \
             continue; \
         }
         LOAD_ARRAY("AbilityScores", c->ability_scores, POCKET_D20_ABILITY_COUNT, int8_t)
@@ -1751,6 +1809,7 @@ static bool pocket_d20_read_character(
             if(count >= 10U) c->hit_die = (uint8_t)n[9];
             if(count >= 11U) c->hit_dice_current = (uint8_t)n[10];
             if(count >= 12U) c->hit_dice_max = (uint8_t)n[11];
+            if(count) recognized_data = true;
             continue;
         }
         if(!strcmp(key, "Spellcasting")) {
@@ -1759,6 +1818,7 @@ static bool pocket_d20_read_character(
             if(count >= 2U) c->spell_attack_misc = (int8_t)n[1];
             if(count >= 3U) c->spell_save_misc = (int8_t)n[2];
             if(count >= 4U) c->arcane_recovery_used = (uint8_t)n[3];
+            if(count) recognized_data = true;
             continue;
         }
         if(!strcmp(key, "Currency")) {
@@ -1768,13 +1828,14 @@ static bool pocket_d20_read_character(
             if(count >= 3U) c->currency_ep = n[2];
             if(count >= 4U) c->currency_gp = n[3];
             if(count >= 5U) c->currency_pp = n[4];
+            if(count) recognized_data = true;
             continue;
         }
 
 #define LOAD_DYNAMIC_COUNT(name, maximum, reserve_fn, count_field) \
         if(!strcmp(key, name)) { \
             if(pocket_d20_parse_u32_range(value, maximum, &number)) { \
-                if(number == 0U || reserve_fn(c, (uint8_t)number)) count_field = (uint8_t)number; \
+                if(number == 0U || reserve_fn(c, (uint8_t)number)) { count_field = (uint8_t)number; recognized_data = true; } \
             } \
             continue; \
         }
@@ -1802,23 +1863,24 @@ static bool pocket_d20_read_character(
                 if(count >= 6U) feature->resource_formula = (uint8_t)n[5];
                 if(count >= 7U) feature->resource_ability = (uint8_t)n[6];
             }
-            continue;
+            recognized_data = true; continue;
         }
 
         if(!strcmp(key, "LanguageCount")) {
-            if(pocket_d20_parse_u32_range(value, POCKET_D20_MAX_LANGUAGES, &number)) c->language_count = (uint8_t)number;
+            if(pocket_d20_parse_u32_range(value, POCKET_D20_MAX_LANGUAGES, &number)) { c->language_count = (uint8_t)number; recognized_data = true; }
             continue;
         }
         if(pocket_d20_indexed_key(key, "Language", "", POCKET_D20_MAX_LANGUAGES, &index)) {
             pocket_d20_decode_string(c->languages[index], sizeof(c->languages[index]), value);
             if(c->language_count <= index) c->language_count = (uint8_t)(index + 1U);
-            continue;
+            recognized_data = true; continue;
         }
         if(!strcmp(key, "CombatFlags")) {
             size_t count = pocket_d20_parse_numbers(value, n, 3U);
             if(count >= 1U) c->reaction_available = (uint8_t)n[0];
             if(count >= 2U) c->encumbrance_mode = (uint8_t)n[1];
             if(count >= 3U) c->carrying_capacity_override = (int16_t)n[2];
+            if(count) recognized_data = true;
             continue;
         }
 
@@ -1848,11 +1910,11 @@ static bool pocket_d20_read_character(
                 if(count >= 3U) grant->level_gained = (uint8_t)n[2];
                 if(count >= 4U) grant->status = (uint8_t)n[3];
             }
-            continue;
+            recognized_data = true; continue;
         }
 
         if(!strcmp(key, "AttackTemplateCount")) {
-            if(pocket_d20_parse_u32_range(value, POCKET_D20_MAX_ATTACK_TEMPLATES, &number)) c->attack_template_count = (uint8_t)number;
+            if(pocket_d20_parse_u32_range(value, POCKET_D20_MAX_ATTACK_TEMPLATES, &number)) { c->attack_template_count = (uint8_t)number; recognized_data = true; }
             continue;
         }
         if(pocket_d20_indexed_key(key, "AttackTemplate", "Name", POCKET_D20_MAX_ATTACK_TEMPLATES, &index) ||
@@ -1882,7 +1944,7 @@ static bool pocket_d20_read_character(
                 if(count >= 8U) attack->rider_dice = (uint8_t)n[7];
                 if(count >= 9U) attack->rider_die = (uint8_t)n[8];
             }
-            continue;
+            recognized_data = true; continue;
         }
         /* Party, initiative, encounter-history and unknown fields are intentionally
            ignored. Their state belongs to companion apps and cannot invalidate a character. */
@@ -1894,10 +1956,7 @@ static bool pocket_d20_read_character(
 
     bool io_ok = storage_file_get_error(file) == FSE_OK;
     pocket_d20_data_sanitize(data);
-    /* Loading is best-effort by field name. A readable file is not rejected merely
-       because this build did not recognize any of its body fields; filename metadata
-       and defaults remain usable, and future/unknown fields must not invalidate it. */
-    return io_ok;
+    return io_ok && recognized_data;
 }
 
 static bool pocket_d20_load_text_path(
@@ -2645,6 +2704,7 @@ bool pocket_d20_profiles_refresh(Storage* storage, PocketProfileState* profiles)
 
         size_t length = strlen(filename);
         bool collection_sidecar =
+            !strncmp(filename, "spellbook_", 10U) || !strncmp(filename, "inventory_", 10U) ||
             (length >= 14U && !strcmp(filename + length - 14U, "_spellbook.txt")) ||
             (length >= 10U && !strcmp(filename + length - 10U, "_items.txt"));
         bool character_related =

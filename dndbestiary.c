@@ -4,7 +4,6 @@
 #include "dndbestiary_packs.h"
 
 #include <furi.h>
-#include <furi_hal.h>
 #include <gui/gui.h>
 #include <gui/modules/text_input.h>
 #include <gui/view.h>
@@ -353,7 +352,8 @@ static void bestiary_refresh_count(BestiaryApp* app) {
 
 static void bestiary_cache_filter_rows(BestiaryApp* app) {
     app->state_total = pocket_bestiary_filter_count(app->storage);
-    for(uint16_t index = 0U; index < app->state_total && index < 16U; ++index) {
+    if(app->state_total > 16U) app->state_total = 16U;
+    for(uint16_t index = 0U; index < app->state_total; ++index) {
         PocketBestiaryFilterPreset preset;
         if(pocket_bestiary_filter_at(app->storage, index, &preset))
             snprintf(app->state_rows[index], sizeof(app->state_rows[index]), "%s", preset.name);
@@ -366,7 +366,8 @@ static void bestiary_cache_filter_rows(BestiaryApp* app) {
 
 static void bestiary_cache_encounter_rows(BestiaryApp* app) {
     app->state_total = pocket_bestiary_encounter_count(app->storage);
-    for(uint16_t index = 0U; index < app->state_total && index < 16U; ++index) {
+    if(app->state_total > 17U) app->state_total = 17U;
+    for(uint16_t index = 0U; index < app->state_total; ++index) {
         PocketSavedEncounter encounter;
         if(pocket_bestiary_encounter_at(app->storage, index, &encounter))
             snprintf(
@@ -381,7 +382,8 @@ static void bestiary_cache_encounter_rows(BestiaryApp* app) {
 
 static void bestiary_cache_pack_rows(BestiaryApp* app) {
     app->state_total = pocket_pack_count(app->storage);
-    for(uint16_t index = 0U; index < app->state_total && index < 16U; ++index) {
+    if(app->state_total > 16U) app->state_total = 16U;
+    for(uint16_t index = 0U; index < app->state_total; ++index) {
         PocketPackSummary pack;
         if(pocket_pack_at(app->storage, index, &pack))
             snprintf(
@@ -422,7 +424,6 @@ static void bestiary_quiesce_async(BestiaryApp* app) {
         furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
         app->input_subscription = NULL;
     }
-    if(app->marquee_timer) furi_timer_stop(app->marquee_timer);
 }
 
 static void bestiary_release_monster_memory_for_launch(BestiaryApp* app) {
@@ -477,16 +478,16 @@ static void bestiary_row(Canvas* canvas, uint8_t row, bool selected, const char*
     uint8_t y = 11U + row * 10U;
     char display[32];
     size_t length = strlen(text);
-    if(selected && length > 26U) {
+    if(selected && length > 25U) {
         size_t cycle = length + 4U;
         size_t start = bestiary_marquee_offset % cycle;
-        for(size_t i = 0U; i < 26U; ++i) {
+        for(size_t i = 0U; i < 25U; ++i) {
             size_t position = (start + i) % cycle;
             display[i] = position < length ? text[position] : ' ';
         }
-        display[26] = '\0';
+        display[25] = '\0';
     } else {
-        size_t copy = length > 26U ? 26U : length;
+        size_t copy = length > 25U ? 25U : length;
         memcpy(display, text, copy);
         display[copy] = '\0';
     }
@@ -1273,17 +1274,7 @@ static void bestiary_generate(BestiaryApp* app) {
         bestiary_status(app, "No encounter matched");
         return;
     }
-    DateTime now;
-    furi_hal_rtc_get_datetime(&now);
-    snprintf(
-        app->encounter_name,
-        sizeof(app->encounter_name),
-        "Enc%02u%02u%02u%02u%02u",
-        (unsigned int)(now.year % 100U),
-        (unsigned int)now.month,
-        (unsigned int)now.day,
-        (unsigned int)now.hour,
-        (unsigned int)now.minute);
+    bestiary_copy(app->encounter_name, sizeof(app->encounter_name), "Generated Encounter");
     bestiary_enter(app, BestiaryScreenEncounter);
 }
 
@@ -2041,18 +2032,28 @@ static void bestiary_handle_packs(BestiaryApp* app, const InputEvent* event) {
         bestiary_move(app, count, -1);
     else if(bestiary_move_event(event) && event->key == InputKeyDown)
         bestiary_move(app, count, 1);
-    else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+    else if(
+        event->type == InputTypeLong && event->key == InputKeyOk &&
+        app->selection < app->state_total) {
+        PocketPackSummary pack;
         bool changed = false;
-        if(app->selection == app->state_total) {
-            changed = pocket_pack_install_inbox(
-                app->storage, app->status, sizeof(app->status));
-        } else {
-            PocketPackSummary pack;
-            if(pocket_pack_at(app->storage, app->selection, &pack)) {
-                changed = pocket_pack_set_enabled(app->storage, pack.id, !pack.enabled);
-                bestiary_status(app, changed ? "Pack state updated" : "Pack update failed");
-            }
+        if(pocket_pack_at(app->storage, app->selection, &pack)) {
+            changed = pocket_pack_set_enabled(app->storage, pack.id, !pack.enabled);
+            bestiary_status(
+                app,
+                changed ? (pack.enabled ? "Pack inactive" : "Pack active") :
+                          "Pack update failed");
         }
+        if(changed) {
+            pocket_monster_cache_reset();
+            app->monster_total_valid = 0U;
+            bestiary_cache_pack_rows(app);
+        }
+    } else if(
+        event->type == InputTypeShort && event->key == InputKeyOk &&
+        app->selection == app->state_total) {
+        bool changed = pocket_pack_install_inbox(
+            app->storage, app->status, sizeof(app->status));
         if(changed) {
             pocket_monster_cache_reset();
             app->monster_total_valid = 0U;
@@ -2285,10 +2286,31 @@ static BestiaryApp* bestiary_alloc(const char* args) {
         if(sscanf(args, "%lu", &character_id) == 1) app->character_id = (uint32_t)character_id;
     }
 
+    /* Reserve the fixed UI/runtime objects while the heap is still clean. The
+       migration/pack work below uses temporary file and cache allocations. */
     app->storage = furi_record_open(RECORD_STORAGE);
-    if(!app->storage) goto fail;
-    pocket_bestiary_party_settings_load(app->storage, &app->party_level, &app->party_size);
+    app->gui = furi_record_open(RECORD_GUI);
+    if(!app->storage || !app->gui) goto fail;
+    app->dispatcher = view_dispatcher_alloc();
+    app->view = view_alloc();
+    app->marquee_timer =
+        furi_timer_alloc(bestiary_marquee_timer_callback, FuriTimerTypePeriodic, app);
+    app->input_events = furi_record_open(RECORD_INPUT_EVENTS);
+    if(!app->dispatcher || !app->view || !app->marquee_timer || !app->input_events) goto fail;
 
+    view_dispatcher_set_event_callback_context(app->dispatcher, app);
+    view_dispatcher_set_navigation_event_callback(app->dispatcher, bestiary_navigation);
+    view_dispatcher_set_custom_event_callback(app->dispatcher, bestiary_custom_event);
+    view_allocate_model(app->view, ViewModelTypeLockFree, sizeof(BestiaryApp*));
+    BestiaryApp** model = view_get_model(app->view);
+    if(!model) goto fail;
+    *model = app;
+    view_commit_model(app->view, false);
+    view_set_context(app->view, app);
+    view_set_draw_callback(app->view, bestiary_draw);
+    view_set_input_callback(app->view, bestiary_input);
+
+    pocket_bestiary_party_settings_load(app->storage, &app->party_level, &app->party_size);
     uint16_t migrated_files = 0U;
     uint16_t seeded_files = 0U;
     uint16_t recovered = 0U;
@@ -2301,40 +2323,17 @@ static BestiaryApp* bestiary_alloc(const char* args) {
     bool installed_packs_ok = pocket_pack_ensure_enabled(app->storage);
     pocket_monster_cache_reset();
 
-    app->gui = furi_record_open(RECORD_GUI);
-    if(!app->gui) goto fail;
-    app->dispatcher = view_dispatcher_alloc();
-    if(!app->dispatcher) goto fail;
-    view_dispatcher_set_event_callback_context(app->dispatcher, app);
-    view_dispatcher_set_navigation_event_callback(app->dispatcher, bestiary_navigation);
-    view_dispatcher_set_custom_event_callback(app->dispatcher, bestiary_custom_event);
-
-    app->input_events = furi_record_open(RECORD_INPUT_EVENTS);
-    if(!app->input_events) goto fail;
+    /* Subscribe/start asynchronous sources only after startup storage work is
+       complete, so callbacks cannot observe a partially initialized app. */
     app->input_subscription =
         furi_pubsub_subscribe(app->input_events, bestiary_input_events_callback, app);
     if(!app->input_subscription) goto fail;
-
-    app->view = view_alloc();
-    if(!app->view) goto fail;
-    view_allocate_model(app->view, ViewModelTypeLockFree, sizeof(BestiaryApp*));
-    BestiaryApp** model = view_get_model(app->view);
-    if(!model) goto fail;
-    *model = app;
-    view_commit_model(app->view, false);
-    view_set_context(app->view, app);
-    view_set_draw_callback(app->view, bestiary_draw);
-    view_set_input_callback(app->view, bestiary_input);
-
-    app->marquee_timer =
-        furi_timer_alloc(bestiary_marquee_timer_callback, FuriTimerTypePeriodic, app);
-    if(!app->marquee_timer) goto fail;
-
     if(furi_timer_start(app->marquee_timer, furi_ms_to_ticks(BESTIARY_MARQUEE_MS)) !=
        FuriStatusOk)
         goto fail;
     view_dispatcher_add_view(app->dispatcher, BestiaryViewMain, app->view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+
     if(!installed_packs_ok)
         bestiary_status(app, "Installed pack check failed");
     else if(!migration_ok)
@@ -2352,12 +2351,11 @@ static BestiaryApp* bestiary_alloc(const char* args) {
     return app;
 
 fail:
-    /* Nothing is attached to the dispatcher until all allocations above succeed,
-       so a partial startup can be unwound without touching an unregistered view. */
-    if(app->marquee_timer) furi_timer_free(app->marquee_timer);
-    if(app->view) view_free(app->view);
+    /* Async sources may or may not have started; quiesce the ones that did. */
     if(app->input_subscription && app->input_events)
         furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->marquee_timer) furi_timer_free(app->marquee_timer);
+    if(app->view) view_free(app->view);
     if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
     if(app->gui) furi_record_close(RECORD_GUI);

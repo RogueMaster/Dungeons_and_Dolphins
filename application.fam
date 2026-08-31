@@ -10,7 +10,6 @@ App(
         "dnd_handoff.c",
         "dndolphins_data.c",
         "dndolphins_rules.c",
-        "dndolphins_progression.c",
         "dndolphins_items.c",
         "dndolphins_spells.c",
         "dndolphins_spell_combat.c",
@@ -21,7 +20,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="3.2.18",
+    fap_version="3.2.31",
     fap_description="Offline 5E-compatible character, spells, inventory, dice, and combat hub.",
 )
 
@@ -49,7 +48,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="3.2.18",
+    fap_version="3.2.31",
     fap_description="Standalone campaign packs and Adventure progression for DNDolphins.",
 )
 
@@ -69,7 +68,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="3.2.18",
+    fap_version="3.2.31",
     fap_description="Standalone per-character journal for DNDolphins.",
 )
 
@@ -89,7 +88,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="3.2.18",
+    fap_version="3.2.31",
     fap_description="Standalone party roster and initiative tracker for DNDolphins.",
 )
 
@@ -112,6 +111,6 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="3.2.18",
+    fap_version="3.2.31",
     fap_description="Offline monster reference and party-level encounter generator.",
 )

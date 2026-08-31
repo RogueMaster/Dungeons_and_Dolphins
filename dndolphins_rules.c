@@ -102,7 +102,9 @@ void dndolphins_apply_experience_floor(PocketCharacter* character) {
 }
 
 uint8_t pocket_d20_proficiency_bonus(const PocketCharacter* character) {
-    return (uint8_t)(2U + ((pocket_d20_total_level(character) - 1U) / 4U));
+    uint8_t total_level = pocket_d20_total_level(character);
+    if(total_level < 1U) total_level = 1U;
+    return (uint8_t)(2U + ((total_level - 1U) / 4U));
 }
 
 static int8_t dndolphins_apply_proficiency(int8_t base, uint8_t proficiency, uint8_t bonus) {

@@ -242,10 +242,10 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
     memset(data, 0, sizeof(*data));
     PocketCharacter* character = &data->character;
 
-    pocket_d20_copy(character->name, sizeof(character->name), "New");
+    pocket_d20_copy(character->name, sizeof(character->name), "New Hero");
     pocket_d20_copy(character->player, sizeof(character->player), "Player");
-    pocket_d20_copy(character->species, sizeof(character->species), "New");
-    pocket_d20_copy(character->background, sizeof(character->background), "New");
+    pocket_d20_copy(character->species, sizeof(character->species), "Human");
+    pocket_d20_copy(character->background, sizeof(character->background), "Adventurer");
     pocket_d20_copy(character->alignment, sizeof(character->alignment), "True Neutral");
     pocket_d20_copy(character->origin_feat, sizeof(character->origin_feat), "None");
     character->size = PocketSizeMedium;
@@ -254,25 +254,25 @@ void pocket_d20_data_set_defaults(PocketSaveData* data) {
     character->reaction_available = 1U;
 
     character->class_count = 1U;
-    /* Class/species stay explicitly unconfirmed until the player selects them.
-       This prevents a temporary default Fighter/Human from receiving permanent
-       fixed grants while a Wizard or another character is being created. */
-    pocket_d20_copy(character->classes[0].name, sizeof(character->classes[0].name), "New");
+    pocket_d20_copy(character->classes[0].name, sizeof(character->classes[0].name), "Fighter");
     pocket_d20_copy(
         character->classes[0].subclass, sizeof(character->classes[0].subclass), "None");
     character->classes[0].level = 1U;
-    character->classes[0].hit_die = 8U;
+    character->classes[0].hit_die = 10U;
     character->classes[0].hit_dice_current = 1U;
     character->classes[0].hit_dice_max = 1U;
     character->classes[0].spellcasting_mode = PocketSpellcastingNone;
     character->classes[0].spellcasting_ability = PocketAbilityIntelligence;
     character->milestone_leveling = 1U;
 
-    /* New characters use the standard array in the existing ability order.
-       Players can immediately rearrange/edit the scores from Abilities. */
-    static const int8_t standard_array[POCKET_D20_ABILITY_COUNT] = {15, 14, 13, 12, 10, 8};
-    for(uint8_t i = 0U; i < POCKET_D20_ABILITY_COUNT; ++i)
-        character->ability_scores[i] = standard_array[i];
+    /* New characters start from the standard array. Existing profiles are never
+       rewritten because this path is used only for a freshly initialized save. */
+    character->ability_scores[PocketAbilityStrength] = 15;
+    character->ability_scores[PocketAbilityDexterity] = 14;
+    character->ability_scores[PocketAbilityConstitution] = 13;
+    character->ability_scores[PocketAbilityIntelligence] = 12;
+    character->ability_scores[PocketAbilityWisdom] = 10;
+    character->ability_scores[PocketAbilityCharisma] = 8;
     character->hp_current = 10;
     character->hp_max = 10;
     character->armor_class = 10;

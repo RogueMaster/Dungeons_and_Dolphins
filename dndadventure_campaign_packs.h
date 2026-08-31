@@ -16,6 +16,11 @@ typedef struct {
 
 uint16_t pocket_campaign_pack_count(Storage* storage);
 bool pocket_campaign_pack_at(Storage* storage, uint16_t index, PocketCampaignPackSummary* output);
+bool pocket_campaign_pack_preview_inbox(
+    Storage* storage,
+    PocketCampaignPackSummary* output,
+    char* status,
+    size_t status_size);
 bool pocket_campaign_pack_install_inbox(Storage* storage, char* status, size_t status_size);
 bool pocket_campaign_pack_set_enabled(Storage* storage, const char* id, bool enabled);
 bool pocket_campaign_pack_rebuild_enabled(Storage* storage);

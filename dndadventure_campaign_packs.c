@@ -220,7 +220,7 @@ static bool campaign_pack_copy_file(Storage* storage, const char* source, const 
     storage_file_close(output);
     storage_file_free(input);
     storage_file_free(output);
-    if(!ok) storage_common_remove(storage, destination);
+    /* Never delete campaign files. A failed copy remains available for manual recovery. */
     return ok;
 }
 
@@ -380,6 +380,36 @@ bool pocket_campaign_pack_at(Storage* storage, uint16_t index, PocketCampaignPac
     return found;
 }
 
+bool pocket_campaign_pack_preview_inbox(
+    Storage* storage,
+    PocketCampaignPackSummary* output,
+    char* status,
+    size_t status_size) {
+    if(output) memset(output, 0, sizeof(*output));
+    CampaignPackManifest manifest;
+    if(!campaign_pack_read_manifest(storage, &manifest)) {
+        campaign_pack_status(status, status_size, "Inbox manifest invalid");
+        return false;
+    }
+    if(!campaign_pack_validate_index(storage, manifest.id)) {
+        campaign_pack_status(status, status_size, "Inbox index invalid");
+        return false;
+    }
+    if(campaign_pack_file_contains_id(storage, CAMPAIGN_PACKAGED_INDEX, manifest.id) ||
+       campaign_pack_file_contains_id(storage, CAMPAIGN_CUSTOM_INDEX, manifest.id) ||
+       campaign_pack_file_contains_id(storage, CAMPAIGN_ENABLED_INDEX, manifest.id)) {
+        campaign_pack_status(status, status_size, "Campaign ID already used");
+        return false;
+    }
+    if(output) {
+        campaign_pack_copy(output->id, sizeof(output->id), manifest.id);
+        campaign_pack_copy(output->name, sizeof(output->name), manifest.name);
+        output->enabled = 1U;
+    }
+    campaign_pack_status(status, status_size, "Hold OK to install");
+    return true;
+}
+
 bool pocket_campaign_pack_install_inbox(Storage* storage, char* status, size_t status_size) {
     CampaignPackManifest manifest;
     if(!campaign_pack_read_manifest(storage, &manifest) ||
@@ -426,9 +456,8 @@ bool pocket_campaign_pack_install_inbox(Storage* storage, char* status, size_t s
     }
     if(!campaign_pack_copy_file(storage, CAMPAIGN_INBOX_INDEX, index_path) ||
        !campaign_pack_copy_file(storage, CAMPAIGN_INBOX_CONTENT, content_path)) {
-        storage_common_remove(storage, index_path);
-        storage_common_remove(storage, content_path);
-        campaign_pack_status(status, status_size, "Pack copy failed");
+        /* Preserve anything already copied; Adventure never deletes campaign content. */
+        campaign_pack_status(status, status_size, "Pack copy failed; files kept");
         goto done;
     }
 
@@ -456,9 +485,13 @@ bool pocket_campaign_pack_set_enabled(Storage* storage, const char* id, bool ena
     bool valid = false;
     uint16_t count = campaign_pack_load_registry(storage, records, &valid);
     bool found = false;
+    uint16_t found_index = 0U;
+    uint8_t previous_enabled = 0U;
     if(valid) {
         for(uint16_t i = 0U; i < count; ++i) {
             if(strcmp(records[i].summary.id, id)) continue;
+            found_index = i;
+            previous_enabled = records[i].summary.enabled;
             records[i].summary.enabled = enabled ? 1U : 0U;
             found = true;
             break;
@@ -466,6 +499,13 @@ bool pocket_campaign_pack_set_enabled(Storage* storage, const char* id, bool ena
     }
     bool written = found && campaign_pack_write_registry(storage, records, count);
     bool rebuilt = written && campaign_pack_rebuild_from_records(storage, records, count);
+    if(written && !rebuilt) {
+        records[found_index].summary.enabled = previous_enabled;
+        (void)campaign_pack_write_registry(storage, records, count);
+        (void)campaign_pack_rebuild_from_records(storage, records, count);
+    }
     free(records);
     return rebuilt;
 }
+
+

@@ -6,33 +6,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-typedef enum {
-    PocketItemCategoryOther,
-    PocketItemCategoryWeapon,
-    PocketItemCategoryArmor,
-    PocketItemCategoryGear,
-    PocketItemCategoryTool,
-    PocketItemCategoryMountVehicle,
-    PocketItemCategoryPotion,
-    PocketItemCategoryRing,
-    PocketItemCategoryRod,
-    PocketItemCategoryScroll,
-    PocketItemCategoryStaff,
-    PocketItemCategoryWand,
-    PocketItemCategoryWondrous,
-} PocketItemCategory;
-
 /* Inventory initialization is feature-owned: character creation leaves the item
    sidecar absent, and DNDolphins calls this only when the Inventory UI is opened. */
-
-/* Inventory editor helpers are feature-owned so Add New and official catalog
-   selection use the same item initialization rules as the Inventory page. */
-void pocket_d20_items_init_editor_record(PocketItem* item);
-bool pocket_d20_items_append_editor_record(
-    Storage* storage, uint32_t profile, PocketCharacter* owner, PocketItem* item);
-void pocket_d20_items_apply_catalog_name(PocketItem* item, const char* name);
-void pocket_d20_items_apply_catalog_preset(PocketItem* item, const char* name, uint8_t category);
-
 bool pocket_d20_items_initialize_inventory(
     Storage* storage,
     uint32_t profile,

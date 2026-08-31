@@ -5,125 +5,8 @@
 
 #include <string.h>
 
-
-static uint16_t pocket_d20_spells_class_mask_from_name(const char* name) {
-    if(!name) return 0U;
-    if(strcmp(name, "Artificer") == 0) return (uint16_t)(1U << 0);
-    if(strcmp(name, "Bard") == 0) return (uint16_t)(1U << 2);
-    if(strcmp(name, "Cleric") == 0) return (uint16_t)(1U << 3);
-    if(strcmp(name, "Druid") == 0) return (uint16_t)(1U << 4);
-    if(strcmp(name, "Paladin") == 0) return (uint16_t)(1U << 7);
-    if(strcmp(name, "Ranger") == 0) return (uint16_t)(1U << 8);
-    if(strcmp(name, "Sorcerer") == 0) return (uint16_t)(1U << 10);
-    if(strcmp(name, "Warlock") == 0) return (uint16_t)(1U << 11);
-    if(strcmp(name, "Wizard") == 0) return (uint16_t)(1U << 12);
-    return 0U;
-}
-
-void pocket_d20_spells_init_editor_record(PocketSpell* spell) {
-    if(!spell) return;
-    memset(spell, 0, sizeof(*spell));
-    strncpy(spell->name, "New Spell", sizeof(spell->name) - 1U);
-    spell->name[sizeof(spell->name) - 1U] = '\0';
-}
-
-bool pocket_d20_spells_append_editor_record(
-    Storage* storage, uint32_t profile, PocketCharacter* owner, PocketSpell* spell) {
-    if(!storage || !owner || !spell) return false;
-    pocket_d20_spells_init_editor_record(spell);
-    return pocket_d20_storage_append_spell(storage, profile, owner, spell, 1U, 0U, 0U, 0U);
-}
-
-bool pocket_d20_spells_class_allows(
-    const PocketCharacter* character, uint8_t class_index, uint8_t level, uint16_t class_mask) {
-    if(!character || class_index >= character->class_count) return false;
-    const PocketClassLevel* class_level = &character->classes[class_index];
-    uint16_t selected_class = pocket_d20_spells_class_mask_from_name(class_level->name);
-    return selected_class && (class_mask & selected_class) &&
-           level <= pocket_d20_class_max_spell_level(class_level);
-}
-
-bool pocket_d20_spells_allowed_for_character(
-    const PocketCharacter* character, uint8_t class_filter, uint8_t level, uint16_t class_mask) {
-    if(!character || !character->class_count || !class_mask) return false;
-    if(class_filter < character->class_count)
-        return pocket_d20_spells_class_allows(character, class_filter, level, class_mask);
-    for(uint8_t i = 0U; i < character->class_count; ++i)
-        if(pocket_d20_spells_class_allows(character, i, level, class_mask)) return true;
-    return false;
-}
-
-bool pocket_d20_spells_metadata_matches_filters(
-    uint8_t spell_school,
-    uint8_t spell_source,
-    bool spell_ritual,
-    uint8_t school_filter,
-    uint8_t source_filter,
-    uint8_t ritual_filter) {
-    /* Metadata filters are deliberately opt-in. Zero means Any and must never
-       narrow the default Allowed/All Classes catalog. */
-    if(school_filter && spell_school != school_filter) return false;
-    if(source_filter && spell_source != source_filter) return false;
-    if(ritual_filter == 1U && !spell_ritual) return false;
-    if(ritual_filter == 2U && spell_ritual) return false;
-    return true;
-}
-
-uint8_t pocket_d20_spells_choose_class(
-    const PocketCharacter* character,
-    uint8_t class_filter,
-    uint8_t level,
-    uint16_t class_mask,
-    uint8_t preferred) {
-    if(!character || !character->class_count) return 0U;
-    if(class_filter < character->class_count &&
-       pocket_d20_spells_class_allows(character, class_filter, level, class_mask))
-        return class_filter;
-    if(preferred < character->class_count &&
-       pocket_d20_spells_class_allows(character, preferred, level, class_mask))
-        return preferred;
-    for(uint8_t i = 0U; i < character->class_count; ++i)
-        if(pocket_d20_spells_class_allows(character, i, level, class_mask)) return i;
-    return preferred < character->class_count ? preferred : 0U;
-}
-
-void pocket_d20_spells_apply_catalog_record(
-    PocketSpell* spell,
-    const char* name,
-    uint8_t level,
-    uint8_t class_index,
-    const char* stable_id,
-    const char* source,
-    const char* school,
-    bool ritual) {
-    if(!spell || !name) return;
-    strncpy(spell->name, name, sizeof(spell->name) - 1U);
-    spell->name[sizeof(spell->name) - 1U] = '\0';
-    spell->level = level;
-    spell->class_index = class_index;
-    if(stable_id) {
-        strncpy(spell->stable_id, stable_id, sizeof(spell->stable_id) - 1U);
-        spell->stable_id[sizeof(spell->stable_id) - 1U] = '\0';
-    }
-    if(source) {
-        strncpy(spell->source, source, sizeof(spell->source) - 1U);
-        spell->source[sizeof(spell->source) - 1U] = '\0';
-    }
-    if(school) {
-        strncpy(spell->school, school, sizeof(spell->school) - 1U);
-        spell->school[sizeof(spell->school) - 1U] = '\0';
-    } else {
-        spell->school[0] = '\0';
-    }
-    spell->ritual = ritual ? 1U : 0U;
-}
-
 uint8_t pocket_d20_spell_casting_ability_for(
     const PocketCharacter* character, const PocketSpell* spell) {
-    if(spell && spell->grant_source == PocketGrantSpecies)
-        return character->spellcasting_ability < POCKET_D20_ABILITY_COUNT ?
-                   character->spellcasting_ability :
-                   PocketAbilityIntelligence;
     if(spell) {
         uint8_t class_index = spell->class_index;
         if(class_index < character->class_count &&
@@ -188,6 +71,121 @@ void pocket_d20_recalculate_multiclass_slots(PocketCharacter* character) {
         if(character->spell_slots_current[level] > maximum)
             character->spell_slots_current[level] = maximum;
     }
+}
+
+bool pocket_d20_initialize_spell_slots_if_unset(PocketCharacter* character) {
+    if(!character) return false;
+    bool changed = false;
+    bool shared_unset = true;
+    bool has_shared_caster = false;
+    for(uint8_t level = 1U; level < POCKET_D20_SLOT_COUNT; ++level) {
+        if(character->spell_slots_current[level] || character->spell_slots_max[level]) {
+            shared_unset = false;
+            break;
+        }
+    }
+    for(uint8_t index = 0U; index < character->class_count; ++index) {
+        uint8_t mode = character->classes[index].spellcasting_mode;
+        if(mode == PocketSpellcastingFull || mode == PocketSpellcastingHalf ||
+           mode == PocketSpellcastingThird) {
+            has_shared_caster = true;
+            break;
+        }
+    }
+    if(shared_unset && has_shared_caster) {
+        pocket_d20_recalculate_multiclass_slots(character);
+        for(uint8_t level = 1U; level < POCKET_D20_SLOT_COUNT; ++level) {
+            character->spell_slots_current[level] = character->spell_slots_max[level];
+            if(character->spell_slots_max[level]) changed = true;
+        }
+    }
+
+    static const uint8_t pact_slots[20] = {
+        1U, 2U, 2U, 2U, 2U, 2U, 2U, 2U, 2U, 2U,
+        3U, 3U, 3U, 3U, 3U, 3U, 4U, 4U, 4U, 4U};
+    static const uint8_t pact_levels[20] = {
+        1U, 1U, 2U, 2U, 3U, 3U, 4U, 4U, 5U, 5U,
+        5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U, 5U};
+    for(uint8_t index = 0U; index < character->class_count; ++index) {
+        PocketClassLevel* class_level = &character->classes[index];
+        if(class_level->spellcasting_mode != PocketSpellcastingPact) continue;
+        if(class_level->pact_slot_level || class_level->pact_slots_current ||
+           class_level->pact_slots_max)
+            continue;
+        uint8_t level = class_level->level;
+        if(level < 1U) level = 1U;
+        if(level > 20U) level = 20U;
+        class_level->pact_slot_level = pact_levels[level - 1U];
+        class_level->pact_slots_max = pact_slots[level - 1U];
+        class_level->pact_slots_current = class_level->pact_slots_max;
+        changed = true;
+    }
+    return changed;
+}
+
+static bool pocket_d20_class_name_is(const PocketClassLevel* level, const char* name) {
+    return level && name && strcmp(level->name, name) == 0;
+}
+
+bool pocket_d20_apply_level_progression(PocketCharacter* character, uint8_t class_index) {
+    if(!character || class_index >= character->class_count) return false;
+    PocketClassLevel* c = &character->classes[class_index];
+    uint8_t level = c->level ? c->level : 1U;
+    if(level > 20U) level = 20U;
+    bool changed = false;
+
+    if(c->hit_dice_max < level) { c->hit_dice_max = level; changed = true; }
+    if(c->hit_dice_current > c->hit_dice_max) c->hit_dice_current = c->hit_dice_max;
+
+    uint8_t mode = c->spellcasting_mode;
+    if(pocket_d20_class_name_is(c, "Bard") || pocket_d20_class_name_is(c, "Cleric") ||
+       pocket_d20_class_name_is(c, "Druid") || pocket_d20_class_name_is(c, "Sorcerer") ||
+       pocket_d20_class_name_is(c, "Wizard")) mode = PocketSpellcastingFull;
+    else if(pocket_d20_class_name_is(c, "Artificer") || pocket_d20_class_name_is(c, "Paladin") ||
+            pocket_d20_class_name_is(c, "Ranger")) mode = PocketSpellcastingHalf;
+    else if(pocket_d20_class_name_is(c, "Warlock")) mode = PocketSpellcastingPact;
+    if(c->spellcasting_mode != mode) { c->spellcasting_mode = mode; changed = true; }
+
+    uint8_t cantrips = 0U;
+    if(pocket_d20_class_name_is(c, "Wizard") || pocket_d20_class_name_is(c, "Sorcerer")) cantrips = level >= 10U ? 5U : level >= 4U ? 4U : 3U;
+    else if(pocket_d20_class_name_is(c, "Cleric") || pocket_d20_class_name_is(c, "Druid")) cantrips = level >= 10U ? 5U : level >= 4U ? 4U : 3U;
+    else if(pocket_d20_class_name_is(c, "Bard")) cantrips = level >= 10U ? 4U : level >= 4U ? 3U : 2U;
+    else if(pocket_d20_class_name_is(c, "Warlock")) cantrips = level >= 10U ? 4U : level >= 4U ? 3U : 2U;
+    if(cantrips && c->cantrip_limit < cantrips) { c->cantrip_limit = cantrips; changed = true; }
+
+    int16_t ability_mod = 0;
+    if(c->spellcasting_ability < POCKET_D20_ABILITY_COUNT)
+        ability_mod = pocket_d20_ability_modifier(character->ability_scores[c->spellcasting_ability]);
+    int16_t prepared = (int16_t)level + ability_mod;
+    if(prepared < 1) prepared = 1;
+    if((mode == PocketSpellcastingFull || mode == PocketSpellcastingHalf) && c->prepared_limit < (uint8_t)prepared) {
+        c->prepared_limit = (uint8_t)prepared; changed = true;
+    }
+
+    if(pocket_d20_class_name_is(c, "Wizard")) {
+        uint16_t minimum = (uint16_t)(6U + (level > 1U ? 2U * (level - 1U) : 0U));
+        if(c->spellbook_size < minimum) { c->spellbook_size = minimum; changed = true; }
+    }
+    if(pocket_d20_class_name_is(c, "Sorcerer")) {
+        uint16_t points = level >= 2U ? level : 0U;
+        if(c->spell_points_max < points) { c->spell_points_max = points; changed = true; }
+        if(c->spell_points_current > c->spell_points_max) c->spell_points_current = c->spell_points_max;
+    }
+    if(pocket_d20_class_name_is(c, "Warlock")) {
+        static const uint8_t pact_slots[20] = {1,2,2,2,2,2,2,2,2,2,3,3,3,3,3,3,4,4,4,4};
+        static const uint8_t pact_level[20] = {1,1,2,2,3,3,4,4,5,5,5,5,5,5,5,5,5,5,5,5};
+        if(c->pact_slots_max != pact_slots[level-1U]) { c->pact_slots_max = pact_slots[level-1U]; changed = true; }
+        if(c->pact_slot_level != pact_level[level-1U]) { c->pact_slot_level = pact_level[level-1U]; changed = true; }
+        if(c->pact_slots_current > c->pact_slots_max) c->pact_slots_current = c->pact_slots_max;
+        uint16_t mask = 0U;
+        if(level >= 11U) mask |= (uint16_t)(1U << 6U);
+        if(level >= 13U) mask |= (uint16_t)(1U << 7U);
+        if(level >= 15U) mask |= (uint16_t)(1U << 8U);
+        if(level >= 17U) mask |= (uint16_t)(1U << 9U);
+        if((c->mystic_arcanum_mask & mask) != mask) { c->mystic_arcanum_mask |= mask; changed = true; }
+    }
+    pocket_d20_recalculate_multiclass_slots(character);
+    return changed;
 }
 
 uint8_t pocket_d20_class_max_spell_level(const PocketClassLevel* class_level) {

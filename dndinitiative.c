@@ -5,10 +5,10 @@
 #include <furi.h>
 #include <furi_hal_random.h>
 #include <gui/gui.h>
-#include <gui/modules/number_input.h>
-#include <gui/modules/text_input.h>
 #include <gui/view.h>
 #include <gui/view_dispatcher.h>
+#include <gui/modules/number_input.h>
+#include <gui/modules/text_input.h>
 #include <input/input.h>
 #include <storage/storage.h>
 #include <stdio.h>
@@ -29,9 +29,11 @@ typedef struct {
     int16_t armor_class;
     int16_t total;
     int8_t modifier;
+    uint8_t roll_mode;
 } InitiativeMember;
 
 typedef enum {
+    InitiativeScreenNoCharacter,
     InitiativeScreenMenu,
     InitiativeScreenRoster,
     InitiativeScreenSetup,
@@ -40,10 +42,26 @@ typedef enum {
 } InitiativeScreen;
 
 typedef enum {
-    InitiativeViewMain,
-    InitiativeViewText,
-    InitiativeViewNumber,
-} InitiativeView;
+    InitiativeTextNone,
+    InitiativeTextName,
+    InitiativeTextConditions,
+} InitiativeTextTarget;
+
+typedef enum {
+    InitiativeRollNormal,
+    InitiativeRollAdvantage,
+    InitiativeRollDisadvantage,
+} InitiativeRollMode;
+
+typedef enum {
+    InitiativeNumberNone,
+    InitiativeNumberManualRoll,
+    InitiativeNumberTotal,
+    InitiativeNumberModifier,
+    InitiativeNumberArmorClass,
+    InitiativeNumberHpCurrent,
+    InitiativeNumberHpMax,
+} InitiativeNumberTarget;
 
 typedef struct {
     Gui* gui;
@@ -63,13 +81,17 @@ typedef struct {
     uint8_t scroll;
     uint8_t edit_field;
     uint8_t edit_combat;
-    uint8_t text_input_active;
-    uint8_t number_input_active;
-    uint8_t text_target;
-    uint8_t setup_number_index;
+    uint8_t edit_setup;
+    uint8_t delete_armed;
+    InitiativeTextTarget text_target;
     char edit_buffer[INIT_CONDITION_LEN];
-    InitiativeScreen edit_return_screen;
+    uint8_t input_member;
+    InitiativeNumberTarget number_target;
+    uint8_t number_combat;
     uint8_t return_to_dnd;
+    uint8_t have_character;
+    uint8_t roll_mode;
+    char main_character_name[INIT_NAME_LEN];
     uint32_t character_id;
     InitiativeScreen screen;
     char status[32];
@@ -87,106 +109,6 @@ static void initiative_redraw(InitiativeApp* app) {
     if(!model) return;
     *model = app;
     view_commit_model(app->view, true);
-}
-
-static bool initiative_save(InitiativeApp* app);
-static int16_t initiative_clamp(int32_t value, int16_t low, int16_t high);
-
-static InitiativeMember* initiative_edit_member(InitiativeApp* app) {
-    if(!app) return NULL;
-    if(app->edit_combat) {
-        if(app->selection >= app->combat_count) return NULL;
-        return &app->combat[app->selection];
-    }
-    if(app->selection >= app->roster_count) return NULL;
-    return &app->roster[app->selection];
-}
-
-static void initiative_text_done(void* context) {
-    InitiativeApp* app = context;
-    InitiativeMember* member = initiative_edit_member(app);
-    if(member) {
-        if(app->text_target == 0U)
-            initiative_copy(member->name, sizeof(member->name), app->edit_buffer);
-        else
-            initiative_copy(member->conditions, sizeof(member->conditions), app->edit_buffer);
-        initiative_save(app);
-    }
-    app->text_input_active = 0U;
-    view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewMain);
-    initiative_redraw(app);
-}
-
-static void initiative_begin_text(
-    InitiativeApp* app, uint8_t target, const char* title, const char* initial) {
-    if(!app->text_input) {
-        app->text_input = text_input_alloc();
-        if(!app->text_input) {
-            initiative_copy(app->status, sizeof(app->status), "Text input memory low");
-            return;
-        }
-        view_dispatcher_add_view(
-            app->dispatcher, InitiativeViewText, text_input_get_view(app->text_input));
-    }
-    app->text_target = target;
-    app->text_input_active = 1U;
-    initiative_copy(app->edit_buffer, sizeof(app->edit_buffer), initial);
-    text_input_reset(app->text_input);
-    text_input_set_header_text(app->text_input, title);
-    text_input_set_result_callback(
-        app->text_input,
-        initiative_text_done,
-        app,
-        app->edit_buffer,
-        target == 0U ? INIT_NAME_LEN : INIT_CONDITION_LEN,
-        false);
-    view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewText);
-}
-
-static void initiative_number_done(void* context, int32_t number) {
-    InitiativeApp* app = context;
-    if(app->setup_number_index < app->combat_count)
-        app->combat[app->setup_number_index].total =
-            initiative_clamp(number + app->combat[app->setup_number_index].modifier, -99, 199);
-    app->number_input_active = 0U;
-    view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewMain);
-    initiative_redraw(app);
-}
-
-static void initiative_begin_setup_number(InitiativeApp* app, uint8_t index) {
-    if(index >= app->combat_count) return;
-    if(!app->number_input) {
-        app->number_input = number_input_alloc();
-        if(!app->number_input) {
-            initiative_copy(app->status, sizeof(app->status), "Number input memory low");
-            return;
-        }
-        view_dispatcher_add_view(
-            app->dispatcher, InitiativeViewNumber, number_input_get_view(app->number_input));
-    }
-    app->setup_number_index = index;
-    app->number_input_active = 1U;
-    number_input_set_header_text(app->number_input, "Initiative d20 roll");
-    number_input_set_result_callback(
-        app->number_input, initiative_number_done, app, 10, 1, 20);
-    view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewNumber);
-}
-
-static void initiative_roll_member(InitiativeMember* member) {
-    if(!member) return;
-    member->total = (int16_t)(1U + (furi_hal_random_get() % 20U) + member->modifier);
-}
-
-static void initiative_sort_combat(InitiativeApp* app) {
-    for(uint8_t i = 1U; i < app->combat_count; ++i) {
-        InitiativeMember value = app->combat[i];
-        uint8_t position = i;
-        while(position && app->combat[position - 1U].total < value.total) {
-            app->combat[position] = app->combat[position - 1U];
-            --position;
-        }
-        app->combat[position] = value;
-    }
 }
 
 static bool initiative_parse_u32(const char* text, const char** end, uint32_t* output) {
@@ -229,6 +151,26 @@ static bool initiative_path(char* out, size_t size, uint32_t id, const char* suf
 }
 
 
+static int8_t initiative_ability_modifier(int32_t score) {
+    int32_t delta = score - 10;
+    if(delta >= 0) return (int8_t)(delta / 2);
+    return (int8_t)(-(((-delta) + 1) / 2));
+}
+
+static uint8_t initiative_roll_d20(InitiativeRollMode mode) {
+    uint8_t first = (uint8_t)(1U + (furi_hal_random_get() % 20U));
+    if(mode == InitiativeRollNormal) return first;
+    uint8_t second = (uint8_t)(1U + (furi_hal_random_get() % 20U));
+    return mode == InitiativeRollAdvantage ? (first > second ? first : second) :
+                                             (first < second ? first : second);
+}
+
+static const char* initiative_roll_mode_name(InitiativeRollMode mode) {
+    if(mode == InitiativeRollAdvantage) return "Advantage";
+    if(mode == InitiativeRollDisadvantage) return "Disadvantage";
+    return "Normal";
+}
+
 typedef struct {
     File* file;
     uint8_t buffer[256];
@@ -236,10 +178,12 @@ typedef struct {
     uint16_t count;
 } InitiativeReader;
 
-static bool initiative_read_line(InitiativeReader* reader, char* line, size_t size) {
+static bool initiative_read_line_checked(
+    InitiativeReader* reader, char* line, size_t size, bool* overflow) {
     if(!reader || !line || size < 2U) return false;
     size_t used = 0U;
     bool consumed = false;
+    bool too_long = false;
     while(true) {
         if(reader->position >= reader->count) {
             reader->count =
@@ -251,173 +195,18 @@ static bool initiative_read_line(InitiativeReader* reader, char* line, size_t si
         consumed = true;
         if(ch == '\r') continue;
         if(ch == '\n') break;
-        if(used + 1U < size) line[used++] = ch;
+        if(used + 1U < size)
+            line[used++] = ch;
+        else
+            too_long = true;
     }
     line[used] = '\0';
+    if(overflow) *overflow = too_long;
     return consumed;
 }
 
-static uint8_t initiative_hex_value(char value) {
-    if(value >= '0' && value <= '9') return (uint8_t)(value - '0');
-    if(value >= 'A' && value <= 'F') return (uint8_t)(value - 'A' + 10U);
-    if(value >= 'a' && value <= 'f') return (uint8_t)(value - 'a' + 10U);
-    return 0xFFU;
-}
-
-static void initiative_decode_string(char* destination, size_t size, const char* value) {
-    if(!destination || !size) return;
-    size_t output = 0U;
-    for(size_t input = 0U; value && value[input] && output + 1U < size; ++input) {
-        if(value[input] == '%' && value[input + 1U] && value[input + 2U]) {
-            uint8_t high = initiative_hex_value(value[input + 1U]);
-            uint8_t low = initiative_hex_value(value[input + 2U]);
-            if(high != 0xFFU && low != 0xFFU) {
-                destination[output++] = (char)((high << 4U) | low);
-                input += 2U;
-                continue;
-            }
-        }
-        destination[output++] = value[input];
-    }
-    destination[output] = '\0';
-}
-
-static bool initiative_character_path(
-    Storage* storage, uint32_t profile, char* output, size_t size) {
-    if(!storage || !output || !size) return false;
-    File* directory = storage_file_alloc(storage);
-    if(!directory) return false;
-    if(!storage_dir_open(directory, POCKET_D20_CHARACTER_DATA_ROOT)) {
-        storage_file_free(directory);
-        return false;
-    }
-    char prefix[32];
-    int prefix_len = snprintf(prefix, sizeof(prefix), "ch_%lu_", (unsigned long)profile);
-    bool found = false;
-    FileInfo info;
-    char filename[128];
-    while(prefix_len > 0 && storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        if(file_info_is_dir(&info) || strncmp(filename, prefix, (size_t)prefix_len) != 0) continue;
-        size_t length = strlen(filename);
-        if(length < (size_t)prefix_len + 6U || strcmp(filename + length - 4U, ".txt") != 0)
-            continue;
-        const char* level = filename + length - 5U;
-        while(level > filename + prefix_len && *level != '_') --level;
-        if(*level != '_' || level[1] < '0' || level[1] > '9') continue;
-        bool numeric = true;
-        for(const char* digit = level + 1U; digit < filename + length - 4U; ++digit)
-            if(*digit < '0' || *digit > '9') numeric = false;
-        if(!numeric) continue;
-        int written = snprintf(
-            output, size, "%s/%s", POCKET_D20_CHARACTER_DATA_ROOT, filename);
-        found = written > 0 && (size_t)written < size;
-        if(found) break;
-    }
-    storage_dir_close(directory);
-    storage_file_free(directory);
-    return found;
-}
-
-static uint8_t initiative_parse_csv(const char* value, int32_t* values, uint8_t capacity) {
-    uint8_t count = 0U;
-    const char* cursor = value;
-    while(cursor && *cursor && count < capacity) {
-        char* end = NULL;
-        long parsed = strtol(cursor, &end, 10);
-        if(end == cursor) break;
-        values[count++] = parsed > INT32_MAX ? INT32_MAX : parsed < INT32_MIN ? INT32_MIN : (int32_t)parsed;
-        cursor = *end == ',' ? end + 1U : end;
-        if(*end && *end != ',') break;
-    }
-    return count;
-}
-
-static bool initiative_read_main_character(
-    InitiativeApp* app, uint32_t profile, InitiativeMember* member) {
-    char path[INIT_PATH_LEN];
-    if(!initiative_character_path(app->storage, profile, path, sizeof(path))) return false;
-    File* file = storage_file_alloc(app->storage);
-    if(!file) return false;
-    if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        storage_file_free(file);
-        return false;
-    }
-    InitiativeReader reader = {.file = file};
-    char line[256];
-    int8_t dexterity = 10;
-    int8_t initiative_misc = 0;
-    bool named = false;
-    memset(member, 0, sizeof(*member));
-    member->hp_current = member->hp_max = 1;
-    member->armor_class = 10;
-    while(initiative_read_line(&reader, line, sizeof(line))) {
-        char* value = strchr(line, '=');
-        if(!value) continue;
-        *value++ = '\0';
-        if(strcmp(line, "Name") == 0) {
-            initiative_decode_string(member->name, sizeof(member->name), value);
-            named = member->name[0] != '\0';
-        } else if(strcmp(line, "Conditions") == 0) {
-            initiative_decode_string(member->conditions, sizeof(member->conditions), value);
-        } else if(strcmp(line, "AbilityScores") == 0) {
-            int32_t values[6];
-            uint8_t count = initiative_parse_csv(value, values, 6U);
-            if(count >= 2U) dexterity = (int8_t)initiative_clamp(values[1], 1, 30);
-        } else if(strcmp(line, "Vitals") == 0) {
-            int32_t values[12];
-            uint8_t count = initiative_parse_csv(value, values, 12U);
-            if(count >= 1U) member->hp_current = initiative_clamp(values[0], -999, 999);
-            if(count >= 2U) member->hp_max = initiative_clamp(values[1], 0, 999);
-            if(count >= 4U) member->armor_class = initiative_clamp(values[3], 0, 99);
-            if(count >= 6U) initiative_misc = (int8_t)initiative_clamp(values[5], -50, 50);
-        }
-    }
-    bool io_ok = storage_file_get_error(file) == FSE_OK;
-    storage_file_close(file);
-    storage_file_free(file);
-    int16_t dex_mod = dexterity >= 10 ? (dexterity - 10) / 2 : -((11 - dexterity) / 2);
-    member->modifier = (int8_t)initiative_clamp(dex_mod + initiative_misc, -50, 50);
-    return io_ok && named;
-}
-
-static bool initiative_sync_main_character(InitiativeApp* app) {
-    if(!app || !app->storage) return false;
-    uint32_t profile = app->character_id;
-    InitiativeMember fresh;
-    bool loaded = profile && initiative_read_main_character(app, profile, &fresh);
-    if(!loaded) {
-        uint32_t active = 0U;
-        if(dnd_profile_ref_active(app->storage, &active) &&
-           initiative_read_main_character(app, active, &fresh)) {
-            profile = active;
-            loaded = true;
-        }
-    }
-    if(!loaded) return false;
-    app->character_id = profile;
-
-    uint8_t match = INIT_MAX;
-    for(uint8_t i = 0U; i < app->roster_count; ++i) {
-        if(strcmp(app->roster[i].name, fresh.name) == 0) {
-            match = i;
-            break;
-        }
-    }
-    if(match < app->roster_count) {
-        char conditions[INIT_CONDITION_LEN];
-        initiative_copy(conditions, sizeof(conditions), app->roster[match].conditions);
-        app->roster[match] = fresh;
-        if(conditions[0])
-            initiative_copy(
-                app->roster[match].conditions, sizeof(app->roster[match].conditions), conditions);
-    } else if(app->roster_count < INIT_MAX) {
-        app->roster[app->roster_count++] = fresh;
-    } else {
-        initiative_copy(app->status, sizeof(app->status), "Roster full; character skipped");
-        return false;
-    }
-    initiative_save(app);
-    return true;
+static bool initiative_read_line(InitiativeReader* reader, char* line, size_t size) {
+    return initiative_read_line_checked(reader, line, size, NULL);
 }
 
 static bool initiative_parse_i32_strict(const char* text, int32_t* output) {
@@ -500,6 +289,7 @@ static bool initiative_write_member_named(
     INIT_MEMBER_NUMBER("HpMax", member->hp_max);
     INIT_MEMBER_NUMBER("ArmorClass", member->armor_class);
     INIT_MEMBER_NUMBER("Modifier", member->modifier);
+    INIT_MEMBER_NUMBER("RollMode", member->roll_mode);
     INIT_MEMBER_NUMBER("Total", member->total);
     INIT_MEMBER_STRING("Conditions", member->conditions);
 #undef INIT_MEMBER_STRING
@@ -520,6 +310,8 @@ static bool initiative_save(InitiativeApp* app) {
     bool ok = storage_file_open(file, temp, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
               initiative_write_number(file, "DNDInitiative", 1) &&
               initiative_write_number(file, "CharacterId", (int32_t)app->character_id) &&
+              initiative_write_number(file, "RollMode", app->roll_mode) &&
+              initiative_write_named(file, "MainCharacterName", app->main_character_name) &&
               initiative_write_number(file, "RosterCount", app->roster_count);
     for(uint8_t i = 0U; ok && i < app->roster_count; ++i)
         ok = initiative_write_member_named(file, "Roster", i, &app->roster[i]);
@@ -589,6 +381,12 @@ static bool initiative_apply_member_field(
             member->modifier = (int8_t)initiative_clamp(number, -50, 50);
             applied = true;
         }
+    } else if(initiative_indexed_key(key, prefix, "RollMode", &index)) {
+        member = &list[index];
+        if(initiative_parse_i32_strict(value, &number)) {
+            member->roll_mode = (uint8_t)initiative_clamp(number, InitiativeRollNormal, InitiativeRollDisadvantage);
+            applied = true;
+        }
     } else if(initiative_indexed_key(key, prefix, "Total", &index)) {
         member = &list[index];
         if(initiative_parse_i32_strict(value, &number)) {
@@ -632,7 +430,13 @@ static void initiative_load(InitiativeApp* app) {
         *value++ = '\0';
         int32_t number = 0;
 
-        if(!strcmp(line, "Active")) {
+        if(!strcmp(line, "MainCharacterName")) {
+            initiative_copy(app->main_character_name, sizeof(app->main_character_name), value);
+        } else if(!strcmp(line, "RollMode")) {
+            if(initiative_parse_i32_strict(value, &number) && number >= 0 &&
+               number <= (int32_t)InitiativeRollDisadvantage)
+                app->roll_mode = (uint8_t)number;
+        } else if(!strcmp(line, "Active")) {
             if(initiative_parse_i32_strict(value, &number)) app->active = number ? 1U : 0U;
         } else if(!strcmp(line, "Round")) {
             if(initiative_parse_i32_strict(value, &number) && number >= 1 && number <= (int32_t)UINT16_MAX)
@@ -655,6 +459,300 @@ static void initiative_load(InitiativeApp* app) {
     storage_file_free(file);
     if(app->current_turn >= app->combat_count) app->current_turn = 0U;
     if(!app->round) app->round = 1U;
+}
+
+static bool initiative_refresh_main_character(InitiativeApp* app) {
+    if(!app || !app->storage || !app->have_character) return false;
+    char path[INIT_PATH_LEN];
+    if(!dnd_profile_ref_path(app->storage, app->character_id, path, sizeof(path))) return false;
+    File* file = storage_file_alloc(app->storage);
+    if(!file || !storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        if(file) storage_file_free(file);
+        return false;
+    }
+
+    char name[INIT_NAME_LEN] = {0};
+    int32_t dexterity = 10;
+    int32_t hp_current = 1, hp_max = 1, armor_class = 10, initiative_misc = 0, exhaustion = 0;
+    uint8_t total_level = 0U;
+    bool has_alert = false, has_jack_of_all_trades = false;
+    bool have_name = false, have_abilities = false, have_vitals = false;
+    InitiativeReader reader = {.file = file};
+    char line[192];
+    while(initiative_read_line(&reader, line, sizeof(line))) {
+        char* value = strchr(line, '=');
+        if(!value) continue;
+        *value++ = '\0';
+        if(!strcmp(line, "Name")) {
+            initiative_copy(name, sizeof(name), value);
+            have_name = name[0] != '\0';
+        } else if(!strcmp(line, "OriginFeat")) {
+            if(!strcmp(value, "Alert")) has_alert = true;
+        } else if(!strcmp(line, "AbilityScores")) {
+            int32_t values[6] = {0};
+            uint8_t count = 0U;
+            char* cursor = value;
+            while(count < 6U && *cursor) {
+                char* comma = strchr(cursor, ',');
+                if(comma) *comma = '\0';
+                if(!initiative_parse_i32_strict(cursor, &values[count])) break;
+                ++count;
+                if(!comma) break;
+                cursor = comma + 1U;
+            }
+            if(count >= 2U) { dexterity = values[1]; have_abilities = true; }
+        } else if(!strncmp(line, "Class", 5U) && strstr(line, "Data")) {
+            int32_t class_level = 0;
+            char* comma = strchr(value, ',');
+            if(comma) *comma = '\0';
+            if(initiative_parse_i32_strict(value, &class_level) && class_level > 0) {
+                uint16_t next = (uint16_t)total_level + (uint16_t)class_level;
+                total_level = (uint8_t)(next > 20U ? 20U : next);
+            }
+        } else if(!strncmp(line, "Feature", 7U) && strstr(line, "Name")) {
+            if(!strcmp(value, "Alert")) has_alert = true;
+            else if(!strcmp(value, "Jack of All Trades")) has_jack_of_all_trades = true;
+        } else if(!strcmp(line, "Vitals")) {
+            int32_t values[12] = {0};
+            uint8_t count = 0U;
+            char* cursor = value;
+            while(count < 12U && *cursor) {
+                char* comma = strchr(cursor, ',');
+                if(comma) *comma = '\0';
+                if(!initiative_parse_i32_strict(cursor, &values[count])) break;
+                ++count;
+                if(!comma) break;
+                cursor = comma + 1U;
+            }
+            if(count >= 7U) {
+                hp_current = values[0]; hp_max = values[1]; armor_class = values[3];
+                initiative_misc = values[5]; exhaustion = values[6]; have_vitals = true;
+            }
+        }
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    if(!have_name || !have_abilities || !have_vitals) return false;
+
+    uint8_t proficiency = total_level ? (uint8_t)(2U + (total_level - 1U) / 4U) : 2U;
+    int32_t feature_bonus = has_alert ? proficiency :
+                            (has_jack_of_all_trades ? (int32_t)(proficiency / 2U) : 0);
+    int16_t modifier = initiative_clamp(
+        (int32_t)initiative_ability_modifier(dexterity) + initiative_misc + feature_bonus -
+            (2 * exhaustion),
+        -50,
+        50);
+    InitiativeMember* member = NULL;
+    bool changed = false;
+    if(app->main_character_name[0]) {
+        for(uint8_t i = 0U; i < app->roster_count; ++i) {
+            if(!strcmp(app->roster[i].name, app->main_character_name)) { member = &app->roster[i]; break; }
+        }
+    }
+    if(!member) {
+        for(uint8_t i = 0U; i < app->roster_count; ++i) {
+            if(!strcmp(app->roster[i].name, name)) { member = &app->roster[i]; break; }
+        }
+    }
+    if(!member && app->roster_count < INIT_MAX) {
+        member = &app->roster[app->roster_count++];
+        memset(member, 0, sizeof(*member));
+        initiative_copy(member->name, sizeof(member->name), name);
+        member->roll_mode = app->roll_mode;
+        changed = true;
+    }
+    if(!member) return false;
+    char prior_main_name[INIT_NAME_LEN];
+    initiative_copy(prior_main_name, sizeof(prior_main_name), app->main_character_name);
+    int16_t next_hp_current = initiative_clamp(hp_current, -999, 999);
+    int16_t next_hp_max = initiative_clamp(hp_max, 0, 999);
+    int16_t next_ac = initiative_clamp(armor_class, 0, 99);
+    if(strcmp(member->name, name) || strcmp(app->main_character_name, name) ||
+       member->hp_current != next_hp_current || member->hp_max != next_hp_max ||
+       member->armor_class != next_ac || member->modifier != (int8_t)modifier)
+        changed = true;
+    initiative_copy(member->name, sizeof(member->name), name);
+    initiative_copy(app->main_character_name, sizeof(app->main_character_name), name);
+    member->hp_current = next_hp_current;
+    member->hp_max = next_hp_max;
+    member->armor_class = next_ac;
+    member->modifier = (int8_t)modifier;
+
+    for(uint8_t i = 0U; i < app->combat_count; ++i) {
+        if(!strcmp(app->combat[i].name, name) ||
+           (prior_main_name[0] && !strcmp(app->combat[i].name, prior_main_name))) {
+            if(strcmp(app->combat[i].name, name) || app->combat[i].modifier != (int8_t)modifier ||
+               app->combat[i].hp_current != member->hp_current ||
+               app->combat[i].hp_max != member->hp_max ||
+               app->combat[i].armor_class != member->armor_class)
+                changed = true;
+            initiative_copy(app->combat[i].name, sizeof(app->combat[i].name), name);
+            app->combat[i].modifier = (int8_t)modifier;
+            app->combat[i].hp_current = member->hp_current;
+            app->combat[i].hp_max = member->hp_max;
+            app->combat[i].armor_class = member->armor_class;
+            break;
+        }
+    }
+    return changed;
+}
+
+static bool initiative_member_is_main(const InitiativeApp* app, const InitiativeMember* member) {
+    return app && member && app->main_character_name[0] &&
+           !strcmp(app->main_character_name, member->name);
+}
+
+static uint8_t initiative_parse_csv(char* text, int32_t* values, uint8_t capacity) {
+    if(!text || !values || !capacity) return 0U;
+    uint8_t count = 0U;
+    char* cursor = text;
+    while(count < capacity && *cursor) {
+        char* comma = strchr(cursor, ',');
+        if(comma) *comma = '\0';
+        if(!initiative_parse_i32_strict(cursor, &values[count])) return count;
+        ++count;
+        if(!comma) break;
+        cursor = comma + 1U;
+    }
+    return count;
+}
+
+static bool initiative_write_line(File* file, const char* line) {
+    if(!file || !line) return false;
+    size_t length = strlen(line);
+    return storage_file_write(file, line, length) == length &&
+           storage_file_write(file, "\n", 1U) == 1U;
+}
+
+/* Patch only the canonical fields Initiative owns. Unknown/malformed character fields
+   are copied unchanged so a partial or future save remains best-effort readable. */
+static bool initiative_patch_character(
+    InitiativeApp* app,
+    const InitiativeMember* sync_member,
+    uint8_t recharge_cadence) {
+    if(!app || !app->storage || !app->have_character) return false;
+    char path[INIT_PATH_LEN];
+    if(!dnd_profile_ref_path(app->storage, app->character_id, path, sizeof(path))) return false;
+    if(!storage_file_exists(app->storage, path)) return false;
+
+    char temp[INIT_PATH_LEN], backup[INIT_PATH_LEN];
+    int tn = snprintf(temp, sizeof(temp), "%s.itmp", path);
+    int bn = snprintf(backup, sizeof(backup), "%s.ibak", path);
+    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temp) || (size_t)bn >= sizeof(backup))
+        return false;
+
+    File* input = storage_file_alloc(app->storage);
+    File* output = storage_file_alloc(app->storage);
+    char* line = malloc(768U);
+    char* parse = malloc(768U);
+    if(!input || !output || !line || !parse) {
+        if(input) storage_file_free(input);
+        if(output) storage_file_free(output);
+        free(line);
+        free(parse);
+        return false;
+    }
+    bool ok = storage_file_open(input, path, FSAM_READ, FSOM_OPEN_EXISTING) &&
+              storage_file_open(output, temp, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool touched = false;
+    if(ok) {
+        InitiativeReader reader = {.file = input};
+        bool overflow = false;
+        while(ok && initiative_read_line_checked(&reader, line, 768U, &overflow)) {
+            if(overflow) {
+                ok = false;
+                break;
+            }
+            char replacement[192];
+            const char* out_line = line;
+            initiative_copy(parse, 768U, line);
+            char* value = strchr(parse, '=');
+            if(value) {
+                *value++ = '\0';
+                if(sync_member && !strcmp(parse, "Vitals")) {
+                    int32_t values[12] = {0};
+                    if(initiative_parse_csv(value, values, 12U) == 12U) {
+                        values[0] = sync_member->hp_current;
+                        values[1] = sync_member->hp_max;
+                        values[3] = sync_member->armor_class;
+                        int n = snprintf(
+                            replacement,
+                            sizeof(replacement),
+                            "Vitals=%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+                            (long)values[0], (long)values[1], (long)values[2], (long)values[3],
+                            (long)values[4], (long)values[5], (long)values[6], (long)values[7],
+                            (long)values[8], (long)values[9], (long)values[10], (long)values[11]);
+                        if(n > 0 && (size_t)n < sizeof(replacement)) {
+                            out_line = replacement;
+                            touched = true;
+                        }
+                    }
+                } else if(
+                    recharge_cadence && !strncmp(parse, "Feature", 7U) &&
+                    strlen(parse) > 11U && !strcmp(parse + strlen(parse) - 4U, "Data")) {
+                    int32_t values[7] = {0};
+                    if(initiative_parse_csv(value, values, 7U) == 7U &&
+                       values[4] == recharge_cadence && values[0] != values[1]) {
+                        values[0] = values[1];
+                        int n = snprintf(
+                            replacement,
+                            sizeof(replacement),
+                            "%s=%ld,%ld,%ld,%ld,%ld,%ld,%ld",
+                            parse,
+                            (long)values[0], (long)values[1], (long)values[2], (long)values[3],
+                            (long)values[4], (long)values[5], (long)values[6]);
+                        if(n > 0 && (size_t)n < sizeof(replacement)) {
+                            out_line = replacement;
+                            touched = true;
+                        }
+                    }
+                }
+            }
+            ok = initiative_write_line(output, out_line);
+        }
+        if(ok) ok = storage_file_sync(output);
+    }
+    storage_file_close(input);
+    storage_file_close(output);
+    storage_file_free(input);
+    storage_file_free(output);
+    free(line);
+    free(parse);
+
+    if(!ok) {
+        storage_common_remove(app->storage, temp);
+        return false;
+    }
+    if(!touched) {
+        storage_common_remove(app->storage, temp);
+        return true;
+    }
+    storage_common_remove(app->storage, backup);
+    if(storage_common_rename(app->storage, path, backup) != FSE_OK) {
+        storage_common_remove(app->storage, temp);
+        return false;
+    }
+    if(storage_common_rename(app->storage, temp, path) != FSE_OK) {
+        storage_common_rename(app->storage, backup, path);
+        return false;
+    }
+    storage_common_remove(app->storage, backup);
+    return true;
+}
+
+static void initiative_sync_main_if_needed(InitiativeApp* app, InitiativeMember* member) {
+    if(initiative_member_is_main(app, member)) initiative_patch_character(app, member, 0U);
+}
+
+static void initiative_swap(InitiativeApp* app, uint8_t first, uint8_t second) {
+    if(!app || first >= app->combat_count || second >= app->combat_count || first == second) return;
+    InitiativeMember temporary = app->combat[first];
+    app->combat[first] = app->combat[second];
+    app->combat[second] = temporary;
+    if(app->current_turn == first)
+        app->current_turn = second;
+    else if(app->current_turn == second)
+        app->current_turn = first;
 }
 
 static void initiative_import_args(InitiativeApp* app, const char* args) {
@@ -702,9 +800,7 @@ static void initiative_row(Canvas* canvas, uint8_t row, bool selected, const cha
         canvas_set_color(canvas, ColorWhite);
     }
     canvas_set_font(canvas, FontSecondary);
-    char shown[27];
-    initiative_copy(shown, sizeof(shown), text);
-    canvas_draw_str(canvas, 2, (uint8_t)(y + 8U), shown);
+    canvas_draw_str(canvas, 2, (uint8_t)(y + 8U), text);
     if(selected) canvas_set_color(canvas, ColorBlack);
 }
 
@@ -713,13 +809,26 @@ static void initiative_draw(Canvas* canvas, void* model) {
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 9, "DNDInitiative");
-    if(app->screen == InitiativeScreenMenu) {
-        char rows[4][32];
-        snprintf(rows[0], sizeof(rows[0]), "Start Combat (%u)", app->roster_count);
+    if(app->screen == InitiativeScreenNoCharacter) {
+        canvas_set_font(canvas, FontSecondary);
+        canvas_draw_str(canvas, 2, 24, "No DND character found.");
+        canvas_draw_str(canvas, 2, 34, "Create/load one first.");
+        initiative_row(canvas, 3U, app->selection == 0U, "Launch DNDolphins");
+        initiative_row(canvas, 4U, app->selection == 1U, "Exit Initiative");
+    } else if(app->screen == InitiativeScreenMenu) {
+        char rows[7][32];
+        snprintf(rows[0], sizeof(rows[0]), "Start New Combat");
         snprintf(rows[1], sizeof(rows[1]), "Resume%s", app->active ? "" : " (none)");
         snprintf(rows[2], sizeof(rows[2]), "Party Roster (%u)", app->roster_count);
-        initiative_copy(rows[3], sizeof(rows[3]), "Return to DNDolphins");
-        for(uint8_t i = 0U; i < 4U; ++i) initiative_row(canvas, i, i == app->selection, rows[i]);
+        snprintf(rows[3], sizeof(rows[3]), "Edit Current Order");
+        initiative_copy(rows[4], sizeof(rows[4]), "End Current Combat");
+        snprintf(rows[5], sizeof(rows[5]), "Default Roll: %s", initiative_roll_mode_name((InitiativeRollMode)app->roll_mode));
+        initiative_copy(rows[6], sizeof(rows[6]), "Return to DNDolphins");
+        for(uint8_t row = 0U; row < 5U; ++row) {
+            uint8_t i = (uint8_t)(app->scroll + row);
+            if(i >= 7U) break;
+            initiative_row(canvas, row, i == app->selection, rows[i]);
+        }
     } else if(app->screen == InitiativeScreenRoster) {
         uint8_t total = (uint8_t)(app->roster_count + 1U);
         for(uint8_t row = 0U; row < 5U; ++row) {
@@ -727,9 +836,9 @@ static void initiative_draw(Canvas* canvas, void* model) {
             if(i >= total) break;
             char text[48];
             if(i == app->roster_count)
-                initiative_copy(text, sizeof(text), "+ New Member");
+                initiative_copy(text, sizeof(text), "+ New");
             else
-                snprintf(text, sizeof(text), "%.24s HP%d AC%d", app->roster[i].name, app->roster[i].hp_current, app->roster[i].armor_class);
+                snprintf(text, sizeof(text), "%.18s HP%d AC%d", app->roster[i].name, app->roster[i].hp_current, app->roster[i].armor_class);
             initiative_row(canvas, row, i == app->selection, text);
         }
     } else if(app->screen == InitiativeScreenSetup) {
@@ -738,12 +847,11 @@ static void initiative_draw(Canvas* canvas, void* model) {
             uint8_t i = (uint8_t)(app->scroll + row);
             if(i >= total) break;
             char text[48];
-            if(i == 0U)
-                initiative_copy(text, sizeof(text), "Roll for All");
+            if(i == 0U) initiative_copy(text, sizeof(text), "Roll for All");
             else if(i <= app->combat_count) {
                 InitiativeMember* member = &app->combat[i - 1U];
-                snprintf(text, sizeof(text), "%.25s: %d", member->name, member->total);
-            } else if(i == (uint8_t)(app->combat_count + 1U))
+                snprintf(text, sizeof(text), "%.15s I%d HP%d AC%d", member->name, member->total, member->hp_current, member->armor_class);
+            } else if(i == app->combat_count + 1U)
                 initiative_copy(text, sizeof(text), "+ Temporary Member");
             else
                 initiative_copy(text, sizeof(text), "Begin Combat");
@@ -757,58 +865,70 @@ static void initiative_draw(Canvas* canvas, void* model) {
             uint8_t i = (uint8_t)(app->scroll + row);
             if(i >= app->combat_count) break;
             char text[48];
-            snprintf(text, sizeof(text), "%c %.20s %d HP%d", i == app->current_turn ? '>' : ' ', app->combat[i].name, app->combat[i].total, app->combat[i].hp_current);
+            snprintf(text, sizeof(text), "%c %.10s I%d HP%d AC%d %.5s", i == app->current_turn ? '>' : ' ', app->combat[i].name, app->combat[i].total, app->combat[i].hp_current, app->combat[i].armor_class, app->combat[i].conditions);
             initiative_row(canvas, row, i == app->selection, text);
         }
     } else {
-        InitiativeMember* member = initiative_edit_member(app);
-        if(!member) return;
+        InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] : &app->roster[app->selection];
+        char rows[9][48];
+        uint8_t count = app->edit_combat ? 9U : 8U;
+        snprintf(rows[0], sizeof(rows[0]), "Name: %.20s", member->name);
+        if(app->edit_combat) {
+            snprintf(rows[1], sizeof(rows[1]), "Initiative roll: %d", member->total);
+            snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", member->modifier);
+            snprintf(rows[3], sizeof(rows[3]), "Roll: %s", initiative_roll_mode_name((InitiativeRollMode)member->roll_mode));
+            snprintf(rows[4], sizeof(rows[4]), "Armor Class: %d", member->armor_class);
+            snprintf(rows[5], sizeof(rows[5]), "Current HP: %d", member->hp_current);
+            snprintf(rows[6], sizeof(rows[6]), "Maximum HP: %d", member->hp_max);
+            snprintf(rows[7], sizeof(rows[7]), "Conditions: %.16s", member->conditions);
+            initiative_copy(rows[8], sizeof(rows[8]), app->delete_armed ? "OK again: delete" : "Delete");
+        } else {
+            snprintf(rows[1], sizeof(rows[1]), "Initiative mod: %+d", member->modifier);
+            snprintf(rows[2], sizeof(rows[2]), "Roll: %s", initiative_roll_mode_name((InitiativeRollMode)member->roll_mode));
+            snprintf(rows[3], sizeof(rows[3]), "Armor Class: %d", member->armor_class);
+            snprintf(rows[4], sizeof(rows[4]), "Current HP: %d", member->hp_current);
+            snprintf(rows[5], sizeof(rows[5]), "Maximum HP: %d", member->hp_max);
+            snprintf(rows[6], sizeof(rows[6]), "Conditions: %.16s", member->conditions);
+            initiative_copy(rows[7], sizeof(rows[7]), app->delete_armed ? "OK again: delete" : "Delete");
+        }
         for(uint8_t row = 0U; row < 5U; ++row) {
-            uint8_t field = (uint8_t)(app->scroll + row);
-            if(field >= 7U) break;
-            char text[48];
-            if(field == 0U)
-                snprintf(text, sizeof(text), "Name: %.34s", member->name);
-            else if(field == 1U)
-                snprintf(text, sizeof(text), "%s: %d", app->edit_combat ? "Total" : "Initiative", app->edit_combat ? member->total : member->modifier);
-            else if(field == 2U)
-                snprintf(text, sizeof(text), "HP: %d", member->hp_current);
-            else if(field == 3U)
-                snprintf(text, sizeof(text), "Max HP: %d", member->hp_max);
-            else if(field == 4U)
-                snprintf(text, sizeof(text), "AC: %d", member->armor_class);
-            else if(field == 5U)
-                snprintf(text, sizeof(text), "Conditions: %.26s", member->conditions);
-            else
-                initiative_copy(text, sizeof(text), "Delete");
-            initiative_row(canvas, row, field == app->edit_field, text);
+            uint8_t i = (uint8_t)(app->scroll + row);
+            if(i >= count) break;
+            initiative_row(canvas, row, i == app->edit_field, rows[i]);
         }
     }
 }
 
-static void initiative_prepare_combat(InitiativeApp* app) {
-    initiative_sync_main_character(app);
+static void initiative_sort(InitiativeApp* app) {
+    for(uint8_t i = 1U; i < app->combat_count; ++i) {
+        InitiativeMember value = app->combat[i];
+        uint8_t pos = i;
+        while(pos && (app->combat[pos - 1U].total < value.total ||
+                       (app->combat[pos - 1U].total == value.total &&
+                        app->combat[pos - 1U].modifier < value.modifier))) {
+            app->combat[pos] = app->combat[pos - 1U];
+            --pos;
+        }
+        app->combat[pos] = value;
+    }
+}
+
+static void initiative_seed_setup(InitiativeApp* app) {
+    initiative_patch_character(app, NULL, 2U);
     app->combat_count = app->roster_count;
     memcpy(app->combat, app->roster, app->roster_count * sizeof(InitiativeMember));
-    for(uint8_t i = 0U; i < app->combat_count; ++i) app->combat[i].total = 0;
+    for(uint8_t i = 0U; i < app->combat_count; ++i) app->combat[i].total = app->combat[i].modifier;
     app->active = 0U;
     app->round = 1U;
     app->current_turn = 0U;
-    app->selection = 0U;
-    app->scroll = 0U;
+    app->selection = app->scroll = 0U;
     app->screen = InitiativeScreenSetup;
     initiative_save(app);
 }
 
-static void initiative_begin_combat(InitiativeApp* app) {
-    if(!app->combat_count) {
-        initiative_copy(app->status, sizeof(app->status), "No combatants");
-        return;
-    }
-    for(uint8_t i = 0U; i < app->combat_count; ++i)
-        if(app->combat[i].total == 0) initiative_roll_member(&app->combat[i]);
-    initiative_sort_combat(app);
-    app->active = 1U;
+static void initiative_start(InitiativeApp* app) {
+    initiative_sort(app);
+    app->active = app->combat_count ? 1U : 0U;
     app->round = 1U;
     app->current_turn = 0U;
     app->selection = 0U;
@@ -825,211 +945,289 @@ static void initiative_move(uint8_t* selection, uint8_t count, int8_t direction)
     *selection = (uint8_t)next;
 }
 
+static void initiative_text_done(void* context) {
+    InitiativeApp* app = context;
+    InitiativeMember* list = app->edit_combat ? app->combat : app->roster;
+    uint8_t count = app->edit_combat ? app->combat_count : app->roster_count;
+    if(app->input_member < count) {
+        InitiativeMember* member = &list[app->input_member];
+        if(app->text_target == InitiativeTextName) {
+            bool was_main = initiative_member_is_main(app, member);
+            initiative_copy(member->name, sizeof(member->name), app->edit_buffer);
+            if(was_main)
+                initiative_copy(
+                    app->main_character_name, sizeof(app->main_character_name), member->name);
+        } else if(app->text_target == InitiativeTextConditions)
+            initiative_copy(member->conditions, sizeof(member->conditions), app->edit_buffer);
+    }
+    app->text_target = InitiativeTextNone;
+    initiative_save(app);
+    view_dispatcher_switch_to_view(app->dispatcher, 0U);
+    initiative_redraw(app);
+}
+
+static void initiative_begin_text(InitiativeApp* app, InitiativeTextTarget target, const char* header, const char* initial) {
+    if(!app->text_input) {
+        app->text_input = text_input_alloc();
+        if(!app->text_input) return;
+        view_dispatcher_add_view(app->dispatcher, 1U, text_input_get_view(app->text_input));
+    }
+    app->text_target = target;
+    initiative_copy(app->edit_buffer, sizeof(app->edit_buffer), initial);
+    text_input_reset(app->text_input);
+    text_input_set_header_text(app->text_input, header);
+    text_input_set_result_callback(app->text_input, initiative_text_done, app, app->edit_buffer, sizeof(app->edit_buffer), false);
+    view_dispatcher_switch_to_view(app->dispatcher, 1U);
+}
+
+static void initiative_number_done(void* context, int32_t number) {
+    InitiativeApp* app = context;
+    InitiativeMember* list = app->number_combat ? app->combat : app->roster;
+    uint8_t count = app->number_combat ? app->combat_count : app->roster_count;
+    if(app->input_member < count) {
+        InitiativeMember* member = &list[app->input_member];
+        switch(app->number_target) {
+        case InitiativeNumberManualRoll:
+            member->total = (int16_t)(initiative_clamp(number, 1, 20) + member->modifier);
+            break;
+        case InitiativeNumberTotal:
+            member->total = initiative_clamp(number, -99, 199);
+            break;
+        case InitiativeNumberModifier:
+            member->modifier = (int8_t)initiative_clamp(number, -50, 50);
+            break;
+        case InitiativeNumberArmorClass:
+            member->armor_class = initiative_clamp(number, 0, 99);
+            initiative_sync_main_if_needed(app, member);
+            break;
+        case InitiativeNumberHpCurrent:
+            member->hp_current = initiative_clamp(number, -999, 999);
+            initiative_sync_main_if_needed(app, member);
+            break;
+        case InitiativeNumberHpMax:
+            member->hp_max = initiative_clamp(number, 0, 999);
+            initiative_sync_main_if_needed(app, member);
+            break;
+        default:
+            break;
+        }
+    }
+    app->number_target = InitiativeNumberNone;
+    initiative_save(app);
+    view_dispatcher_switch_to_view(app->dispatcher, 0U);
+    initiative_redraw(app);
+}
+
+static void initiative_begin_number(
+    InitiativeApp* app,
+    InitiativeNumberTarget target,
+    bool combat,
+    uint8_t member_index,
+    const char* header,
+    int32_t initial,
+    int32_t minimum,
+    int32_t maximum) {
+    uint8_t count = combat ? app->combat_count : app->roster_count;
+    if(member_index >= count) return;
+    if(!app->number_input) {
+        app->number_input = number_input_alloc();
+        if(!app->number_input) return;
+        view_dispatcher_add_view(app->dispatcher, 2U, number_input_get_view(app->number_input));
+    }
+    app->input_member = member_index;
+    app->number_target = target;
+    app->number_combat = combat ? 1U : 0U;
+    number_input_set_header_text(app->number_input, header);
+    number_input_set_result_callback(
+        app->number_input, initiative_number_done, app, initial, minimum, maximum);
+    view_dispatcher_switch_to_view(app->dispatcher, 2U);
+}
+
+
 static bool initiative_input(InputEvent* event, void* context) {
     InitiativeApp* app = context;
-    if(event->type != InputTypeShort && event->type != InputTypeRepeat && event->type != InputTypeLong)
-        return true;
-
-    if(event->type == InputTypeLong && event->key == InputKeyBack) {
-        if(app->screen == InitiativeScreenCombat || app->screen == InitiativeScreenSetup ||
-           app->screen == InitiativeScreenEdit) {
-            app->screen = InitiativeScreenMenu;
-            app->selection = app->scroll = 0U;
-            initiative_redraw(app);
-        } else {
-            app->return_to_dnd = 1U;
-            view_dispatcher_stop(app->dispatcher);
-        }
+    if(event->type != InputTypeShort && event->type != InputTypeRepeat && event->type != InputTypeLong) return true;
+    if(event->type == InputTypeLong && event->key == InputKeyBack &&
+       app->screen != InitiativeScreenNoCharacter) {
+        app->screen = InitiativeScreenMenu;
+        app->selection = app->scroll = 0U;
+        initiative_redraw(app);
         return true;
     }
-
-    if(app->screen == InitiativeScreenMenu) {
-        if(event->key == InputKeyUp)
-            initiative_move(&app->selection, 4U, -1);
-        else if(event->key == InputKeyDown)
-            initiative_move(&app->selection, 4U, 1);
-        else if(event->key == InputKeyBack) {
-            app->return_to_dnd = 1U;
+    if(app->screen == InitiativeScreenNoCharacter) {
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+           (event->key == InputKeyUp || event->key == InputKeyDown))
+            app->selection ^= 1U;
+        else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            app->return_to_dnd = app->selection == 0U ? 1U : 0U;
             view_dispatcher_stop(app->dispatcher);
-        } else if(event->key == InputKeyOk && event->type == InputTypeShort) {
-            if(app->selection == 0U)
-                initiative_prepare_combat(app);
-            else if(app->selection == 1U && app->active) {
-                app->screen = InitiativeScreenCombat;
-                app->selection = app->current_turn;
-                app->scroll = app->selection >= 5U ? (uint8_t)(app->selection - 4U) : 0U;
-            } else if(app->selection == 2U) {
-                app->screen = InitiativeScreenRoster;
+            return true;
+        } else if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            app->return_to_dnd = 0U;
+            view_dispatcher_stop(app->dispatcher);
+            return true;
+        }
+    } else if(app->screen == InitiativeScreenMenu) {
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) initiative_move(&app->selection, 7U, -1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) initiative_move(&app->selection, 7U, 1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+                app->selection == 5U && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            int8_t delta = event->key == InputKeyRight ? 1 : -1;
+            int8_t mode = (int8_t)app->roll_mode + delta;
+            if(mode < (int8_t)InitiativeRollNormal) mode = (int8_t)InitiativeRollDisadvantage;
+            if(mode > (int8_t)InitiativeRollDisadvantage) mode = (int8_t)InitiativeRollNormal;
+            app->roll_mode = (uint8_t)mode;
+            initiative_save(app);
+        } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            if(app->selection == 0U) initiative_seed_setup(app);
+            else if(app->selection == 1U) { if(app->active) app->screen = InitiativeScreenCombat; }
+            else if(app->selection == 2U) { app->screen = InitiativeScreenRoster; app->selection = app->scroll = 0U; }
+            else if(app->selection == 3U) { if(app->combat_count) { app->screen = InitiativeScreenSetup; app->selection = app->scroll = 0U; } }
+            else if(app->selection == 4U) {
+                app->active = 0U;
+                app->combat_count = 0U;
+                app->current_turn = 0U;
+                app->round = 1U;
                 app->selection = app->scroll = 0U;
-            } else if(app->selection == 3U) {
-                app->return_to_dnd = 1U;
-                view_dispatcher_stop(app->dispatcher);
-            }
+                initiative_copy(app->status, sizeof(app->status), "Combat ended");
+                initiative_save(app);
+            } else if(app->selection == 5U) {
+                app->roll_mode = (uint8_t)((app->roll_mode + 1U) % 3U);
+                initiative_save(app);
+            } else { app->return_to_dnd = 1U; view_dispatcher_stop(app->dispatcher); return true; }
         }
     } else if(app->screen == InitiativeScreenRoster) {
         uint8_t total = (uint8_t)(app->roster_count + 1U);
-        if(event->key == InputKeyUp)
-            initiative_move(&app->selection, total, -1);
-        else if(event->key == InputKeyDown)
-            initiative_move(&app->selection, total, 1);
-        else if(event->key == InputKeyBack)
-            app->screen = InitiativeScreenMenu;
-        else if(event->key == InputKeyOk && event->type == InputTypeShort) {
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) initiative_move(&app->selection, total, -1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) initiative_move(&app->selection, total, 1);
+        else if(event->type == InputTypeShort && event->key == InputKeyBack) { app->screen = InitiativeScreenMenu; app->selection = app->scroll = 0U; }
+        else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == app->roster_count && app->roster_count < INIT_MAX) {
-                InitiativeMember* member = &app->roster[app->roster_count++];
-                memset(member, 0, sizeof(*member));
-                initiative_copy(member->name, sizeof(member->name), "New Member");
-                member->hp_current = member->hp_max = 1;
-                member->armor_class = 10;
+                InitiativeMember* member = &app->roster[app->roster_count++]; memset(member, 0, sizeof(*member));
+                initiative_copy(member->name, sizeof(member->name), "New"); member->hp_current = member->hp_max = 1; member->armor_class = 10; member->roll_mode = app->roll_mode;
                 app->selection = (uint8_t)(app->roster_count - 1U);
-                initiative_save(app);
             }
-            if(app->selection < app->roster_count) {
-                app->screen = InitiativeScreenEdit;
-                app->edit_return_screen = InitiativeScreenRoster;
-                app->edit_combat = 0U;
-                app->edit_field = 0U;
-                app->scroll = 0U;
-            }
+            if(app->selection < app->roster_count) { app->screen = InitiativeScreenEdit; app->edit_combat = 0U; app->edit_setup = 0U; app->edit_field = app->scroll = 0U; app->delete_armed = 0U; }
         }
     } else if(app->screen == InitiativeScreenSetup) {
         uint8_t total = (uint8_t)(app->combat_count + 3U);
-        if(event->key == InputKeyUp)
-            initiative_move(&app->selection, total, -1);
-        else if(event->key == InputKeyDown)
-            initiative_move(&app->selection, total, 1);
-        else if(event->key == InputKeyBack && event->type == InputTypeShort) {
-            app->screen = InitiativeScreenMenu;
-            app->selection = app->scroll = 0U;
-        } else if(event->key == InputKeyOk && event->type == InputTypeLong &&
-                  app->selection >= 1U && app->selection <= app->combat_count) {
-            initiative_begin_setup_number(app, (uint8_t)(app->selection - 1U));
-            return true;
-        } else if(event->key == InputKeyOk && event->type == InputTypeShort) {
-            if(app->selection == 0U) {
-                for(uint8_t i = 0U; i < app->combat_count; ++i) initiative_roll_member(&app->combat[i]);
-                initiative_copy(app->status, sizeof(app->status), "Initiative rolled");
-                initiative_save(app);
-            } else if(app->selection <= app->combat_count) {
-                initiative_roll_member(&app->combat[app->selection - 1U]);
-                initiative_save(app);
-            } else if(app->selection == (uint8_t)(app->combat_count + 1U)) {
-                if(app->combat_count < INIT_MAX) {
-                    InitiativeMember* member = &app->combat[app->combat_count++];
-                    memset(member, 0, sizeof(*member));
-                    initiative_copy(member->name, sizeof(member->name), "New Member");
-                    member->hp_current = member->hp_max = 1;
-                    member->armor_class = 10;
-                    app->selection = (uint8_t)(app->combat_count - 1U);
-                    app->edit_combat = 1U;
-                    app->edit_return_screen = InitiativeScreenSetup;
-                    app->edit_field = 0U;
-                    app->scroll = 0U;
-                    app->screen = InitiativeScreenEdit;
-                }
-            } else {
-                initiative_begin_combat(app);
-            }
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) initiative_move(&app->selection, total, -1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) initiative_move(&app->selection, total, 1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && app->selection > 0U && app->selection <= app->combat_count && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            InitiativeMember* member = &app->combat[app->selection - 1U]; member->total = initiative_clamp(member->total + (event->key == InputKeyRight ? 1 : -1), -99, 199); initiative_save(app);
+        } else if(event->type == InputTypeLong && app->selection > 0U && app->selection <= app->combat_count && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            uint8_t index = (uint8_t)(app->selection - 1U);
+            if(event->key == InputKeyLeft && index > 0U) { initiative_swap(app, index, (uint8_t)(index - 1U)); --app->selection; initiative_save(app); }
+            else if(event->key == InputKeyRight && index + 1U < app->combat_count) { initiative_swap(app, index, (uint8_t)(index + 1U)); ++app->selection; initiative_save(app); }
+        } else if(event->type == InputTypeLong && event->key == InputKeyOk && app->selection > 0U && app->selection <= app->combat_count) {
+            app->selection = (uint8_t)(app->selection - 1U);
+            app->edit_combat = 1U;
+            app->edit_setup = 1U;
+            app->edit_field = app->scroll = 0U;
+            app->delete_armed = 0U;
+            app->screen = InitiativeScreenEdit;
+        }
+        else if(event->type == InputTypeShort && event->key == InputKeyBack) { app->screen = InitiativeScreenMenu; app->selection = app->scroll = 0U; }
+        else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            if(app->selection == 0U) { for(uint8_t i=0;i<app->combat_count;i++) app->combat[i].total=(int16_t)(initiative_roll_d20((InitiativeRollMode)app->combat[i].roll_mode)+app->combat[i].modifier); initiative_save(app); }
+            else if(app->selection <= app->combat_count) { InitiativeMember* member=&app->combat[app->selection-1U]; member->total=(int16_t)(initiative_roll_d20((InitiativeRollMode)member->roll_mode)+member->modifier); initiative_save(app); }
+            else if(app->selection == app->combat_count + 1U && app->combat_count < INIT_MAX) { InitiativeMember* member=&app->combat[app->combat_count++]; memset(member,0,sizeof(*member)); initiative_copy(member->name,sizeof(member->name),"Temp"); member->hp_current=member->hp_max=1; member->armor_class=10; member->roll_mode=app->roll_mode; app->input_member=(uint8_t)(app->combat_count-1U); app->edit_combat=1U; initiative_begin_text(app,InitiativeTextName,"Participant name",member->name); }
+            else initiative_start(app);
         }
     } else if(app->screen == InitiativeScreenCombat) {
-        if(event->key == InputKeyUp)
-            initiative_move(&app->selection, app->combat_count, -1);
-        else if(event->key == InputKeyDown)
-            initiative_move(&app->selection, app->combat_count, 1);
-        else if(event->key == InputKeyBack && event->type == InputTypeShort && app->combat_count) {
-            if(app->current_turn == 0U) {
-                app->current_turn = (uint8_t)(app->combat_count - 1U);
-                if(app->round > 1U) --app->round;
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) initiative_move(&app->selection, app->combat_count, -1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) initiative_move(&app->selection, app->combat_count, 1);
+        else if(event->type == InputTypeShort && event->key == InputKeyBack && app->combat_count) { if(app->current_turn) --app->current_turn; else if(app->round>1U){--app->round;app->current_turn=(uint8_t)(app->combat_count-1U);} app->selection=app->current_turn; initiative_save(app); }
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && (event->key == InputKeyLeft || event->key == InputKeyRight) && app->combat_count) { InitiativeMember* m=&app->combat[app->selection]; m->hp_current=initiative_clamp(m->hp_current+(event->key==InputKeyRight?1:-1),-999,999); initiative_sync_main_if_needed(app,m); initiative_save(app); }
+        else if(event->type == InputTypeLong && event->key == InputKeyOk && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->edit_field=app->scroll=0U; app->delete_armed=0U; app->screen=InitiativeScreenEdit; }
+        else if(event->type == InputTypeLong && event->key == InputKeyUp && app->combat_count) { InitiativeMember* m=&app->combat[app->selection]; m->armor_class=initiative_clamp(m->armor_class+1,0,99); initiative_sync_main_if_needed(app,m); initiative_save(app); }
+        else if(event->type == InputTypeLong && event->key == InputKeyDown && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->input_member=app->selection; initiative_begin_text(app,InitiativeTextConditions,"Participant conditions",app->combat[app->selection].conditions); }
+        else if(event->type == InputTypeLong && event->key == InputKeyLeft && app->combat_count && app->selection>0U) { initiative_swap(app,app->selection,(uint8_t)(app->selection-1U)); --app->selection; initiative_save(app); }
+        else if(event->type == InputTypeLong && event->key == InputKeyRight && app->combat_count && app->selection+1U<app->combat_count) { initiative_swap(app,app->selection,(uint8_t)(app->selection+1U)); ++app->selection; initiative_save(app); }
+        else if(event->type == InputTypeShort && event->key == InputKeyOk && app->combat_count) { initiative_patch_character(app,NULL,1U); ++app->current_turn; if(app->current_turn>=app->combat_count){app->current_turn=0U;++app->round;if(!app->round)app->round=1U;} app->selection=app->current_turn; initiative_save(app); }
+    } else {
+        InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] : &app->roster[app->selection];
+        uint8_t edit_count = app->edit_combat ? 9U : 8U;
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
+            app->delete_armed = 0U;
+            initiative_move(&app->edit_field, edit_count, -1);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
+            app->delete_armed = 0U;
+            initiative_move(&app->edit_field, edit_count, 1);
+        } else if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            if(app->edit_setup) app->screen=InitiativeScreenSetup;
+            else app->screen=app->edit_combat?InitiativeScreenCombat:InitiativeScreenRoster;
+            app->selection=app->scroll=0U;
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && (event->key==InputKeyLeft||event->key==InputKeyRight)) {
+            int16_t d=event->key==InputKeyRight?1:-1;
+            if(app->edit_combat) {
+                if(app->edit_field==1U) member->total=initiative_clamp(member->total+d,-99,199);
+                else if(app->edit_field==2U) member->modifier=(int8_t)initiative_clamp(member->modifier+d,-50,50);
+                else if(app->edit_field==3U) {
+                    int8_t mode=(int8_t)member->roll_mode+d;
+                    if(mode<(int8_t)InitiativeRollNormal) mode=(int8_t)InitiativeRollDisadvantage;
+                    if(mode>(int8_t)InitiativeRollDisadvantage) mode=(int8_t)InitiativeRollNormal;
+                    member->roll_mode=(uint8_t)mode;
+                } else if(app->edit_field==4U) { member->armor_class=initiative_clamp(member->armor_class+d,0,99); initiative_sync_main_if_needed(app,member); }
+                else if(app->edit_field==5U) { member->hp_current=initiative_clamp(member->hp_current+d,-999,999); initiative_sync_main_if_needed(app,member); }
+                else if(app->edit_field==6U) { member->hp_max=initiative_clamp(member->hp_max+d,0,999); initiative_sync_main_if_needed(app,member); }
             } else {
-                --app->current_turn;
+                if(app->edit_field==1U) member->modifier=(int8_t)initiative_clamp(member->modifier+d,-50,50);
+                else if(app->edit_field==2U) {
+                    int8_t mode=(int8_t)member->roll_mode+d;
+                    if(mode<(int8_t)InitiativeRollNormal) mode=(int8_t)InitiativeRollDisadvantage;
+                    if(mode>(int8_t)InitiativeRollDisadvantage) mode=(int8_t)InitiativeRollNormal;
+                    member->roll_mode=(uint8_t)mode;
+                } else if(app->edit_field==3U) { member->armor_class=initiative_clamp(member->armor_class+d,0,99); initiative_sync_main_if_needed(app,member); }
+                else if(app->edit_field==4U) { member->hp_current=initiative_clamp(member->hp_current+d,-999,999); initiative_sync_main_if_needed(app,member); }
+                else if(app->edit_field==5U) { member->hp_max=initiative_clamp(member->hp_max+d,0,999); initiative_sync_main_if_needed(app,member); }
             }
-            app->selection = app->current_turn;
             initiative_save(app);
-        } else if(event->type == InputTypeLong && event->key == InputKeyOk && app->combat_count) {
-            app->selection = app->selection < app->combat_count ? app->selection : 0U;
-            app->edit_combat = 1U;
-            app->edit_return_screen = InitiativeScreenCombat;
-            app->edit_field = 0U;
-            app->scroll = 0U;
-            app->screen = InitiativeScreenEdit;
-        } else if(event->key == InputKeyOk && event->type == InputTypeShort && app->combat_count) {
-            app->current_turn = (uint8_t)((app->current_turn + 1U) % app->combat_count);
-            if(app->current_turn == 0U) ++app->round;
-            app->selection = app->current_turn;
-            initiative_save(app);
-        }
-    } else {
-        InitiativeMember* member = initiative_edit_member(app);
-        if(!member) {
-            app->screen = app->edit_return_screen;
-        } else if(event->key == InputKeyUp) {
-            initiative_move(&app->edit_field, 7U, -1);
-        } else if(event->key == InputKeyDown) {
-            initiative_move(&app->edit_field, 7U, 1);
-        } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
-            InitiativeScreen destination = app->edit_return_screen;
-            uint8_t member_index = app->selection;
-            app->screen = destination;
-            app->selection = destination == InitiativeScreenSetup ? (uint8_t)(member_index + 1U) : member_index;
-            app->scroll = app->selection >= 5U ? (uint8_t)(app->selection - 4U) : 0U;
-        } else if(event->key == InputKeyLeft || event->key == InputKeyRight) {
-            int16_t delta = event->key == InputKeyRight ? 1 : -1;
-            if(app->edit_field == 1U) {
-                if(app->edit_combat)
-                    member->total = initiative_clamp(member->total + delta, -99, 199);
-                else
-                    member->modifier = (int8_t)initiative_clamp(member->modifier + delta, -50, 50);
-            } else if(app->edit_field == 2U)
-                member->hp_current = initiative_clamp(member->hp_current + delta, -999, 999);
-            else if(app->edit_field == 3U)
-                member->hp_max = initiative_clamp(member->hp_max + delta, 0, 999);
-            else if(app->edit_field == 4U)
-                member->armor_class = initiative_clamp(member->armor_class + delta, 0, 99);
-            else
-                goto redraw;
-            initiative_save(app);
-        } else if(event->key == InputKeyOk && event->type == InputTypeShort) {
-            if(app->edit_field == 0U) {
-                initiative_begin_text(app, 0U, "Character name", member->name);
-                return true;
-            } else if(app->edit_field == 5U) {
-                initiative_begin_text(app, 1U, "Conditions", member->conditions);
-                return true;
-            } else if(app->edit_field == 6U) {
-                InitiativeMember* list = app->edit_combat ? app->combat : app->roster;
-                uint8_t* count = app->edit_combat ? &app->combat_count : &app->roster_count;
-                memmove(
-                    &list[app->selection],
-                    &list[app->selection + 1U],
-                    (*count - app->selection - 1U) * sizeof(*list));
-                --*count;
-                if(app->selection >= *count && *count) app->selection = (uint8_t)(*count - 1U);
-                app->screen = app->edit_return_screen;
-                if(app->screen == InitiativeScreenSetup) app->selection = app->selection + 1U;
-                initiative_save(app);
+        } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            app->input_member=app->selection;
+            if(app->edit_field==0U) {
+                initiative_begin_text(app,InitiativeTextName,"Participant name",member->name);
+            } else if(app->edit_combat) {
+                if(app->edit_field==1U) initiative_begin_number(app,InitiativeNumberTotal,true,app->selection,"Initiative total",member->total,-99,199);
+                else if(app->edit_field==2U) initiative_begin_number(app,InitiativeNumberModifier,true,app->selection,"Initiative modifier",member->modifier,-50,50);
+                else if(app->edit_field==3U) { member->roll_mode=(uint8_t)((member->roll_mode+1U)%3U); initiative_save(app); }
+                else if(app->edit_field==4U) initiative_begin_number(app,InitiativeNumberArmorClass,true,app->selection,"Armor Class",member->armor_class,0,99);
+                else if(app->edit_field==5U) initiative_begin_number(app,InitiativeNumberHpCurrent,true,app->selection,"Current HP",member->hp_current,-999,999);
+                else if(app->edit_field==6U) initiative_begin_number(app,InitiativeNumberHpMax,true,app->selection,"Maximum HP",member->hp_max,0,999);
+                else if(app->edit_field==7U) initiative_begin_text(app,InitiativeTextConditions,"Conditions",member->conditions);
+                else if(app->delete_armed) {
+                    memmove(&app->combat[app->selection],&app->combat[app->selection+1U],(app->combat_count-app->selection-1U)*sizeof(*app->combat));
+                    --app->combat_count;
+                    if(!app->combat_count) { app->active=0U; app->current_turn=0U; }
+                    else if(app->current_turn>=app->combat_count) app->current_turn=0U;
+                    app->screen=app->edit_setup?InitiativeScreenSetup:InitiativeScreenCombat; app->selection=app->scroll=0U; initiative_save(app);
+                } else app->delete_armed=1U;
+            } else {
+                if(app->edit_field==1U) initiative_begin_number(app,InitiativeNumberModifier,false,app->selection,"Initiative modifier",member->modifier,-50,50);
+                else if(app->edit_field==2U) { member->roll_mode=(uint8_t)((member->roll_mode+1U)%3U); initiative_save(app); }
+                else if(app->edit_field==3U) initiative_begin_number(app,InitiativeNumberArmorClass,false,app->selection,"Armor Class",member->armor_class,0,99);
+                else if(app->edit_field==4U) initiative_begin_number(app,InitiativeNumberHpCurrent,false,app->selection,"Current HP",member->hp_current,-999,999);
+                else if(app->edit_field==5U) initiative_begin_number(app,InitiativeNumberHpMax,false,app->selection,"Maximum HP",member->hp_max,0,999);
+                else if(app->edit_field==6U) initiative_begin_text(app,InitiativeTextConditions,"Conditions",member->conditions);
+                else if(app->delete_armed) {
+                    memmove(&app->roster[app->selection],&app->roster[app->selection+1U],(app->roster_count-app->selection-1U)*sizeof(*app->roster));
+                    --app->roster_count;
+                    app->screen=InitiativeScreenRoster; app->selection=app->scroll=0U; initiative_save(app);
+                } else app->delete_armed=1U;
             }
         }
     }
-
-redraw:
-    if(app->screen == InitiativeScreenEdit) {
-        if(app->edit_field < app->scroll) app->scroll = app->edit_field;
-        if(app->edit_field >= app->scroll + 5U) app->scroll = (uint8_t)(app->edit_field - 4U);
-    } else {
-        if(app->selection < app->scroll) app->scroll = app->selection;
-        if(app->selection >= app->scroll + 5U) app->scroll = (uint8_t)(app->selection - 4U);
-    }
+    if(app->screen == InitiativeScreenEdit) { if(app->edit_field < app->scroll) app->scroll=app->edit_field; if(app->edit_field>=app->scroll+5U) app->scroll=(uint8_t)(app->edit_field-4U); }
+    else { if(app->selection < app->scroll) app->scroll=app->selection; if(app->selection>=app->scroll+5U) app->scroll=(uint8_t)(app->selection-4U); }
     initiative_redraw(app);
     return true;
 }
 
 static bool initiative_navigation(void* context) {
     InitiativeApp* app = context;
-    if(app->text_input_active || app->number_input_active) {
-        app->text_input_active = 0U;
-        app->number_input_active = 0U;
-        view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewMain);
-        initiative_redraw(app);
+    if(app->screen == InitiativeScreenNoCharacter) {
+        app->return_to_dnd = 0U;
+        view_dispatcher_stop(app->dispatcher);
     } else if(app->screen == InitiativeScreenMenu) {
         app->return_to_dnd = 1U;
         view_dispatcher_stop(app->dispatcher);
@@ -1048,12 +1246,28 @@ static InitiativeApp* initiative_alloc(const char* args) {
     app->storage = furi_record_open(RECORD_STORAGE);
     if(!app->gui || !app->storage) goto fail;
     const char* end = NULL;
-    if(!(args && initiative_parse_u32(args, &end, &app->character_id)) &&
-       !dnd_profile_ref_active(app->storage, &app->character_id))
-        app->character_id = 0U;
-    initiative_load(app);
-    if(args) initiative_import_args(app, args);
-    if(args && strchr(args, ';')) initiative_save(app);
+    bool explicit_profile = args && initiative_parse_u32(args, &end, &app->character_id);
+    char profile_path[INIT_PATH_LEN];
+    if(explicit_profile) {
+        app->have_character =
+            dnd_profile_ref_path(app->storage, app->character_id, profile_path, sizeof(profile_path)) ? 1U : 0U;
+        if(!app->have_character)
+            app->have_character =
+                dnd_profile_ref_active(app->storage, &app->character_id) ? 1U : 0U;
+    } else {
+        app->have_character =
+            dnd_profile_ref_active(app->storage, &app->character_id) ? 1U : 0U;
+    }
+    if(app->have_character) {
+        initiative_load(app);
+        if(args) initiative_import_args(app, args);
+        bool refreshed_main = initiative_refresh_main_character(app);
+        if(refreshed_main || (args && strchr(args, ';'))) initiative_save(app);
+        app->screen = InitiativeScreenMenu;
+    } else {
+        app->selection = app->scroll = 0U;
+        app->screen = InitiativeScreenNoCharacter;
+    }
     app->dispatcher = view_dispatcher_alloc();
     app->view = view_alloc();
     if(!app->dispatcher || !app->view) goto fail;
@@ -1067,7 +1281,7 @@ static InitiativeApp* initiative_alloc(const char* args) {
     view_set_context(app->view, app);
     view_set_draw_callback(app->view, initiative_draw);
     view_set_input_callback(app->view, initiative_input);
-    view_dispatcher_add_view(app->dispatcher, InitiativeViewMain, app->view);
+    view_dispatcher_add_view(app->dispatcher, 0U, app->view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     return app;
 fail:
@@ -1083,12 +1297,9 @@ fail:
 
 static void initiative_free(InitiativeApp* app) {
     if(!app) return;
-    if(app->dispatcher && app->text_input)
-        view_dispatcher_remove_view(app->dispatcher, InitiativeViewText);
-    if(app->dispatcher && app->number_input)
-        view_dispatcher_remove_view(app->dispatcher, InitiativeViewNumber);
-    if(app->dispatcher && app->view)
-        view_dispatcher_remove_view(app->dispatcher, InitiativeViewMain);
+    if(app->dispatcher && app->text_input) view_dispatcher_remove_view(app->dispatcher, 1U);
+    if(app->dispatcher && app->number_input) view_dispatcher_remove_view(app->dispatcher, 2U);
+    if(app->dispatcher && app->view) view_dispatcher_remove_view(app->dispatcher, 0U);
     if(app->text_input) text_input_free(app->text_input);
     if(app->number_input) number_input_free(app->number_input);
     if(app->view) view_free(app->view);
@@ -1101,10 +1312,9 @@ static void initiative_free(InitiativeApp* app) {
 int32_t dndinitiative_app(void* context) {
     InitiativeApp* app = initiative_alloc(context);
     if(!app) return -1;
-    view_dispatcher_switch_to_view(app->dispatcher, InitiativeViewMain);
+    view_dispatcher_switch_to_view(app->dispatcher, 0U);
     view_dispatcher_run(app->dispatcher);
     bool return_to_dnd = app->return_to_dnd;
-    initiative_save(app);
     initiative_free(app);
     if(return_to_dnd) {
         if(!dnd_handoff_launch(DNDOLPHINS_FAP_PATH, NULL)) return -1;

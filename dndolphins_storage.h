@@ -102,6 +102,8 @@ bool pocket_d20_storage_item_aggregate(
     PocketD20ItemAggregate* aggregate,
     uint8_t* total_count);
 bool pocket_d20_storage_items_exist(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile);
+bool pocket_d20_storage_ensure_items_sidecar(Storage* storage, uint32_t profile);
 bool pocket_d20_storage_remove_live_items(Storage* storage, uint32_t profile);
 
 typedef struct {
