@@ -12,7 +12,7 @@ Offline 5E-compatible character, campaign and encounter tools for Flipper Zero. 
 
 ### DNDolphins — character and combat hub
 
-- **Home:** Characters, Character, Vitals, Abilities & Saves, Skills, Magic & Spells, Features & Perks, Inventory, Journal, Adventure, Bestiary, Combat, Initiative and Dice Roller.
+- **Home:** Characters, Character, Vitals, Abilities & Saves, Skills, Features & Perks, Inventory, Magic & Spells, Bestiary, Initiative, Combat, Dice Roller, Adventure and Journal.
 - **Profiles:** multiple characters; create, switch/open, rename, duplicate, export, import, archive, delete, verify save and restore backup. Character files use tolerant named-field loading, automatic save/retry and write-only shadow history.
 - **Character sheet:** name/player, species, background, alignment, languages/proficiencies, inspiration, multiclass levels/subclasses, total level, proficiency bonus, XP/milestone progression and Hit Dice; bundled class/subclass/species/background/alignment/feat catalogs remain available where those fields support catalog selection.
 - **Abilities and skills:** six ability scores/modifiers, saving-throw proficiency/misc/total, all 18 skills with proficiency/expertise/misc/total, and passive Perception/Insight/Investigation.

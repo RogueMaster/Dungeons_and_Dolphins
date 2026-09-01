@@ -354,43 +354,70 @@ static bool dndolphins_flush_save(PocketD20App* app, bool report);
 static void dndolphins_collection_save_failed(PocketD20App* app);
 static uint8_t dndolphins_marquee_offset = 0U;
 
-static const char* const dndolphins_home_items[] = {
-    "Characters",
-    "Character",
-    "Vitals",
-    "Abilities & Saves",
-    "Skills",
-    "Magic & Spells",
-    "Features & Perks",
-    "Inventory",
-    "Journal",
-    "Adventure",
-    "Bestiary",
-    "Combat",
-    "Initiative",
-    "Dice Roller",
+typedef enum {
+    DndolphinsHomeCharacters = 0,
+    DndolphinsHomeCharacter,
+    DndolphinsHomeVitals,
+    DndolphinsHomeAbilitiesSaves,
+    DndolphinsHomeSkills,
+    DndolphinsHomeFeaturesPerks,
+    DndolphinsHomeInventory,
+    DndolphinsHomeMagicSpells,
+    DndolphinsHomeBestiary,
+    DndolphinsHomeInitiative,
+    DndolphinsHomeCombat,
+    DndolphinsHomeDiceRoller,
+    DndolphinsHomeAdventure,
+    DndolphinsHomeJournal,
+    DndolphinsHomeCount,
+} DndolphinsHomeIndex;
+
+static const char* const dndolphins_home_items[DndolphinsHomeCount] = {
+    [DndolphinsHomeCharacters] = "Characters",
+    [DndolphinsHomeCharacter] = "Character",
+    [DndolphinsHomeVitals] = "Vitals",
+    [DndolphinsHomeAbilitiesSaves] = "Abilities & Saves",
+    [DndolphinsHomeSkills] = "Skills",
+    [DndolphinsHomeFeaturesPerks] = "Features & Perks",
+    [DndolphinsHomeInventory] = "Inventory",
+    [DndolphinsHomeMagicSpells] = "Magic & Spells",
+    [DndolphinsHomeBestiary] = "Bestiary",
+    [DndolphinsHomeInitiative] = "Initiative",
+    [DndolphinsHomeCombat] = "Combat",
+    [DndolphinsHomeDiceRoller] = "Dice Roller",
+    [DndolphinsHomeAdventure] = "Adventure",
+    [DndolphinsHomeJournal] = "Journal",
 };
 
 static const char* const dndolphins_home_retry_save = "Retry Save";
 
+static bool dndolphins_home_index_from_return_focus(
+    const char* args,
+    DndolphinsHomeIndex* home_index) {
+    if(!args || !home_index) return false;
+    if(strcmp(args, POCKET_D20_RETURN_FOCUS_INVENTORY) == 0)
+        *home_index = DndolphinsHomeInventory;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_SPELLBOOK) == 0)
+        *home_index = DndolphinsHomeMagicSpells;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_ADVENTURE) == 0)
+        *home_index = DndolphinsHomeAdventure;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_JOURNAL) == 0)
+        *home_index = DndolphinsHomeJournal;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_INITIATIVE) == 0)
+        *home_index = DndolphinsHomeInitiative;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_BESTIARY) == 0)
+        *home_index = DndolphinsHomeBestiary;
+    else
+        return false;
+    return true;
+}
+
 static void dndolphins_apply_return_focus(PocketD20App* app, const char* args) {
     if(!app || !args) return;
-    uint16_t selection = UINT16_MAX;
-    if(strcmp(args, POCKET_D20_RETURN_FOCUS_INVENTORY) == 0)
-        selection = 7U;
-    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_SPELLBOOK) == 0)
-        selection = 5U;
-    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_ADVENTURE) == 0)
-        selection = 9U;
-    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_JOURNAL) == 0)
-        selection = 8U;
-    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_INITIATIVE) == 0)
-        selection = 12U;
-    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_BESTIARY) == 0)
-        selection = 10U;
-    if(selection == UINT16_MAX) return;
-    app->selection = selection;
-    app->scroll = selection >= 5U ? (uint16_t)(selection - 4U) : 0U;
+    DndolphinsHomeIndex home_index;
+    if(!dndolphins_home_index_from_return_focus(args, &home_index)) return;
+    app->selection = (uint16_t)home_index;
+    app->scroll = app->selection >= 5U ? (uint16_t)(app->selection - 4U) : 0U;
 }
 
 static const char* const dndolphins_profile_actions[] = {
@@ -2858,13 +2885,11 @@ static void dndolphins_begin_number(
 }
 
 static uint16_t dndolphins_home_count(const PocketD20App* app) {
-    return (uint16_t)(sizeof(dndolphins_home_items) / sizeof(dndolphins_home_items[0])) +
-           (app->storage_unsaved ? 1U : 0U);
+    return (uint16_t)DndolphinsHomeCount + (app->storage_unsaved ? 1U : 0U);
 }
 
 static const char* dndolphins_home_item_at(uint16_t index) {
-    const uint16_t base_count = sizeof(dndolphins_home_items) / sizeof(dndolphins_home_items[0]);
-    if(index < base_count) return dndolphins_home_items[index];
+    if(index < (uint16_t)DndolphinsHomeCount) return dndolphins_home_items[index];
     return dndolphins_home_retry_save;
 }
 
@@ -5262,64 +5287,65 @@ static void dndolphins_request_launch(PocketD20App* app, PocketPendingLaunch lau
 }
 
 static void dndolphins_handle_home(PocketD20App* app, const InputEvent* event) {
-    const uint16_t base_count = sizeof(dndolphins_home_items) / sizeof(dndolphins_home_items[0]);
     uint16_t count = dndolphins_home_count(app);
     if(dndolphins_is_move_event(event) && event->key == InputKeyUp)
         dndolphins_menu_move(app, count, -1);
     else if(dndolphins_is_move_event(event) && event->key == InputKeyDown)
         dndolphins_menu_move(app, count, 1);
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
-        if(app->selection >= base_count) {
+        if(app->selection >= (uint16_t)DndolphinsHomeCount) {
             app->storage_read_only = 0U;
             dndolphins_save(app, true);
             return;
         }
-        switch(app->selection) {
-        case 0:
+        switch((DndolphinsHomeIndex)app->selection) {
+        case DndolphinsHomeCharacters:
             dnd_storage_profiles_refresh(app->storage, &app->profiles);
             dndolphins_profile_include_active(app);
             dndolphins_enter_screen(app, PocketScreenProfiles);
             break;
-        case 1:
+        case DndolphinsHomeCharacter:
             dndolphins_enter_screen(app, PocketScreenCharacter);
             break;
-        case 2:
+        case DndolphinsHomeVitals:
             dndolphins_enter_screen(app, PocketScreenVitals);
             break;
-        case 3:
+        case DndolphinsHomeAbilitiesSaves:
             dndolphins_enter_screen(app, PocketScreenAbilities);
             break;
-        case 4:
+        case DndolphinsHomeSkills:
             dndolphins_enter_screen(app, PocketScreenSkills);
             break;
-        case 5:
-            dndolphins_enter_screen(app, PocketScreenMagic);
-            break;
-        case 6:
+        case DndolphinsHomeFeaturesPerks:
             dndolphins_open_list(app, PocketListFeatures, PocketScreenHome);
             break;
-        case 7:
+        case DndolphinsHomeInventory:
             dndolphins_request_launch(app, PocketPendingLaunchInventory);
             break;
-        case 8:
-            dndolphins_request_launch(app, PocketPendingLaunchJournal);
+        case DndolphinsHomeMagicSpells:
+            dndolphins_enter_screen(app, PocketScreenMagic);
             break;
-        case 9:
-            dndolphins_request_launch(app, PocketPendingLaunchAdventure);
-            break;
-        case 10:
+        case DndolphinsHomeBestiary:
             dndolphins_request_launch(app, PocketPendingLaunchBestiary);
             break;
-        case 11:
+        case DndolphinsHomeInitiative:
+            dndolphins_request_launch(app, PocketPendingLaunchInitiative);
+            break;
+        case DndolphinsHomeCombat:
             app->hit_die_class_index = 0U;
             if(app->roll_mode == PocketRollGuidance) app->roll_mode = PocketRollNormal;
             dndolphins_enter_screen(app, PocketScreenCombat);
             break;
-        case 12:
-            dndolphins_request_launch(app, PocketPendingLaunchInitiative);
-            break;
-        case 13:
+        case DndolphinsHomeDiceRoller:
             dndolphins_enter_screen(app, PocketScreenDice);
+            break;
+        case DndolphinsHomeAdventure:
+            dndolphins_request_launch(app, PocketPendingLaunchAdventure);
+            break;
+        case DndolphinsHomeJournal:
+            dndolphins_request_launch(app, PocketPendingLaunchJournal);
+            break;
+        case DndolphinsHomeCount:
             break;
         }
     }

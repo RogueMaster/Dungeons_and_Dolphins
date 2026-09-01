@@ -8,7 +8,7 @@ Save structures are frozen by default. Do not change a schema merely for write s
 
 Preserve explicit full-path FAP handoffs, teardown-before-launch, combat-only lazy eight-record Inventory/Spellbook paging, eight-record Feature paging, storage-backed Journal/profile paging, write-only character shadows, explicit DNDInventory-only starting-equipment grant, explicit Grant Initial Traits gating, lazy/no-hash progression metadata reads, and bounded Bestiary/campaign access. Character-owned Inventory, Spellbook, Feature and applied-grant sidecars remain centralized under `/ext/apps_data/dndolphins/` even though Inventory and Spellbook have their own FAPs.
 
-## 3.3.8 — Hardware validation and bounded profile access
+## 3.3.9 — Hardware validation and bounded profile access
 
 - Hardware-validate the RAM-only draw contract under rapid scrolling across Profiles, Journal, Spell Attacks, Rituals, Weapon Attacks, Inventory, Spellbook and Bestiary, and confirm no SD activity/heap growth occurs merely from redraw.
 - Run repeated cold-launch and cross-FAP handoff stress tests while monitoring firmware free-heap/fragmentation and stack high-water values; compare device measurements with the source-derived bounds in `MEMORY_AUDIT.md`.

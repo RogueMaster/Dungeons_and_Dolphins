@@ -2,6 +2,12 @@
 
 Released work only. Normal releases are retained as concise summaries; closely related recovery spans may be consolidated when the individual troubleshooting chronology would obscure the released outcome.
 
+## 3.3.8 — DNDolphins home-menu ordering and named focus indices
+
+- Reordered the DNDolphins Home menu into character sheet, character resources, encounter tools and campaign-play groups: Characters, Character, Vitals, Abilities & Saves, Skills, Features & Perks, Inventory, Magic & Spells, Bestiary, Initiative, Combat, Dice Roller, Adventure and Journal. The encounter workflow is intentionally Bestiary → Initiative → Combat.
+- Replaced raw numeric Home-menu cases and companion-return focus positions with the `DndolphinsHomeIndex` enum. Home dispatch now uses named cases, and companion return arguments translate to the matching named index before selection/scroll restoration.
+- Preserved same-row return from DNDolphins submenus and cross-FAP return focus while making future menu reordering resistant to index drift.
+
 ## 3.3.7 — Documentation, profile handoff ownership and manifest audit
 
 - Consolidated the suite-wide active-profile reference and cross-FAP Loader handoff contracts into `dnd_profile_handoff.*`, linked by all seven FAPs. Removed the duplicate `Active=` parser from shared storage so active-character metadata has one implementation while full profile/sidecar persistence remains in `dnd_storage.*`.

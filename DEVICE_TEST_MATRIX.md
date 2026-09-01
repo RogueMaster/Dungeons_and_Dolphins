@@ -190,6 +190,7 @@
 ### Return focus / paging performance / ordering
 
 - [ ] From each companion main screen, Short Back and confirm DNDolphins opens with the corresponding home row already highlighted: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary and Initiative. Repeat with Hold Back and confirm it exits to firmware instead of launching DNDolphins.
+- [ ] Confirm the DNDolphins Home menu order is Characters, Character, Vitals, Abilities & Saves, Skills, Features & Perks, Inventory, Magic & Spells, Bestiary, Initiative, Combat, Dice Roller, Adventure, Journal. Enter and return from each internal submenu and companion FAP; confirm the same named row is restored rather than a stale numeric position.
 - [ ] In DNDolphins, highlight each internal home row that opens a submenu (Profiles, Character, Vitals, Abilities, Skills, Magic, Features, Combat and Dice), enter it, then Short Back; confirm Home returns to the same highlighted row/scroll position rather than row 0.
 - [ ] Open Initiative and confirm the title bar is dark on the main menu and during Combat; `[id]` is right-aligned on the main menu and `Round N` replaces it during Combat.
 - [ ] Open Item Name Catalog and compare with the established presentation: category initials are **not bracketed**, magic entries append `*`, Other entries show only their names, and the header shows `Page N <>`.
