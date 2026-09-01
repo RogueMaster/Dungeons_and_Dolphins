@@ -1,6 +1,5 @@
 #include "dnd_fs.h"
-#include "dnd_handoff.h"
-#include "dnd_profile_ref.h"
+#include "dnd_profile_handoff.h"
 
 #include <furi.h>
 #include <furi_hal.h>

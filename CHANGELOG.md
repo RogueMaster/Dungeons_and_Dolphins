@@ -2,6 +2,14 @@
 
 Released work only. Normal releases are retained as concise summaries; closely related recovery spans may be consolidated when the individual troubleshooting chronology would obscure the released outcome.
 
+## 3.3.7 — Documentation, profile handoff ownership and manifest audit
+
+- Consolidated the suite-wide active-profile reference and cross-FAP Loader handoff contracts into `dnd_profile_handoff.*`, linked by all seven FAPs. Removed the duplicate `Active=` parser from shared storage so active-character metadata has one implementation while full profile/sidecar persistence remains in `dnd_storage.*`.
+- Alphabetized every FAP manifest `sources` list for auditability without changing runtime behavior or link ownership.
+- Rebuilt README as an app-by-app feature inventory covering DNDolphins, Inventory, Spellbook, Adventure, Journal, Initiative and Bestiary, with suite-wide behavior kept in a separate shared section.
+- Recalculated current ARM32 project memory documentation from the actual app structs/manifests. Correct fixed app blocks are 4,924 B DNDolphins, 5,072 B Inventory, 5,112 B Spellbook, 4,760 B Adventure, 1,352 B Journal, 5,276 B Initiative and 1,528 B Bestiary; stack reservations remain 6/4/4/4/4/3/6 KB. Updated derived working-set arithmetic and clearly separated exact project sizes from source-estimated stack peaks and firmware/framework overhead.
+- Tightened compatibility, save-schema, feature, source-ownership and device-test documentation to match the unified profile/handoff contract and current memory figures.
+
 ## 3.3.6 — Inventory currency grants and navigation focus
 
 - Made normal **Grant Initial Inventory** persist the existing balance plus class/species/background starting currency in the same synced `inventory_{id}.txt` creation as the granted Item records and `InitialInventory=1`, removing the second metadata rewrite that previously separated Item creation from final currency persistence. The exact committed balance is mirrored back into the Inventory app state.
@@ -30,7 +38,7 @@ Released work only. Normal releases are retained as concise summaries; closely r
 - Hardened companion character-ID headers so the internal `UINT32_MAX` sentinel can never render as `[4294967295]`; valid ID `0` remains supported.
 - Completed a render-path stability pass across all seven FAPs. Canvas drawing now uses resident RAM state only: profile windows, class spell counts, Journal windows and Combat Item/Spell rows are prepared from screen-entry/input paths instead of performing storage reads or allocations from draw callbacks. Unrelated row preparation was also removed from Attack Templates navigation.
 - Re-audited project-owned allocation ownership and failure cleanup. Collection pages, combat indexes, Bestiary windows/details/encounters, Adventure scenes, Journal scan buffers and shared storage temporaries remain bounded and have matched release paths; Bestiary startup failure cleanup now also releases any partially created dynamic blocks.
-- Recomputed current ARM32 app-state and collection-page sizes for the memory audit. Fixed app allocations are 5,248 B DNDolphins, 4,800 B DNDInventory, 4,836 B DNDSpellbook, 4,760 B DNDAdventure, 1,352 B DNDJournal, 5,276 B DNDInitiative and 1,528 B DNDBestiary, excluding firmware/framework objects and allocator metadata.
+- Recomputed the app-state/collection memory audit for that release; the current audit later replaced those early layout figures with compiler-checked ARM32 sizes and derived working sets.
 - Updated all seven FAP manifests to release version 3.3.4 and refreshed rules, compatibility, feature, test, accessibility, save-schema, roadmap and memory documentation for the retained behavior.
 
 ## 3.3.3 — Combat spell eligibility, one-time inventory regrant and UI consistency

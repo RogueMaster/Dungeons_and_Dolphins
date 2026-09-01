@@ -1,162 +1,159 @@
 <h1 align="center"><a href='https://rogue-master.net'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/rmlogo.png" width="40%"></a>
 <br><a href='https://discord.gg/gF2bBUzAFe' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Discord.png" alt='Discord' title='Discord'></a>
-&nbsp;<a href='https://github.com/RogueMaster/flipperzero-firmware-wPlugins/releases/latest' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Github.png"  alt='Firmware GitHub' title='Firmware GitHub'></a>
-&nbsp;<a href='https://www.patreon.com/RogueMaster?filters[tag]=Latest%20Release' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Patreon.png"  alt='Latest PATREON Release' title='Latest PATREON Release'></a>
-&nbsp;<a href='https://github.com/RogueMaster/awesome-flipperzero-withModules' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Resources.png"  alt='More Research / Assets' title='More Research / Assets'></a></h1>
+&nbsp;<a href='https://github.com/RogueMaster/flipperzero-firmware-wPlugins/releases/latest' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Github.png" alt='Firmware GitHub' title='Firmware GitHub'></a>
+&nbsp;<a href='https://www.patreon.com/RogueMaster?filters[tag]=Latest%20Release' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Patreon.png" alt='Latest PATREON Release' title='Latest PATREON Release'></a>
+&nbsp;<a href='https://github.com/RogueMaster/awesome-flipperzero-withModules' target='_blank'><img src="https://raw.githubusercontent.com/RogueMaster/flipperzero-firmware-wPlugins/420/.github/assets/Resources.png" alt='More Research / Assets' title='More Research / Assets'></a></h1>
 
 # DNDolphins
 
-Offline 5E-compatible tools for Flipper Zero, split into seven FAPs so the main character hub stays within loader RAM while collection-heavy workflows own their UI/catalog memory separately.
+Offline 5E-compatible character, campaign and encounter tools for Flipper Zero. The suite is split into seven independent FAPs so collection-heavy workflows do not have to share one resident application heap.
 
-## Apps
+## Apps and features
 
-| App | Purpose | Writable root |
-|---|---|---|
-| DNDolphins | Characters, progression, dice and character combat hub | `/ext/apps_data/dndolphins/` |
-| DNDInventory | Per-character Inventory, Item editor/catalog and equipment state | `/ext/apps_data/dndolphins/` (shared character root) |
-| DNDSpellbook | Per-character Spellbook, Spell editor/catalog and preparation state | `/ext/apps_data/dndolphins/` (shared character root) |
-| DNDAdventure | Campaigns, checks, rewards, milestones and campaign packs | `/ext/apps_data/dndadventure/` |
-| DNDJournal | Per-character notes and Adventure milestone history | `/ext/apps_data/dndjournal/` |
-| DNDInitiative | Party roster, initiative, rounds, HP/AC and conditions | `/ext/apps_data/dndinitiative/` |
-| DNDBestiary | Monsters, custom monsters, packs and encounters | `/ext/apps_data/dndbestiary/` |
+### DNDolphins — character and combat hub
 
-Cross-app launches use explicit `/ext/apps/Games/*.fap` paths. The outgoing app tears down its views, callbacks, services, caches and heap state before Loader starts the next FAP. In each of the six companion FAPs, Short Back from the main screen returns to DNDolphins when that FAP is installed and restores focus to the corresponding DNDolphins home row (Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary or Initiative); if the parent is absent, the companion simply exits. Hold Back exits the companion without a parent handoff, so explicit Return/Open-DNDolphins rows are not needed on normal companion menus. Companion selection is driven only by `/ext/apps_data/dndolphins/custom_active_profile.txt` (`Active=<id>`); launch arguments do not override it and companions never discover or fall forward to another character. Adventure and Journal require that exact ID to have a canonical character profile. Inventory and Spellbook read that exact ID through the `dnd_storage.c` implementation they already use for character/collection I/O, then load that same character through the normal character loader. Initiative uses ID `0` only when the active-profile metadata itself is absent or unreadable, then validates that exact ID; an existing but stale `Active=<id>` does not fall back to 0. Bestiary likewise defaults its displayed/transfer character ID to `0` only when the metadata is absent or unreadable and otherwise keeps the persisted ID while remaining usable without a character profile. Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook display the resolved character ID in brackets at the top-right of their main screen only. Inventory and Spellbook keep their character-owned sidecars in `/ext/apps_data/dndolphins/` so Combat, Adventure, Journal and progression always see one source of truth.
+- **Home:** Characters, Character, Vitals, Abilities & Saves, Skills, Magic & Spells, Features & Perks, Inventory, Journal, Adventure, Bestiary, Combat, Initiative and Dice Roller.
+- **Profiles:** multiple characters; create, switch/open, rename, duplicate, export, import, archive, delete, verify save and restore backup. Character files use tolerant named-field loading, automatic save/retry and write-only shadow history.
+- **Character sheet:** name/player, species, background, alignment, languages/proficiencies, inspiration, multiclass levels/subclasses, total level, proficiency bonus, XP/milestone progression and Hit Dice; bundled class/subclass/species/background/alignment/feat catalogs remain available where those fields support catalog selection.
+- **Abilities and skills:** six ability scores/modifiers, saving-throw proficiency/misc/total, all 18 skills with proficiency/expertise/misc/total, and passive Perception/Insight/Investigation.
+- **Vitals:** current/max/temp HP, AC, speed/effective speed, initiative/misc, exhaustion, death saves and Hit Dice.
+- **Level progression:** standard-array defaults, explicit ASI/Feat level choices, **Grant Initial Traits**, deterministic class/species progression grants, persistent applied-grant history and no automatic arbitrary spell/feat choice for the player.
+- **Magic rules:** Open Spellbook plus casting ability/mode, Spell Attack, Spell Save DC, spell modifiers, current/max level 1–9 slots, multiclass slot rules, half/third casters, Pact Magic, spell points, Mystic Arcanum, Arcane Recovery and rest recovery. Eldritch Knight and Arcane Trickster use third-caster progression and Wizard-list rules where applicable.
+- **Features & Perks:** add/edit persistent paged features with uses, recharge cadence (Manual/Turn/Encounter/Dawn/Short-Long/Long), class metadata and resource formulas.
+- **Combat hub:** Weapon Attacks, Spell Attacks, Rituals, Attack Templates, HP/temp HP, Short Rest, Spend Hit Die, Long Rest, Conditions, Concentration, Reaction, temporary effects, resistances, immunities, vulnerabilities, senses, movement, death saves and exhaustion.
+- **Weapon combat:** STR/DEX/finesse selection, proficiency, magic bonuses, advantage/disadvantage, ammunition, versatile damage, extra damage dice, riders and critical dice doubling.
+- **Spell combat:** bounded Spellbook lookup, attack/save mappings, source-class casting modifiers, cantrip scaling, upcasting, healing/multipart effects, resource selection and bounded `XdY` Notes fallback for custom spells. Wizard Ritual Adept exposes known Wizard Ritual spells without preparation or resource consumption and reports the extra ritual casting time.
+- **Attack Templates:** editable unarmed/spell-attack/saving-throw/custom templates with ability, save/DC, damage, rider and recharge settings.
+- **Dice Roller:** d4/d6/d8/d10/d12/d20/d100, multiple dice, modifier, Normal/Advantage/Disadvantage/Guidance, individual results, sum and total.
+- **Navigation:** returning from an internal submenu restores the same DNDolphins home-row selection. Companion returns can focus the matching home row.
 
-## Features
+### DNDInventory — inventory, equipment and currency
 
-- **Level Choices:** explicit ASI/Feat choices are detected from class level, survive restarts through existing grant records, and never silently choose a feat for the player.
-- **Adventure pack controls:** installed campaign packs can be enabled/disabled; installed campaign packs remain registered in the campaign pack list; Hold OK toggles a selected pack active/inactive, short OK does nothing on existing pack rows, and campaign files remain on storage.
+- Opens the exact active character directly to the bounded Inventory list with **+ Add New**.
+- Character-owned sidecar: `/ext/apps_data/dndolphins/inventory_<id>.txt`; opening a missing Inventory is read-only until the first real write/grant.
+- Eight-record paging with only the active page resident; the first four Item rows remain visible with **+ Add New**.
+- **Add/Edit/Delete Item:** blank record opens the full **36-field** editor immediately; Item Name can use the streamed catalog or a custom name. Item data covers quantity, weight, detail, equipped/attuned state, weapon/armor fields, damage, properties, ammunition, charges, containers and source metadata.
+- **Catalog filters:** All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic.
+- Bundled generic **Spell Scroll (Cantrip)** and **Spell Scroll (Level 1–9)** entries use level-appropriate rarity.
+- **Quick equip:** Hold OK on an Item row toggles Equipped and saves immediately.
+- **Inventory Tools:** Currency, Inventory Resources and Grant Initial Inventory.
+- **Currency:** CP/SP/EP/GP/PP is editable and stored only in the Inventory sidecar. Coin normalization is available from Inventory Resources.
+- **Derived resources:** carried/equipped weight, carrying capacity, standard/variant encumbrance, attunement count and calculated armor/shield AC with an Apply AC action.
+- **Starting inventory:** explicit one-time class/species/background grant; items, prior balance + granted currency and grant marker publish in one synced sidecar transaction. A deliberate one-time regrant preserves existing Items, adds the package/currency once and advances the marker. A d100 trinket is fallback only when normal composition yields neither items nor currency. Merely opening Inventory never seeds equipment.
 
-### Characters
+### DNDSpellbook — spells, preparation and catalog
 
-- Multiple independent character profiles stored as readable, manually editable text files.
-- Best-effort named-field loading: unknown, reordered, missing or individually malformed fields do not invalidate otherwise usable character data.
-- Automatic saves plus import, export, duplicate, rename, archive, delete, retry and write-only shadow history.
-- Multiclass characters with class levels, subclasses, Hit Dice and class-linked feature handling.
-- Ability scores, saving throws, skills, proficiency/expertise, passive scores and miscellaneous modifiers. New characters use the standard array; level-1 class/species/background traits are applied only when **Grant Initial Traits** is selected.
-- HP, temporary HP, AC, speed, initiative, exhaustion, death saves, inspiration, XP and milestones.
-- Species, background, alignment, languages, feats, tools, armor/weapon training, size, senses and proficiencies. Supported species progression is checked against total character level, including deterministic innate spells/features where metadata is available.
+- Opens the exact active character directly to the bounded Spellbook list with **+ Add New**.
+- Character-owned sidecar: `/ext/apps_data/dndolphins/spellbook_<id>.txt`; a missing Spellbook remains empty until the first saved spell.
+- Eight-record paging with only the active page resident; the first four spells remain visible with **+ Add New**.
+- **Add/Edit/Delete Spell:** blank record opens the full **17-field** editor immediately; Name can use the streamed catalog or a custom name. Stored state includes source class, level, Known, Prepared, Always Prepared, Ritual, free casts and catalog/source/school/grant metadata.
+- **Quick prepare:** Hold OK toggles Prepared and saves immediately; Always Prepared remains fixed. List marks show `A`, `P`, `K` or `-`, plus `F` when a free cast remains.
+- Bundled 448-spell catalog with class, level, school, ritual, source, status and eligibility filtering.
+- **Class filtering:** All Classes is the eligible union across the character's classes; individual class filters remain available. Eldritch Knight and Arcane Trickster use the Wizard spell list. Eligibility defaults to Allowed; All Spells is an explicit opt-in override.
+- **Sorting:** saved spells remain level-ascending then case-insensitive alphabetical by name. Sorting uses bounded compact keys and rewrites only when order changed.
+- Catalog and sidecar access are streamed/bounded; no collection or storage work occurs from canvas drawing.
 
-### Magic & spells
+### DNDAdventure — campaigns and campaign packs
 
-- Known, Prepared, Always Prepared, Ritual and free-cast spell states.
-- Per-class casting ability/mode, prepared limits, spellbook size, Pact Magic, Mystic Arcanum and spell points.
-- Shared multiclass slots, automatic empty-slot initialization, Eldritch Knight/Arcane Trickster third-caster handling with Wizard-list filtering, Spell Attack, Spell Save DC, slot spending and rest recovery.
-- Spell filtering by class, level, ritual, school, source and prepared state. **Spell Class** defaults to **All Classes**, the union of currently eligible spells across every class on a multiclass character, while individual classes remain selectable. Hold Up from the Spellbook list opens the filter screen directly. `Eligibility: Allowed` is the default; the explicit `All Spells` override restores the older show-all picker without weakening normal eligibility filtering. The bundled 448-spell catalog fully populates these filter fields and filtering occurs during streaming before the bounded result page is built. Hold OK on a Spellbook row toggles Prepared and saves immediately; always-prepared spells remain fixed.
-- Streamed spell catalog plus custom spell support; short or hold OK on **+ Add New** creates a blank spell and opens the full editor immediately. The successful `Spell added` notice is one-shot and clears on the next real input. Catalog selection remains available from the Name field inside that editor; catalog headers retain page `<>` hints.
-- Combat Spell Attacks use structured spell mappings for supported attacks, saves, scaling, healing and multi-part effects; unmapped custom spells can use the first valid `XdY`/`XDY` expression in Notes as a bounded fallback.
-- DNDSpellbook reserves its fixed main UI before variable character/collection loading, then opens directly to the active character Spellbook list with **+ Add New** selected; an absent sidecar is treated as an empty list until the first spell is saved. The first four spells remain visible together with `+ Add New`; the fifth is the first row that requires scrolling. Ordinary Up/Down stays cache-only until an eight-record page boundary; the normal list does not display a persistent `<>` hint. Explicit `Page N <>` paging remains in the Name-field spell catalog. Spell rows show `A` (always prepared), `P` (prepared), `K` (known) or `-`, plus `F` when a free cast remains (for example `AF`). DNDSpellbook owns the full Spellbook list/editor/catalog UI. Character-owned spellbooks remain in the shared DNDolphins data root and use eight-record sidecar paging instead of keeping the whole collection resident. Recorded spells are maintained in level-ascending, then case-insensitive alphabetical-name order; the bounded sorter is owned directly by the DNDSpellbook collection implementation, keeps only compact offset/level/name keys, and rewrites the sidecar only when order actually changed. Shared `dnd_storage.c` contains no Spellbook sorting implementation. Three tiny aligned sidecar offsets make later 8-record page changes direct seeks after the initial scan, while the Name catalog uses a 256-byte bounded filtered-page offset map plus a 128-byte buffered reader rather than whole-catalog loading. DNDolphins retains only the runtime access needed for Combat and progression. It does not hydrate a Spellbook page during startup or ordinary character navigation; Spell Combat builds a bounded logical index on entry and loads an eight-record page only when the combat UI requests a spell. Non-combat progression maintenance streams the sidecar without retaining a Spellbook page.
+- Requires the exact active canonical character and stores per-character campaign progress under `/ext/apps_data/dndadventure/`.
+- Campaign scenes support narrative text, branching choices, skill checks, flags, achievements, checkpoints/milestones and Item rewards.
+- Bundled campaigns include **Reef Wardens** and **Ghost Protocol**.
+- Adventure milestones integrate with Journal; active campaign/scene state can be continued from the matching Journal milestone.
+- Item rewards append to the character Inventory but never initialize starting inventory or starting currency.
+- **Campaign packs:** inbox preview/validation, manifest/index/content/entry-scene/compatibility/ID-conflict checks and explicit install.
+- Installed packs stay registered and on storage. Hold OK toggles an existing pack active/inactive; short OK on an existing pack row is intentionally inert.
+- Campaign reading uses bounded streaming/sparse hints rather than retaining whole campaign packs.
 
-### Inventory, equipment & items
+### DNDJournal — per-character notes and milestones
 
-- Inventory quantities, weight, containers, equipped/attuned state, charges and ammunition groups. Hold OK on an Inventory row toggles Equipped and saves immediately; successful quick actions briefly mark the affected row with `[X]`.
-- Weapon attack modifiers, damage dice, versatile damage, riders, proficiency, magic bonuses and weapon properties.
-- Armor/shield values, calculated AC, carrying capacity and currency normalization.
-- Granular Item Name-catalog filters include Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and aggregate Magic. The bundled Scroll category contains one generic Spell Scroll entry for Cantrip and each spell level 1 through 9, with level-appropriate rarity. Item records currently do not persist GP cost/value metadata.
-- Copper, Silver, Electrum, Gold and Platinum tracking.
-- Starting inventory is created only from **Hold Up → Inventory Tools → Grant Initial Inventory**. Short OK performs the normal one-shot grant while no grant marker exists and the sidecar contains no manual Item records. The existing balance, granted starting currency, Item records and `InitialInventory=1` are committed together in the same synced Inventory-sidecar write, and the committed currency total becomes the Inventory UI state immediately. After a successful normal grant, Hold OK on the same tool is a deliberate **one-time regrant override**: existing Items are preserved, the starting class/species/background package and its currency are appended once more, and the override is then permanently consumed. Merely opening DNDInventory does not create or seed an absent Inventory sidecar; an existing item-only sidecar may be completed with missing Inventory metadata without granting equipment. Class/species/background defaults are streamed from assets. A random d100 trinket is used **only as fallback equipment if the normal starting-equipment seed/regrant produces no equipment/currency**. The Item Catalog supports Hold-OK filters for All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic. The broad Magic filter remains available alongside the individual magic-item categories.
-- **Hold Up** from the Inventory list opens the bounded Inventory Tools menu containing Currency, Inventory Resources and Grant Initial Inventory. Currency and Inventory Resources are owned by DNDInventory rather than occupying DNDolphins home-menu rows.
-- Routine successful collection notices such as Saved, Item/Spell added, catalog saved, Equip/Prepare and grant/regrant feedback are one-shot and clear on the next real input; storage failures remain visible until replaced.
-- Currency persistence is exclusive to `inventory_{id}.txt`; character-profile `Currency=` lines are ignored and character saves do not serialize currency. Non-Inventory Item appenders never create `Currency=`. If DNDInventory opens an existing item-only sidecar with no Currency record, DNDInventory initializes it to `Currency=0,0,0,0,0`.
-- Resources, Weapon Attacks and Adventure do not silently seed starting equipment.
-- DNDInventory reserves its fixed main UI before variable character/collection loading, then opens directly to the active character Inventory list with **+ Add New** selected; Hold Up from that list opens Inventory Tools. The first four items remain visible together with `+ Add New`; the fifth is the first row that requires scrolling. Ordinary Up/Down stays cache-only until an eight-record page boundary; the normal list does not display a persistent `<>` hint. Explicit `Page N <>` paging remains in the Name-field item catalog. DNDInventory owns the full Inventory list/editor/catalog UI; Item Catalog headers retain `Page N <>`. Catalog rows match the compact established presentation: a category initial without brackets, `*` appended for magic entries, and a bare name for Other items. Three tiny aligned sidecar offsets make later 8-record page changes direct seeks after the initial scan; the Name catalog uses a 256-byte bounded filtered-page offset map plus a 128-byte buffered reader instead of whole-catalog loading. Character-owned inventory remains in the shared DNDolphins data root, uses eight-record sidecar paging and streamed whole-collection calculations, and short or hold OK on **+ Add New** creates a blank item and opens the full editor immediately. A successful `Item added` notice is one-shot and clears on the next real input. Catalog selection remains available from the Name field inside that editor. DNDolphins retains only combat-time item access for attacks, ammunition and combat calculations. Weapon Combat creates a bounded weapon index on entry and loads an eight-record Item page only when a concrete weapon record is requested; the index/page are released on exit.
+- Requires the exact active canonical character and stores Journal data under `/ext/apps_data/dndjournal/`.
+- Timestamped per-character entries sorted newest first with bounded metadata paging and body loading only when opened.
+- Entry categories include Quick, Adventure, Item and Milestone.
+- Add/edit title and body; persistent completion state is supported.
+- Adventure writes milestone/history entries without duplicating Adventure progress into the Journal.
+- Milestone entries can select a class and apply the milestone level once.
+- Item entries can create a character Inventory Item from the Journal entry.
+- A matching active Adventure milestone can continue the current Adventure.
 
-### Dice & combat
+### DNDInitiative — roster and active combat
 
-- Animated d4, d6, d8, d10, d12, d20 and d100 rolls.
-- Advantage, Disadvantage, modifiers, multiple dice and Guidance mode.
-- Individual results, dice sum, modifier and final total display.
-- Weapon Attacks and Spell Attacks use the character's owned records and current resources. Weapon attacks retain proficiency/magic/ability/exhaustion modifiers, advantage/disadvantage, ammunition use, versatile damage, extra dice and critical doubling. Spell attacks retain per-class casting ability, attack/save modifiers, cantrip scaling, upcasting and mapped/fallback damage. For Wizard-sourced combat spells, cantrips remain available normally; level-1+ spells appear only when Prepared/Always Prepared or when a Free Cast remains. An unprepared Wizard spell exposed only by a Free Cast offers that Free Cast only rather than normal slot/Pact/spell-point choices. Other classes retain their existing Known/Prepared behavior.
-- **Combat → Rituals** exposes Wizard Ritual Adept separately from Spell Attacks. It streams the character's known Wizard spellbook entries and lists only level-1+ spells with the Ritual tag; a ritual need not be Prepared. Selecting one casts it as a ritual through the existing result flow, consumes no slot/Pact slot/spell points/free cast and reports the additional 10-minute casting time. Cantrips are excluded from this ritual list.
-- HP, temporary HP, rests, Hit Dice, conditions, concentration, reactions, exhaustion, resistances, immunities, vulnerabilities, senses and movement support.
+- Uses the persisted active character ID; ID `0` is chosen only when active-profile metadata is absent/unreadable. A present but stale `Active=<id>` is not silently replaced by another character.
+- Per-character Initiative data is stored under `/ext/apps_data/dndinitiative/`.
+- **Setup roster:** main character plus temporary/manual participants; editable name, initiative modifier/total, roll mode, AC, current/max HP and conditions.
+- Main-character name, HP, AC and initiative modifier refresh from the canonical character. Initiative includes DEX, misc/exhaustion and supported feature effects such as Alert/Jack of All Trades.
+- Normal/Advantage/Disadvantage initiative modes, individual rolls and **Roll for All**; typed totals remain user-entered and tie handling uses modifier order.
+- Setup controls include initiative adjustment, participant reordering, Hold Up quick AC increase and Hold OK full participant editing.
+- **Combat:** current participant and round tracking, short Left/Right HP adjustment, Hold Down conditions, Hold Left/Right participant reordering and Hold OK full edit.
+- **Short Back** returns from active Combat to the Initiative main menu without ending the encounter; Resume continues it.
+- **Hold Up** moves back one turn, including from the first participant of a later round to the previous round's last participant.
+- Explicit **End Current Combat** clears active-combat state.
+- Main-character HP/AC changes synchronize back to the canonical character, and Turn/Encounter feature recharge is applied at the corresponding cadence.
+- Accepts Bestiary monster/encounter handoff data.
 
-### Initiative
+### DNDBestiary — monsters, packs and encounters
 
-- Standalone per-character Party Roster with name, initiative modifier, AC, current HP and maximum HP. The main/combat screens use the shared dark title bar; `[characterId]` occupies the right side on the main menu and `Round N` occupies it during combat.
-- Initiative setup provides Roll for All, individual automatic rolls, temporary members, short/repeat left/right initiative adjustment, Hold Up quick AC increase on a selected participant, long left/right manual participant reordering, and Hold OK full participant editing.
-- Initiative automatically refreshes the active character's current name, HP, AC and initiative modifier from the canonical primary character profile when opened; Inventory/Spellbook sidecars cannot be mistaken for the profile, character ID 0 remains valid, and other roster members keep their independently assigned modifiers.
-- Initiative Roll mode can be set to Normal, Advantage or Disadvantage. Roll for All and individual automatic rolls use the selected mode; the full editor accepts direct numeric initiative total, modifier, AC, current HP and maximum HP values.
-- Round/current-turn tracking; Short Back during active combat returns to the Initiative main menu without ending the encounter, and Resume returns to the active combat. Hold Up moves the current turn backward, including across a round boundary. Hold Back follows the companion-wide force-exit behavior and exits Initiative to firmware. The menu can explicitly end the current combat.
-- During active combat, AC is shown beside HP; left/right changes HP, Hold Down opens quick condition editing, Hold Left/Right manually reorders participants, and Hold OK opens the full participant editor including numeric AC editing.
-- HP/AC edits for the tracked main character synchronize back to the canonical character profile. Turn- and Encounter-recharge features are restored automatically at their corresponding Initiative cadence.
-- Participant editing, temporary participants, negative HP, conditions and removal.
-- Bestiary Add to Initiative can append selected monsters or encounter members to the active character roster before opening Initiative.
+- Usable without a character profile. It uses the persisted character ID for display/Initiative transfer and defaults that ID to `0` only when active-profile metadata is absent/unreadable.
+- Streamed monster catalog with bounded windows and filters for name, maximum CR, creature type, source, environment and role.
+- Full monster detail includes CR/XP, AC/HP, type/source/role, size/alignment, speed, abilities, skills, defenses, senses, languages, traits, actions and extra text.
+- Favorites and recent-monster state.
+- Create, edit and delete custom monsters. Bundled Dolphin/Capybara records do not create custom files merely by browsing.
+- **Encounter generator:** party level/size, Low/Moderate/High difficulty, environment, preferred role, repeats toggle and Balanced/Horde/Elite templates.
+- Encounter output includes XP/difficulty simulation and composition warnings such as leader/support balance, exposed artillery and minion density.
+- Saved encounters can be resumed, renamed, duplicated, archived, deleted and sent to Initiative.
+- Saved filter presets.
+- **Monster packs:** packaged/custom/inbox handling, validation, install, active/inactive toggle, diagnostics/recovery and file-preserving deactivation.
 
-### Journal
+## Shared behavior
 
-- Standalone per-character timestamped text entries stored outside the character save.
-- Newest-first storage-backed listing with bounded metadata caching and body-on-open loading.
-- Adventure milestone history is written directly to Journal. Milestone entries can select a character class and apply that milestone level exactly once.
-- Item-category entries can create an inventory item from the Journal title/body without embedding Journal data in the character save.
-- Journal can return to DNDolphins or use **Continue active Adventure** from a milestone entry. That handoff resumes the character's persisted active campaign/scene directly when available; Journal does not create or duplicate Adventure progress.
+- `dnd_profile_handoff.*` is linked by all seven FAPs and is the single shared contract for persisted active-character resolution, canonical profile lookup, FAP paths, launch arguments and parent-return handoff.
+- `/ext/apps_data/dndolphins/custom_active_profile.txt` stores `Active=<id>`. Companion launch arguments do not override that selection and companions do not discover/fall forward to another character.
+- Inventory and Spellbook sidecars remain in the DNDolphins character root so Combat, progression, Adventure and Journal see one source of truth.
+- Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook show the resolved `[id]` at the top-right of their main screen only; the internal invalid-ID sentinel is never rendered.
+- Cross-FAP launch paths are explicit `/ext/apps/Games/*.fap`. The outgoing app tears down views/callbacks/services/caches/owned heap before Loader starts the destination.
+- On companion main screens, Short Back returns to DNDolphins when installed and restores the matching parent row; Hold Back exits to firmware. Subscreen Back remains local except for Initiative Combat's explicit behavior above.
+- Collection readers use bounded pages/windows. Project canvas callbacks do not allocate project heap, perform storage I/O or rewrite collections.
+- No firmware `qsort` dependency is used.
 
-### Adventure
+## Storage model
 
-- Declarative campaign manifests/scenes with branching choices, skill checks, flags, achievements, item rewards, milestones and checkpoints.
-- Per-character campaign progress owned by DNDAdventure rather than embedded in the character file.
-- Bundled **Reef Wardens** aquatic adventure.
-- Bundled **Ghost Protocol**, a fictional authorized security-audit adventure using a Flipper Zero as an in-world inspection tool; it contains game checks and branching outcomes rather than real exploit instructions.
-- Adventure item rewards use shared item storage behavior but never initialize starting equipment.
-- Installable campaign-pack support with a concise pre-install details/validation screen. The preview checks manifest/index shape, compatibility, content presence, declared entry-scene presence and ID conflicts before Hold OK can install.
-- Campaign discovery uses bounded sparse index hints and streaming lookup rather than a heap offset for every campaign row.
-- Main canvas draw paths are RAM-only with respect to project-owned state: no draw callback allocates/frees heap, opens/scans storage, rewrites sidecars or advances storage-backed paging. Profile/Journal windows, class spell counts and Combat row caches are hydrated from screen-entry/input paths. Character-ID badges also suppress the internal `UINT32_MAX` sentinel so `[4294967295]` cannot be rendered as a profile ID.
+- Character profiles and character-owned sidecars: `/ext/apps_data/dndolphins/`
+- Inventory: `inventory_<id>.txt`
+- Spellbook: `spellbook_<id>.txt`
+- Features: `feats_<id>.txt`
+- Applied deterministic grants: `appliedgrants_<id>.txt`
+- Journal: `/ext/apps_data/dndjournal/`
+- Initiative: `/ext/apps_data/dndinitiative/`
+- Adventure: `/ext/apps_data/dndadventure/`
+- Bestiary/custom monsters/packs/encounters: `/ext/apps_data/dndbestiary/`
 
-### Bestiary
-
-- Large bundled monster catalog with streamed browsing, filtering, detail views and encounter generation.
-- Search/filter support for monster metadata such as name, challenge, type, source, environment and encounter role where present.
-- Favorites, recents, saved filters, diagnostics and named saved encounters.
-- Saved encounter resume, rename, duplicate, archive, delete and Add to Initiative workflows.
-- Custom monster create/edit/delete without rewriting packaged monster assets.
-- Installable monster packs remain separate from packaged and direct-custom records.
-- **Monster pack controls:** existing installed packs remain registered and preserve their files; Hold OK toggles Active/Inactive, while short OK does nothing on existing pack rows. Short OK remains the install action on the separate inbox row.
-- If no custom monster files exist, Bestiary seeds a small bundled custom pack containing **Dolphin** and **Capybara**. Existing or partial user custom files always win and are never overwritten by the seed.
-- Full stat-block rows can be opened in the scrolling full-screen reader.
-
-### Storage, memory & resilience
-
-- Character core saves, spellbooks, inventories, Journal entries, Adventure progress and Bestiary state are owned by the FAP that uses them.
-- Character shadows are write-only history and are never used as live recovery input.
-- Packaged catalogs/campaigns/monsters remain in app assets; mutable user data remains in app data.
-- Large lists are streamed, paged or bounded rather than loaded wholesale.
-- Cross-FAP handoffs free outgoing runtime state before launching the next app.
-- Text data remains manually editable; no checksum match is required for ordinary character/custom-pack loading.
-
-## Controls
-
-- **OK** — select, open, confirm or roll.
-- **Hold OK** — alternate action such as custom text, numeric entry or participant editing where supported.
-- **Back** — previous screen; on a companion app's main screen, return to DNDolphins when installed. During active Initiative combat, Short Back returns to the Initiative main menu while preserving the active encounter. DNDolphins restores the same highlighted home row after returning from an internal submenu.
-- **Hold Back** — exit the current companion app back to firmware without launching DNDolphins. DNDolphins itself retains its screen-specific controls.
-- **Left / Right** — change pages or values where supported.
-- **Up / Down** — move through rows and lists.
+Character/profile parsing is best-effort by field name. Collection and progression sidecars are created only by a real write; opening a missing collection does not create it. Transactional rewrites publish only after successful sync, and campaign/monster content is preserved when marked inactive.
 
 ## Memory model
 
-- DNDolphins: 6 KB stack
-- DNDInventory: 4 KB
-- DNDSpellbook: 4 KB
-- DNDAdventure: 4 KB
-- DNDJournal: 4 KB
-- DNDInitiative: 3 KB
-- DNDBestiary: 6 KB
-
-See `MEMORY_AUDIT.md` for current source-derived stack-use estimates and remaining device stress targets. Persistent Feature state is stored in `feats_{charID}.txt` and loaded in pages of at most eight only when needed. Applied progression history is streamed from `appliedgrants_{charID}.txt` during progression checks rather than kept resident.
+Each FAP is loaded independently; opening Inventory or Spellbook does not keep DNDolphins resident. Large collections/catalogs are streamed or bounded rather than retained whole. Exact manifest stack reservations, ARM32 project app-state sizes and source-derived working-set estimates are maintained in `MEMORY_AUDIT.md`; firmware/framework objects and allocator overhead are intentionally separate from those project-owned figures.
 
 ## Documentation
 
-- `CHANGELOG.md` — released history from the retained release line onward, summarized per revision.
-- `ROADMAP.md` — future work only.
-- `SAVE_SCHEMA.md` — persistence ownership and paths.
-- `CAMPAIGN_PACK_SCHEMA.md` / `MONSTER_PACK_SCHEMA.md` — declarative pack formats.
-- `MEMORY_AUDIT.md` — stack reservations, estimated source-visible usage and memory ownership.
-- `SOURCE_OWNERSHIP.md` — shared-vs-app source and header ownership rules.
-- `DEVICE_TEST_MATRIX.md` — device validation checklist.
+- `FEATURE_CHECKLIST.md` — implementation/behavior checklist
+- `MEMORY_AUDIT.md` — stack reservations, project heap/state sizes and transient working sets
+- `RULES_AUDIT.md` — 5E/rule behavior audit
+- `SAVE_SCHEMA.md` — character and sidecar persistence contract
+- `SOURCE_OWNERSHIP.md` — shared versus app-owned code/header policy
+- `COMPATIBILITY.md` — migration and cross-FAP compatibility
+- `DEVICE_TEST_MATRIX.md` — hardware regression/stress checklist
+- `CAMPAIGN_PACK_SCHEMA.md` / `MONSTER_PACK_SCHEMA.md` — pack formats
+- `CATALOG_POLICY.md` — bundled catalog policy
+- `ACCESSIBILITY.md` — controls/readability conventions
+- `ATTRIBUTION.md` — source/content attribution
+- `CHANGELOG.md` — released history
+- `ROADMAP.md` — future work
 
-### Initiative roll behavior
+## Build
 
-Initiative refreshes the active character from the current profile when launched. The player modifier includes Dexterity, Initiative Misc, exhaustion, and recognized initiative-related features currently mapped by the app. Each participant can independently use Normal, Advantage, or Disadvantage for generated rolls; a directly edited initiative total remains exactly the entered total until the participant is rolled again.
+From a RogueMaster/Flipper firmware tree containing this directory:
 
-### Initial traits and level progression
+```text
+fbt fap_dndolphins fap_dndadventure fap_dndjournal fap_dndinitiative fap_dndbestiary fap_dndinventory fap_dndspellbook
+```
 
-`Grant Initial Traits` stages the initial species/background/class/subclass grants into the Grant Review screen before applying them. Deterministic class and supported species progression updates numeric resources/features automatically. Species progression uses total character level, so multiclassing does not delay species-level unlocks. Deterministic species spells such as High Elf innate progression are granted automatically; ordinary class spell choices remain player-selected and the app prompts when class spell/cantrip allowances expand.
+Device builds and hardware stack/free-heap/fragmentation testing remain the final authority for firmware/framework memory behavior.

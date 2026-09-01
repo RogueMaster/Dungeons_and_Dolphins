@@ -2,12 +2,12 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <storage/storage.h>
 
-/* Shared cross-FAP launch contract. Every Loader handoff uses an explicit,
-   absolute FAP path; app IDs are manifest identifiers only and are never used
-   as launch targets. DNDolphins passes a decimal character ID to companion
-   FAPs. DNDBestiary transfers monsters directly to DNDInitiative:
-   CharacterId;Name,HP,AC,InitiativeMod;Name,HP,AC,InitiativeMod;... */
+/* Shared character-selection and cross-FAP launch contract. All seven FAPs use
+   this module so active-character resolution, data roots, launch paths and
+   parent-return behavior have one source of truth. */
 #define POCKET_D20_HANDOFF_LAUNCH_ARG    "initiative"
 #define POCKET_D20_HANDOFF_LAUNCH_PREFIX "initiative;"
 #define POCKET_D20_HANDOFF_ADVENTURE_CONTINUE ";continue"
@@ -29,8 +29,22 @@
 #define POCKET_D20_CHARACTER_DATA_ROOT   "/ext/apps_data/dndolphins"
 #define POCKET_D20_JOURNAL_DATA_ROOT     "/ext/apps_data/dndjournal"
 
-/* Launches an already-known absolute FAP path after the caller has torn down
-   its app state. Loader is intentionally isolated to dnd_handoff.c. */
+/* Read only DNDolphins' persisted Active= ID from custom_active_profile.txt.
+   This lightweight reader does not scan, infer, validate or switch profiles. */
+bool dnd_profile_ref_active_id(Storage* storage, uint32_t* profile);
+
+/* Resolve only the persisted active character. No cross-character fallback. */
+bool dnd_profile_ref_active_exact(Storage* storage, uint32_t* profile);
+
+/* Resolve the canonical primary character file for a profile. Collection
+   sidecars such as inventory_<id>.txt and spellbook_<id>.txt are excluded. */
+bool dnd_profile_ref_path(Storage* storage, uint32_t profile, char* output, size_t size);
+
+/* True only when this exact profile ID has a canonical primary character file. */
+bool dnd_profile_ref_exists(Storage* storage, uint32_t profile);
+
+/* Launch an already-known absolute FAP path after caller teardown. */
 bool dnd_handoff_launch(const char* fap_path, const char* args);
-/* Best-effort return target: launch only when the target FAP exists. */
+
+/* Best-effort return/companion target: launch only when the target FAP exists. */
 bool dnd_handoff_launch_if_present(const char* fap_path, const char* args);

@@ -2,7 +2,7 @@
 
 - Character files load best-effort by recognized field name. Unknown fields and unrelated malformed values are ignored when possible.
 - Current Inventory, Spellbook, Feature and applied-grant sidecars remain authoritative under `/ext/apps_data/dndolphins/`; splitting Inventory and Spellbook into separate FAPs does not move or rename those live files.
-- Companion character selection comes only from `custom_active_profile.txt` (`Active=<id>`); launch arguments do not override it and companions never scan for a replacement character. Inventory/Spellbook use the exact reader in their already-linked storage module; Journal/Adventure use the shared profile-reference path. All four require the exact persisted ID to load successfully. Initiative and Bestiary use ID `0` only when the active-profile metadata itself is absent or unreadable; an existing stale `Active=<id>` is not replaced by 0.
+- Companion character selection comes only from `custom_active_profile.txt` (`Active=<id>`); launch arguments do not override it and companions never scan for a replacement character. All seven FAPs use `dnd_profile_handoff.*` for this persisted active-ID/exact-profile contract. Inventory, Spellbook, Adventure and Journal require the exact persisted character to load; Initiative and Bestiary use ID `0` only when the metadata itself is absent or unreadable, and an existing stale `Active=<id>` is not replaced by 0.
 - Historical SWD/SHD files are not used as live collection/character state.
 - Legacy embedded Feature/Grant character fields are tolerated but ignored and are not migrated into sidecars.
 - Journal, Adventure, Initiative and Bestiary keep independent storage ownership except for their explicit character-sidecar bridges.

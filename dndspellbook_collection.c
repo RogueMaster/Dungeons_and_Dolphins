@@ -1,6 +1,6 @@
 #include "dndspellbook_collection.h"
 
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 #include "dnd_fs.h"
 #include "dnd_data.h"
 #include "dnd_spell_eligibility.h"
@@ -1843,7 +1843,7 @@ static bool dndspellbook_collection_load_profile(
        loading the character so a character-load failure still reports the exact
        persisted ID in the header. */
     uint32_t requested = 0U;
-    if(!dnd_storage_load_active_profile_id(app->storage, &requested)) return false;
+    if(!dnd_profile_ref_active_id(app->storage, &requested)) return false;
     app->profile = requested;
 
     bool recovered = false;

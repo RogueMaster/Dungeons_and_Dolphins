@@ -1,7 +1,6 @@
 #include "dnd_fs.h"
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 #include "dndinitiative_feature_recharge.h"
-#include "dnd_profile_ref.h"
 
 #include <furi.h>
 #include <furi_hal_random.h>

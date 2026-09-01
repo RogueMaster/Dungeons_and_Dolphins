@@ -1,5 +1,5 @@
 #include "dndinitiative_feature_recharge.h"
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 
 #include <limits.h>
 #include <stdio.h>

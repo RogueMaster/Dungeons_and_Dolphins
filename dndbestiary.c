@@ -1,7 +1,6 @@
 #include "dndbestiary_monsters.h"
 #include "dndbestiary_state.h"
-#include "dnd_handoff.h"
-#include "dnd_profile_ref.h"
+#include "dnd_profile_handoff.h"
 #include "dndbestiary_packs.h"
 
 #include <furi.h>

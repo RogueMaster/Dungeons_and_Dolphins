@@ -1,5 +1,5 @@
 #include "dnd_data.h"
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 #include "dnd_fs.h"
 #include "dnd_rules.h"
 #include "dndolphins_rules_character.h"

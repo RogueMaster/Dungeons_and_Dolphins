@@ -1,6 +1,6 @@
 #include "dnd_storage.h"
 #include "dnd_fs.h"
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 
 #include <furi.h>
 #include <furi_hal.h>
@@ -3178,46 +3178,16 @@ uint32_t dnd_storage_profiles_next_id(const PocketProfileState* profiles) {
                                                         UINT32_MAX;
 }
 
-bool dnd_storage_load_active_profile_id(Storage* storage, uint32_t* profile) {
-    furi_assert(storage);
-    if(!profile) return false;
-
-    bool found = false;
-    File* file = storage_file_alloc(storage);
-    if(file && storage_file_open(
-                   file, POCKET_D20_ACTIVE_PROFILE_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        PocketD20Reader reader;
-        dnd_storage_reader_init(&reader, file);
-        char line[POCKET_D20_VALUE_LINE_LEN];
-        while(dnd_storage_read_line(&reader, line, sizeof(line))) {
-            char* value = strchr(line, '=');
-            if(!value) continue;
-            *value++ = '\0';
-            if(strcmp(line, "Active") != 0) continue;
-            uint32_t active_profile = 0U;
-            if(dnd_storage_parse_u32_range(value, UINT32_MAX, &active_profile)) {
-                *profile = active_profile;
-                found = true;
-            }
-        }
-    }
-    if(file) {
-        storage_file_close(file);
-        storage_file_free(file);
-    }
-    return found;
-}
-
 bool dnd_storage_profiles_load(Storage* storage, PocketProfileState* profiles) {
     furi_assert(storage);
     furi_assert(profiles);
     dnd_storage_profiles_set_defaults(profiles);
 
     /* DNDolphins may still recover its own profile list if metadata is absent.
-       Companion FAPs use the lightweight dnd_profile_ref reader instead of
-       linking this full storage implementation solely for Active= metadata. */
+       All FAPs use dnd_profile_handoff for Active= metadata; this full storage
+       module owns profile scanning, fallback selection and profile-file persistence. */
     uint32_t active_profile = 0U;
-    if(dnd_storage_load_active_profile_id(storage, &active_profile))
+    if(dnd_profile_ref_active_id(storage, &active_profile))
         profiles->active_profile = active_profile;
 
     bool scanned = dnd_storage_profiles_refresh(storage, profiles);

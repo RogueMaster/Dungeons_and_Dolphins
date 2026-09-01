@@ -52,10 +52,6 @@ bool dnd_storage_profiles_next_after(
     PocketProfileEntry* entry);
 uint32_t dnd_storage_profiles_next_id(const PocketProfileState* profiles);
 
-/* Read only the persisted Active=<id> metadata. This never scans for,
-   substitutes, or activates another character. */
-bool dnd_storage_load_active_profile_id(Storage* storage, uint32_t* profile);
-
 /* Character-owned spell/item collections. These files are authoritative for owned
    records; the main character save does not contain spell/item rows. */
 typedef bool (*PocketD20SpellRecordVisitor)(

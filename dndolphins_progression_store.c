@@ -1,5 +1,5 @@
 #include "dndolphins_progression_store.h"
-#include "dnd_handoff.h"
+#include "dnd_profile_handoff.h"
 
 #include <furi.h>
 #include <limits.h>

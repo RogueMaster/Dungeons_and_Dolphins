@@ -94,7 +94,7 @@
 - [x] Applied-grant stable IDs are normalized to the stored representation and known truncation collisions use compact unique IDs.
 
 - [x] Active-profile loading: companion selection comes only from `custom_active_profile.txt` (`Active=<id>`); no companion discovers another character or accepts a launch-time profile override. Inventory/Spellbook load that exact ID through the normal character loader; Journal/Adventure require that exact canonical profile. Initiative/Bestiary use ID `0` only when active-profile metadata is absent/unreadable, never when a present `Active=<id>` is merely stale.
-- [x] Journal/Initiative/Bestiary keep active-profile parsing self-contained in `dnd_profile_ref.c`; they do not link the full storage module solely for active-ID lookup. Inventory/Spellbook use the exact active-ID reader in `dnd_storage.c`, which they already link for their character and collection I/O, and do not compile `dnd_profile_ref.c`.
+- [x] All seven FAPs use `dnd_profile_handoff.c` for the same persisted active-profile/exact-profile/handoff contract. FAPs link `dnd_storage.c` only when they also need full character/collection persistence, not merely to read `Active=<id>`.
 - [x] Inventory/Spellbook reserve the dispatcher/main view before variable-size character/collection loading so low-heap collection parsing cannot strand the app without its main drawable view.
 - [x] Inventory/Spellbook main-list header reserves the top-right for `[characterId]` only; `<>` is limited to explicit catalog/name-selection paging and detail/editor/tool headers do not show the character ID.
 - [x] Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook show `[characterId]` at the top-right of the main screen only.
