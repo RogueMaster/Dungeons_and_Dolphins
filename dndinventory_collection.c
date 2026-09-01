@@ -287,7 +287,7 @@ static void dndinventory_collection_draw_header(Canvas* canvas, DndInventoryColl
     /* Character ID belongs only to the main list screen. Catalog paging hints
        are shown only inside the explicit Name/catalog picker, not persistently
        on the normal Inventory list. */
-    bool main_list = app && app->screen == DndInventoryCollectionScreenList;
+    bool main_list = app && app->screen == DndInventoryCollectionScreenList && app->profile != UINT32_MAX;
     uint16_t status_right = 126U;
     if(main_list) {
         char profile_id[16];
@@ -927,6 +927,16 @@ static PocketItem* dndinventory_collection_item(
                NULL;
 }
 
+static PocketItem* dndinventory_collection_item_cached(
+    DndInventoryCollectionApp* app,
+    uint8_t logical) {
+    if(!app || logical < app->cache_start) return NULL;
+    uint8_t local = (uint8_t)(logical - app->cache_start);
+    return local < app->data.character.item_count ?
+               &app->data.character.items[local] :
+               NULL;
+}
+
 static bool dndinventory_collection_add_blank(DndInventoryCollectionApp* app) {
     if(app->total >= POCKET_D20_MAX_ITEMS) {
         dndinventory_collection_set_status(app, "Collection full");
@@ -1107,7 +1117,7 @@ static void dndinventory_collection_format_detail(
     char* out,
     size_t size) {
     PocketCharacter* c = &app->data.character;
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    PocketItem* item = dndinventory_collection_item_cached(app, app->record_index);
     if(!item) {
         dndinventory_collection_copy(out, size, "Read error");
         return;

@@ -53,6 +53,7 @@
 
 ## Companion apps
 - [x] Wizard Spell Attacks use combat-appropriate preparation state: cantrips remain available; level-1+ Wizard spells require Prepared/Always Prepared or a current Free Cast, and an unprepared free-cast spell offers Free Cast only.
+- [x] Combat → Rituals implements Wizard Ritual Adept as a separate known-spellbook Ritual list; preparation is not required, cantrips/non-Wizard/non-Ritual entries are excluded, and ritual casting consumes no spell resource while reporting +10 minutes.
 - [x] Routine successful save/add/catalog/Equip/Prepare/grant notices are transient; failure/UNSAVED notices remain visible.
 - [x] Shared companion Back convention: Short Back from each companion main screen returns to DNDolphins only when its FAP exists; Hold Back exits to firmware without a DNDolphins handoff; normal menus contain no redundant Return/Open-DNDolphins row.
 
@@ -72,6 +73,8 @@
 - [x] Explicit full-path FAP launches.
 - [x] Outgoing-app teardown before handoff; no artificial pre-launch sleep is used because delaying the outgoing FAP delays reclamation rather than creating Loader headroom.
 - [x] Stack reservations: DNDolphins 6 KB; DNDInventory 4 KB; DNDSpellbook 4 KB; DNDAdventure 4 KB; DNDJournal 4 KB; DNDInitiative 3 KB; DNDBestiary 6 KB.
+- [x] Companion profile badges reject the internal `UINT32_MAX` sentinel; `[4294967295]` cannot be displayed as a character ID while valid `[0]` remains supported.
+- [x] Seven-FAP draw-path call-graph audit: project-owned draw paths perform no storage I/O, heap allocation/free, collection rewrite or storage-backed page advancement; remaining draw-time loops are bounded fixed-buffer text formatting only.
 - [x] Main DNDolphins collection UI/catalog code and full Item/Spell catalogs are no longer linked/packaged into the main FAP asset set.
 - [x] No checksum requirement for editable text packs.
 

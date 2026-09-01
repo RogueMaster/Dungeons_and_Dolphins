@@ -512,7 +512,7 @@ static void dndadventure_draw_header(Canvas* canvas, DndAdventureApp* app, const
         uint16_t width = canvas_string_width(canvas, status);
         if(width < 58U) canvas_draw_str(canvas, 126U - width, 8, status);
     }
-    if(app && app->screen == DndAdventureScreenCampaigns) {
+    if(app && app->screen == DndAdventureScreenCampaigns && app->profile != UINT32_MAX) {
         char profile_id[16];
         snprintf(profile_id, sizeof(profile_id), "[%lu]", (unsigned long)app->profile);
         uint16_t id_width = canvas_string_width(canvas, profile_id);

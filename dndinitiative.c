@@ -798,7 +798,7 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 2, 8, "DNDInitiative");
-    if(app->screen == InitiativeScreenMenu) {
+    if(app->screen == InitiativeScreenMenu && app->character_id != UINT32_MAX) {
         char profile_id[16];
         snprintf(profile_id, sizeof(profile_id), "[%lu]", (unsigned long)app->character_id);
         uint16_t profile_width = canvas_string_width(canvas, profile_id);

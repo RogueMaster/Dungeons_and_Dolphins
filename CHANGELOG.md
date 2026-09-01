@@ -2,6 +2,15 @@
 
 Released work only. Normal releases are retained as concise summaries; closely related recovery spans may be consolidated when the individual troubleshooting chronology would obscure the released outcome.
 
+## 3.3.4 — Ritual Adept and stability audit
+
+- Added **Combat → Rituals** for Wizard Ritual Adept. The list is built from the active character's known Wizard spellbook entries that have the Ritual tag; preparation is not required. Ritual casting uses the existing spell result flow, consumes no spell slot/Pact slot/spell points/free cast, and reports the additional 10-minute ritual casting time.
+- Hardened companion character-ID headers so the internal `UINT32_MAX` sentinel can never render as `[4294967295]`; valid ID `0` remains supported.
+- Completed a render-path stability pass across all seven FAPs. Canvas drawing now uses resident RAM state only: profile windows, class spell counts, Journal windows and Combat Item/Spell rows are prepared from screen-entry/input paths instead of performing storage reads or allocations from draw callbacks. Unrelated row preparation was also removed from Attack Templates navigation.
+- Re-audited project-owned allocation ownership and failure cleanup. Collection pages, combat indexes, Bestiary windows/details/encounters, Adventure scenes, Journal scan buffers and shared storage temporaries remain bounded and have matched release paths; Bestiary startup failure cleanup now also releases any partially created dynamic blocks.
+- Recomputed current ARM32 app-state and collection-page sizes for the memory audit. Fixed app allocations are 5,248 B DNDolphins, 4,800 B DNDInventory, 4,836 B DNDSpellbook, 4,760 B DNDAdventure, 1,352 B DNDJournal, 5,276 B DNDInitiative and 1,528 B DNDBestiary, excluding firmware/framework objects and allocator metadata.
+- Updated all seven FAP manifests to release version 3.3.4 and refreshed rules, compatibility, feature, test, accessibility, save-schema, roadmap and memory documentation for the retained behavior.
+
 ## 3.3.3 — Combat spell eligibility, one-time inventory regrant and UI consistency
 
 - Corrected Combat → Spell Attacks for Wizard characters. Wizard cantrips remain normally available; level-1+ Wizard spells appear only when Prepared/Always Prepared or when a Free Cast remains. An unprepared Wizard spell exposed solely by a Free Cast offers only that Free Cast and cannot spend ordinary slots, Pact slots or spell points from the combat picker. Other classes retain their existing Known/Prepared rules, and the existing combat damage mappings, scaling, upcasting and resource consumption remain intact.

@@ -11,5 +11,6 @@
 - The default Dolphin/Capybara custom seed runs only when no user custom monster files exist, so upgrades do not replace an existing custom pack.
 - Ghost Protocol uses the existing campaign schema and therefore requires no progress-file conversion.
 - Save structure changes are avoided unless new information truly must be persisted. Campaign variables are added only when a future campaign feature genuinely requires new persisted state.
-
 - Inventory grant markers remain backward compatible: `InitialInventory=1` is the normal granted state; `InitialInventory=2` means the optional one-time regrant override has already been consumed. Older sidecars with state `1` remain valid.
+- Combat Ritual Adept uses existing Spellbook fields (`Known`, `Ritual`, `Level`, `SourceClass`) and adds no save-schema field or migration.
+- Companion main-screen profile badges never render the internal `UINT32_MAX` sentinel as `[4294967295]`; the sentinel remains an internal lookup value only and valid character ID `0` remains supported.

@@ -66,3 +66,12 @@ bool dndolphins_spells_collect_combat_indices(
     uint8_t capacity,
     uint8_t* count,
     uint8_t* total_count);
+
+bool dndolphins_spells_collect_ritual_indices(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* character,
+    uint8_t* indices,
+    uint8_t capacity,
+    uint8_t* count,
+    uint8_t* total_count);

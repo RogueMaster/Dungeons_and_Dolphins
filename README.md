@@ -66,6 +66,7 @@ Cross-app launches use explicit `/ext/apps/Games/*.fap` paths. The outgoing app 
 - Advantage, Disadvantage, modifiers, multiple dice and Guidance mode.
 - Individual results, dice sum, modifier and final total display.
 - Weapon Attacks and Spell Attacks use the character's owned records and current resources. Weapon attacks retain proficiency/magic/ability/exhaustion modifiers, advantage/disadvantage, ammunition use, versatile damage, extra dice and critical doubling. Spell attacks retain per-class casting ability, attack/save modifiers, cantrip scaling, upcasting and mapped/fallback damage. For Wizard-sourced combat spells, cantrips remain available normally; level-1+ spells appear only when Prepared/Always Prepared or when a Free Cast remains. An unprepared Wizard spell exposed only by a Free Cast offers that Free Cast only rather than normal slot/Pact/spell-point choices. Other classes retain their existing Known/Prepared behavior.
+- **Combat → Rituals** exposes Wizard Ritual Adept separately from Spell Attacks. It streams the character's known Wizard spellbook entries and lists only level-1+ spells with the Ritual tag; a ritual need not be Prepared. Selecting one casts it as a ritual through the existing result flow, consumes no slot/Pact slot/spell points/free cast and reports the additional 10-minute casting time. Cantrips are excluded from this ritual list.
 - HP, temporary HP, rests, Hit Dice, conditions, concentration, reactions, exhaustion, resistances, immunities, vulnerabilities, senses and movement support.
 
 ### Initiative
@@ -97,6 +98,7 @@ Cross-app launches use explicit `/ext/apps/Games/*.fap` paths. The outgoing app 
 - Adventure item rewards use shared item storage behavior but never initialize starting equipment.
 - Installable campaign-pack support with a concise pre-install details/validation screen. The preview checks manifest/index shape, compatibility, content presence, declared entry-scene presence and ID conflicts before Hold OK can install.
 - Campaign discovery uses bounded sparse index hints and streaming lookup rather than a heap offset for every campaign row.
+- Main canvas draw paths are RAM-only with respect to project-owned state: no draw callback allocates/frees heap, opens/scans storage, rewrites sidecars or advances storage-backed paging. Profile/Journal windows, class spell counts and Combat row caches are hydrated from screen-entry/input paths. Character-ID badges also suppress the internal `UINT32_MAX` sentinel so `[4294967295]` cannot be rendered as a profile ID.
 
 ### Bestiary
 

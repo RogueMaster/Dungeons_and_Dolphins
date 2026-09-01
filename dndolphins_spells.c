@@ -380,7 +380,9 @@ bool dndolphins_spells_record_has_cast_resource(
             }
         }
     }
-    return spell->ritual != 0U;
+    /* Ritual casting is intentionally exposed through Combat -> Rituals, not
+       through the normal Spell Attacks resource picker. */
+    return false;
 }
 
 uint8_t dndolphins_spells_build_cast_options(
@@ -434,8 +436,6 @@ uint8_t dndolphins_spells_build_cast_options(
             }
         }
     }
-    if(dndolphins_spells_can_ritual(spell, known, always_prepared))
-        POCKET_ADD_CAST_OPTION(spell->level, PocketSpellCastRitual, spell->class_index);
 #undef POCKET_ADD_CAST_OPTION
     return count;
 }
@@ -493,6 +493,55 @@ bool dndolphins_spells_collect_combat_indices(
     uint8_t total = 0U;
     bool success = dnd_storage_visit_spells(
         storage, profile, dndolphins_spells_combat_spell_index_visitor, &context, &total);
+    *count = context.count;
+    if(total_count) *total_count = total;
+    return success;
+}
+
+typedef struct {
+    const PocketCharacter* character;
+    uint8_t* indices;
+    uint8_t capacity;
+    uint8_t count;
+} PocketD20RitualSpellIndexContext;
+
+static bool dndolphins_spells_ritual_spell_index_visitor(
+    uint8_t logical_index,
+    const PocketSpell* spell,
+    uint8_t known,
+    uint8_t always_prepared,
+    uint8_t free_casts_current,
+    uint8_t free_casts_max,
+    void* context) {
+    (void)always_prepared;
+    (void)free_casts_current;
+    (void)free_casts_max;
+    PocketD20RitualSpellIndexContext* scan = context;
+    if(!spell || !known || !spell->ritual || spell->level == 0U ||
+       !dndolphins_spells_is_wizard_spell(scan->character, spell))
+        return true;
+    if(scan->count < scan->capacity) scan->indices[scan->count++] = logical_index;
+    return true;
+}
+
+bool dndolphins_spells_collect_ritual_indices(
+    Storage* storage,
+    uint32_t profile,
+    const PocketCharacter* character,
+    uint8_t* indices,
+    uint8_t capacity,
+    uint8_t* count,
+    uint8_t* total_count) {
+    if(!storage || !character || !indices || !count) return false;
+    PocketD20RitualSpellIndexContext context = {
+        .character = character,
+        .indices = indices,
+        .capacity = capacity,
+        .count = 0U,
+    };
+    uint8_t total = 0U;
+    bool success = dnd_storage_visit_spells(
+        storage, profile, dndolphins_spells_ritual_spell_index_visitor, &context, &total);
     *count = context.count;
     if(total_count) *total_count = total;
     return success;

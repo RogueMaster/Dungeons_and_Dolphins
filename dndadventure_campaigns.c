@@ -583,32 +583,64 @@ static void dndadventure_campaigns_validate_scenes(
     free(scene_ids);
 }
 
-static bool dndadventure_campaigns_seen_append(
-    char (**seen)[POCKET_CAMPAIGN_ID_LEN],
-    uint16_t* count,
-    uint16_t* capacity,
-    const char* id) {
-    if(*count == UINT16_MAX) return false;
-    if(*count == *capacity) {
-        uint32_t next_capacity = *capacity ? (uint32_t)*capacity * 2U : 16U;
-        if(next_capacity > UINT16_MAX) next_capacity = UINT16_MAX;
-        char(*resized)[POCKET_CAMPAIGN_ID_LEN] = realloc(*seen, next_capacity * sizeof(**seen));
-        if(!resized) return false;
-        *seen = resized;
-        *capacity = (uint16_t)next_capacity;
+static bool dndadventure_campaigns_path_has_id_before(
+    Storage* storage,
+    const char* path,
+    bool bundled,
+    const char* id,
+    uint16_t record_limit) {
+    if(!storage || !path || !id || !id[0] || !record_limit) return false;
+    File* file = storage_file_alloc(storage);
+    if(!file) return false;
+    bool found = false;
+    if(storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        CampaignReader reader;
+        dndadventure_campaigns_reader_init(&reader, file, 0U);
+        char line[CAMPAIGN_LINE_LEN];
+        uint16_t records = 0U;
+        while(records < record_limit &&
+              dndadventure_campaigns_read_line(&reader, line, sizeof(line), NULL)) {
+            PocketCampaignSummary campaign;
+            if(!dndadventure_campaigns_parse(line, bundled, &campaign)) continue;
+            if(!strcmp(campaign.id, id)) {
+                found = true;
+                break;
+            }
+            if(records < UINT16_MAX) ++records;
+        }
+        storage_file_close(file);
     }
-    dndadventure_campaigns_copy((*seen)[*count], POCKET_CAMPAIGN_ID_LEN, id);
-    ++*count;
-    return true;
+    storage_file_free(file);
+    return found;
+}
+
+static bool dndadventure_campaigns_id_seen_before(
+    Storage* storage,
+    const char* current_path,
+    bool current_bundled,
+    uint8_t path_rank,
+    uint16_t prior_records,
+    const char* id) {
+    /* Diagnostics is an explicit maintenance action, so prefer bounded heap over
+       retaining one campaign ID per manifest. Re-scan earlier records instead.
+       Rank order is bundled -> enabled -> user. */
+    if(path_rank > 0U &&
+       dndadventure_campaigns_path_has_id_before(
+           storage, CAMPAIGN_BUNDLED_INDEX, true, id, UINT16_MAX))
+        return true;
+    if(path_rank > 1U &&
+       dndadventure_campaigns_path_has_id_before(
+           storage, CAMPAIGN_ENABLED_INDEX, false, id, UINT16_MAX))
+        return true;
+    return dndadventure_campaigns_path_has_id_before(
+        storage, current_path, current_bundled, id, prior_records);
 }
 
 static void dndadventure_campaigns_diagnose_path(
     Storage* storage,
     const char* path,
     bool bundled,
-    char (**seen)[POCKET_CAMPAIGN_ID_LEN],
-    uint16_t* seen_count,
-    uint16_t* seen_capacity,
+    uint8_t path_rank,
     PocketCampaignDiagnostics* output) {
     File* file = storage_file_alloc(storage);
     if(!file) return;
@@ -619,6 +651,7 @@ static void dndadventure_campaigns_diagnose_path(
     CampaignReader reader;
     dndadventure_campaigns_reader_init(&reader, file, 0U);
     char line[CAMPAIGN_LINE_LEN];
+    uint16_t prior_records = 0U;
     while(dndadventure_campaigns_read_line(&reader, line, sizeof(line), NULL)) {
         PocketCampaignSummary campaign;
         if(!dndadventure_campaigns_parse(line, bundled, &campaign)) continue;
@@ -629,17 +662,12 @@ static void dndadventure_campaigns_diagnose_path(
             ++output->incompatible;
             dndadventure_campaigns_note_problem(output, campaign.id, "Incompatible manifest");
         }
-        bool duplicate = false;
-        for(uint16_t prior = 0U; prior < *seen_count; ++prior) {
-            if(!strcmp((*seen)[prior], campaign.id)) {
-                ++output->duplicate_campaign_ids;
-                dndadventure_campaigns_note_problem(output, campaign.id, "Duplicate campaign ID");
-                duplicate = true;
-                break;
-            }
+        if(dndadventure_campaigns_id_seen_before(
+               storage, path, bundled, path_rank, prior_records, campaign.id)) {
+            ++output->duplicate_campaign_ids;
+            dndadventure_campaigns_note_problem(output, campaign.id, "Duplicate campaign ID");
         }
-        if(!duplicate && !dndadventure_campaigns_seen_append(seen, seen_count, seen_capacity, campaign.id))
-            dndadventure_campaigns_note_problem(output, campaign.id, "Diagnostics memory low");
+        if(prior_records < UINT16_MAX) ++prior_records;
         dndadventure_campaigns_validate_scenes(storage, &campaign, output);
     }
     storage_file_close(file);
@@ -648,14 +676,10 @@ static void dndadventure_campaigns_diagnose_path(
 
 void dndadventure_campaigns_diagnose(Storage* storage, PocketCampaignDiagnostics* output) {
     memset(output, 0, sizeof(*output));
-    char(*seen)[POCKET_CAMPAIGN_ID_LEN] = NULL;
-    uint16_t seen_count = 0U;
-    uint16_t seen_capacity = 0U;
     dndadventure_campaigns_diagnose_path(
-        storage, CAMPAIGN_BUNDLED_INDEX, true, &seen, &seen_count, &seen_capacity, output);
+        storage, CAMPAIGN_BUNDLED_INDEX, true, 0U, output);
     dndadventure_campaigns_diagnose_path(
-        storage, CAMPAIGN_ENABLED_INDEX, false, &seen, &seen_count, &seen_capacity, output);
+        storage, CAMPAIGN_ENABLED_INDEX, false, 1U, output);
     dndadventure_campaigns_diagnose_path(
-        storage, CAMPAIGN_USER_INDEX, false, &seen, &seen_count, &seen_capacity, output);
-    free(seen);
+        storage, CAMPAIGN_USER_INDEX, false, 2U, output);
 }

@@ -937,6 +937,19 @@ static bool dndjournal_window(JournalApp* app, uint16_t start) {
     return dndjournal_scan_cache(app, boundary, false, start);
 }
 
+static const JournalEntryMeta* dndjournal_cached_entry_at(
+    const JournalApp* app, uint16_t index) {
+    if(!app || index >= app->count || !app->cache_count || index < app->cache_start ||
+       index >= (uint16_t)(app->cache_start + app->cache_count))
+        return NULL;
+    return &app->entries[index - app->cache_start];
+}
+
+static void dndjournal_prepare_list_window(JournalApp* app) {
+    if(!app || !app->count || app->scroll >= app->count) return;
+    (void)dndjournal_window(app, app->scroll);
+}
+
 static uint16_t dndjournal_index_of_file(JournalApp* app, const char* target) {
     char directory_path[JOURNAL_PATH_LEN];
     if(!target || !dndjournal_profile_dir(directory_path, sizeof(directory_path), app->profile))
@@ -1132,7 +1145,7 @@ static void dndjournal_draw_header(Canvas* canvas, JournalApp* app, const char* 
         uint16_t width = canvas_string_width(canvas, app->status);
         if(width < 62U) canvas_draw_str(canvas, 126U - width, 8, app->status);
     }
-    if(app->screen == JournalScreenList) {
+    if(app->screen == JournalScreenList && app->profile != UINT32_MAX) {
         char profile_id[16];
         snprintf(profile_id, sizeof(profile_id), "[%lu]", (unsigned long)app->profile);
         uint16_t id_width = canvas_string_width(canvas, profile_id);
@@ -1160,7 +1173,6 @@ static void dndjournal_draw_row(Canvas* canvas, uint8_t row, bool selected, cons
 }
 
 static void dndjournal_draw_list(Canvas* canvas, JournalApp* app) {
-    if(app->scroll < app->count) (void)dndjournal_window(app, app->scroll);
     dndjournal_draw_header(canvas, app, "DNDJournal");
     uint32_t total = (uint32_t)app->count + 1U;
     for(uint8_t row = 0U; row < 5U; ++row) {
@@ -1170,7 +1182,7 @@ static void dndjournal_draw_list(Canvas* canvas, JournalApp* app) {
         if(index == app->count) {
             dndjournal_copy(text, sizeof(text), "+ New Entry");
         } else {
-            const JournalEntryMeta* entry = dndjournal_entry_at(app, index);
+            const JournalEntryMeta* entry = dndjournal_cached_entry_at(app, index);
             if(entry) {
                 snprintf(
                     text,
@@ -1279,7 +1291,7 @@ static void dndjournal_move_list(JournalApp* app, int8_t delta) {
     app->selection = (uint16_t)next;
     if(app->selection < app->scroll) app->scroll = app->selection;
     if(app->selection >= app->scroll + 5U) app->scroll = (uint16_t)(app->selection - 4U);
-    if(app->selection < app->count) (void)dndjournal_entry_at(app, app->selection);
+    dndjournal_prepare_list_window(app);
 }
 
 static void dndjournal_return_to_dnd(JournalApp* app) {
@@ -1298,6 +1310,7 @@ static void dndjournal_delete_current(JournalApp* app) {
     app->selection = old_selection < app->count ? old_selection : app->count;
     if(app->selection < app->scroll) app->scroll = app->selection;
     if(app->selection >= app->scroll + 5U) app->scroll = (uint16_t)(app->selection - 4U);
+    dndjournal_prepare_list_window(app);
     app->screen = JournalScreenList;
     app->current_loaded = 0U;
     dndjournal_set_status(app, loaded ? "Deleted" : "Deleted; index partial");
@@ -1365,6 +1378,7 @@ static bool dndjournal_input(InputEvent* event, void* context) {
             app->screen = JournalScreenList;
             app->current_loaded = 0U;
             app->status[0] = '\0';
+            dndjournal_prepare_list_window(app);
         } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
                   (event->key == InputKeyLeft || event->key == InputKeyRight) &&
                   app->current_loaded) {
@@ -1454,6 +1468,7 @@ static bool dndjournal_navigation(void* context) {
     } else if(app->screen == JournalScreenDetail) {
         app->screen = JournalScreenList;
         app->current_loaded = 0U;
+        dndjournal_prepare_list_window(app);
         dndjournal_refresh(app);
     } else {
         dndjournal_return_to_dnd(app);
@@ -1493,6 +1508,7 @@ static JournalApp* dndjournal_app_alloc(const char* args) {
     else if(!dndjournal_load(app))
         dndjournal_set_status(app, "Partial load/memory");
     app->screen = JournalScreenList;
+    dndjournal_prepare_list_window(app);
     view_dispatcher_add_view(app->dispatcher, JournalViewMain, app->view);
     view_dispatcher_attach_to_gui(app->dispatcher, app->gui, ViewDispatcherTypeFullscreen);
     return app;

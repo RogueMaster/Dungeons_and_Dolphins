@@ -192,7 +192,7 @@ static void dndspellbook_collection_draw_header(Canvas* canvas, DndSpellbookColl
 
     /* Character ID belongs only to the main Spellbook list. Catalog paging
        hints are shown only inside the explicit Name/catalog picker. */
-    bool main_list = app && app->screen == DndSpellbookCollectionScreenList;
+    bool main_list = app && app->screen == DndSpellbookCollectionScreenList && app->profile != UINT32_MAX;
     uint16_t status_right = 126U;
     if(main_list) {
         char profile_id[16];
@@ -393,6 +393,17 @@ static PocketSpell* dndspellbook_collection_spell(
     uint8_t* local_out) {
     if(!dndspellbook_collection_prepare_record(app, logical)) return NULL;
     uint8_t local = dndspellbook_collection_local(app, logical);
+    if(local >= app->data.character.spell_count) return NULL;
+    if(local_out) *local_out = local;
+    return &app->data.character.spells[local];
+}
+
+static PocketSpell* dndspellbook_collection_spell_cached(
+    DndSpellbookCollectionApp* app,
+    uint8_t logical,
+    uint8_t* local_out) {
+    if(!app || logical < app->cache_start) return NULL;
+    uint8_t local = (uint8_t)(logical - app->cache_start);
     if(local >= app->data.character.spell_count) return NULL;
     if(local_out) *local_out = local;
     return &app->data.character.spells[local];
@@ -797,7 +808,7 @@ static void dndspellbook_collection_format_detail(
     size_t size) {
     PocketCharacter* character = &app->data.character;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    PocketSpell* spell = dndspellbook_collection_spell_cached(app, app->record_index, &local);
     if(!spell) {
         dndspellbook_collection_copy(out, size, "Read error");
         return;

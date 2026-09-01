@@ -54,3 +54,7 @@ No campaign, Bestiary, Journal or Initiative state is serialized into the core c
 ### Initiative participant roll mode
 
 DNDInitiative owns its `ch_{characterId}.txt` sidecar. Participant rows may include `RosterN RollMode` / `CombatN RollMode`-style named fields (serialized without spaces as `RosterNRollMode` and `CombatNRollMode`) using 0=Normal, 1=Advantage, 2=Disadvantage. Loading remains best-effort by field name, so older Initiative files without these fields default normally and remain readable.
+
+## Ritual Adept derivation
+
+Combat → Rituals adds no persisted field. The list is derived from existing Spellbook records: the spell must be `Known`, have `Ritual=1`, be level 1 or higher, and resolve as a Wizard spell for the active character. Preparation state is intentionally ignored for this ritual list. Ritual casting consumes no slot/Pact/points/free-cast state, so no collection rewrite is required solely for the ritual action.

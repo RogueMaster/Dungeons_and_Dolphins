@@ -472,7 +472,7 @@ static void dndbestiary_header(Canvas* canvas, BestiaryApp* app, const char* tit
         uint16_t width = canvas_string_width(canvas, status);
         if(width < 58U) canvas_draw_str(canvas, 126U - width, 8, status);
     }
-    if(app && app->screen == BestiaryScreenHome) {
+    if(app && app->screen == BestiaryScreenHome && app->character_id != UINT32_MAX) {
         char profile_id[16];
         snprintf(profile_id, sizeof(profile_id), "[%lu]", (unsigned long)app->character_id);
         uint16_t id_width = canvas_string_width(canvas, profile_id);
@@ -2352,9 +2352,18 @@ static BestiaryApp* dndbestiary_alloc(const char* args) {
     return app;
 
 fail:
-    /* Async sources may or may not have started; quiesce the ones that did. */
+    /* Async sources may or may not have started; quiesce the ones that did.
+       Also release every optional dynamic block because startup storage/migration
+       helpers may have created one before a later UI/runtime allocation failed. */
     if(app->input_subscription && app->input_events)
         furi_pubsub_unsubscribe(app->input_events, app->input_subscription);
+    if(app->marquee_timer) furi_timer_stop(app->marquee_timer);
+    dndbestiary_release_window(app);
+    dndbestiary_release_detail(app);
+    dndbestiary_release_encounter(app);
+    if(app->text_input) text_input_free(app->text_input);
+    free(app->pending_launch_args);
+    app->pending_launch_args = NULL;
     if(app->marquee_timer) furi_timer_free(app->marquee_timer);
     if(app->view) view_free(app->view);
     if(app->input_events) furi_record_close(RECORD_INPUT_EVENTS);
