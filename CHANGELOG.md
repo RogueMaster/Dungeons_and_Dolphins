@@ -2,7 +2,7 @@
 
 Released changes only. Historical recovery spans are consolidated where individual interim builds add little value.
 
-## 3.5.5 — Spell class filters
+## 4.19 — Spell class filters
 
 - Added **Character Classes** as the default Spellbook class filter, plus **Any Class** and all 13 supported class filters.
 - `Allowed` applies character spell-list/level eligibility; `All Spells` browses the selected catalog class directly.
