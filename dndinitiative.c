@@ -796,6 +796,13 @@ static void dndinitiative_row(Canvas* canvas, uint8_t row, bool selected, const 
 static void dndinitiative_draw(Canvas* canvas, void* model) {
     InitiativeApp* app = *(InitiativeApp**)model;
     canvas_clear(canvas);
+
+    /* Initiative uses the same dark title bar as the other standalone DND FAPs.
+       Character ID remains main-menu-only; active combat uses that right-side
+       header space for the round counter instead. */
+    canvas_set_color(canvas, ColorBlack);
+    canvas_draw_box(canvas, 0, 0, 128, 10);
+    canvas_set_color(canvas, ColorWhite);
     canvas_set_font(canvas, FontSecondary);
     canvas_draw_str(canvas, 2, 8, "DNDInitiative");
     if(app->screen == InitiativeScreenMenu && app->character_id != UINT32_MAX) {
@@ -804,7 +811,14 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
         uint16_t profile_width = canvas_string_width(canvas, profile_id);
         uint8_t profile_x = profile_width < 125U ? (uint8_t)(126U - profile_width) : 1U;
         canvas_draw_str(canvas, profile_x, 8, profile_id);
+    } else if(app->screen == InitiativeScreenCombat) {
+        char round_text[24];
+        snprintf(round_text, sizeof(round_text), "Round %u", app->round);
+        uint16_t round_width = canvas_string_width(canvas, round_text);
+        uint8_t round_x = round_width < 125U ? (uint8_t)(126U - round_width) : 1U;
+        canvas_draw_str(canvas, round_x, 8, round_text);
     }
+    canvas_set_color(canvas, ColorBlack);
     if(app->screen == InitiativeScreenNoCharacter) {
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str(canvas, 2, 24, "No DND character found.");
@@ -853,12 +867,6 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
             dndinitiative_row(canvas, row, i == app->selection, text);
         }
     } else if(app->screen == InitiativeScreenCombat) {
-        char header[24];
-        snprintf(header, sizeof(header), "Round %u", app->round);
-        canvas_set_font(canvas, FontSecondary);
-        uint16_t round_width = canvas_string_width(canvas, header);
-        uint8_t round_x = round_width < 125U ? (uint8_t)(126U - round_width) : 1U;
-        canvas_draw_str(canvas, round_x, 8, header);
         for(uint8_t row = 0U; row < 5U; ++row) {
             uint8_t i = (uint8_t)(app->scroll + row);
             if(i >= app->combat_count) break;
@@ -1308,6 +1316,6 @@ int32_t dndinitiative_app(void* context) {
     bool return_to_dnd = app->return_to_dnd;
     dndinitiative_free(app);
     if(return_to_dnd)
-        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, NULL);
+        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, POCKET_D20_RETURN_FOCUS_INITIATIVE);
     return 0;
 }

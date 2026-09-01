@@ -6,7 +6,7 @@
 - Historical SWD/SHD files are not used as live collection/character state.
 - Legacy embedded Feature/Grant character fields are tolerated but ignored and are not migrated into sidecars.
 - Journal, Adventure, Initiative and Bestiary keep independent storage ownership except for their explicit character-sidecar bridges.
-- Companion main-screen Back-to-parent handoff is best-effort: Short Back launches DNDolphins only when `/ext/apps/Games/dndolphins.fap` exists; otherwise the companion exits normally. Hold Back always exits to firmware and never launches the parent.
+- Companion main-screen Back-to-parent handoff is best-effort: Short Back launches DNDolphins only when `/ext/apps/Games/dndolphins.fap` exists and passes a small non-persistent focus hint so the corresponding DNDolphins home row is selected; otherwise the companion exits normally. Hold Back always exits to firmware and never launches the parent. The focus hint changes no save data and is not a character selector.
 - Pack text is intentionally editable and has no checksum requirement.
 - The default Dolphin/Capybara custom seed runs only when no user custom monster files exist, so upgrades do not replace an existing custom pack.
 - Ghost Protocol uses the existing campaign schema and therefore requires no progress-file conversion.
@@ -14,3 +14,5 @@
 - Inventory grant markers remain backward compatible: `InitialInventory=1` is the normal granted state; `InitialInventory=2` means the optional one-time regrant override has already been consumed. Older sidecars with state `1` remain valid.
 - Combat Ritual Adept uses existing Spellbook fields (`Known`, `Ritual`, `Level`, `SourceClass`) and adds no save-schema field or migration.
 - Companion main-screen profile badges never render the internal `UINT32_MAX` sentinel as `[4294967295]`; the sentinel remains an internal lookup value only and valid character ID `0` remains supported.
+
+- Existing Spellbook sidecars require no schema migration for ordering. When opened by Spellbook, valid `S|` records may be rewritten into level/name order while their fields and non-record metadata are preserved.

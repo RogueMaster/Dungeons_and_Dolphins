@@ -7,8 +7,8 @@ This audit is source-derived. It separates **stack reservation**, **project-owne
 | FAP | Reserved stack | Estimated project-visible peak | Approx. reservation used | Approx. headroom |
 |---|---:|---:|---:|---:|
 | DNDolphins | 6,144 B | ~2,900 B | ~47% | ~3,240 B |
-| DNDInventory | 4,096 B | ~1,800 B | ~44% | ~2,290 B |
-| DNDSpellbook | 4,096 B | ~1,800 B | ~44% | ~2,290 B |
+| DNDInventory | 4,096 B | ~2,000 B | ~49% | ~2,090 B |
+| DNDSpellbook | 4,096 B | ~2,000 B | ~49% | ~2,090 B |
 | DNDAdventure | 4,096 B | ~2,770 B | ~68% | ~1,330 B |
 | DNDJournal | 4,096 B | ~2,660 B | ~65% | ~1,440 B |
 | DNDInitiative | 3,072 B | ~2,000 B | ~65% | ~1,070 B |
@@ -16,7 +16,7 @@ This audit is source-derived. It separates **stack reservation**, **project-owne
 
 The Inventory/Spellbook split does **not** justify shrinking DNDolphins below 6 KB merely to make Loader accept it. Increasing the stack would increase loader RAM demand; decreasing it would trade loader headroom for runtime stack risk. The structural split is therefore the preferred fix.
 
-The source-ownership audit still supports DNDInitiative at 3 KB. DNDInventory and DNDSpellbook are restored to 4 KB because each standalone app must parse the full canonical character profile before its own sidecar/catalog UI can apply class/species/background and spellcasting rules; 3 KB did not leave enough margin for that nested parser path. DNDAdventure and DNDJournal remain at 4 KB, DNDBestiary at 6 KB, and DNDolphins at 6 KB. Device stack-high-water testing remains authoritative.
+The source-ownership audit still supports DNDInitiative at 3 KB. DNDInventory and DNDSpellbook remain at 4 KB because each standalone app must parse the full canonical character profile before its own sidecar/catalog UI can apply class/species/background and spellcasting rules; 3 KB did not leave enough margin for that nested parser path. The current catalog optimization adds only a 128-byte stack reader to the catalog-load path, so their conservative project-visible estimate is now ~2.0 KB and still leaves about 2.1 KB of the 4 KB reservation. The Spellbook ordering key table is heap-owned, not stack-owned. DNDAdventure and DNDJournal remain at 4 KB, DNDBestiary at 6 KB, and DNDolphins at 6 KB. Device stack-high-water testing remains authoritative.
 
 
 DNDInitiative no longer links the general progression store merely for Turn/Encounter recharge. Its Initiative-only Feature rewrite preserves the existing Feature sidecar format and resets only persisted `uses_current` values that match the Turn/Encounter cadence. A same-flags local stack-usage comparison reduced the recharge helper from a ~1,712-byte frame plus the nested ~752-byte general Feature writer to a single ~1,536-byte compiled recharge path. The table keeps a conservative ~2.0 KB project-visible estimate for caller overhead; hardware stack-high-water testing remains authoritative.
@@ -28,8 +28,8 @@ The fixed app-state figures below are **source-derived ARM32 struct-layout sizes
 | FAP | Fixed app-state allocation | Largest ordinary project-owned resident addition | Representative project-owned working set |
 |---|---:|---:|---:|
 | DNDolphins | **5,248 B** | Spell page 2,624 B + 24 B logical index + 320 B visible-row cache | **8,216 B** during Spell/Ritual Combat; Weapon Combat is 7,976 B |
-| DNDInventory | **4,800 B** | Item page 2,384 B | **7,184 B** normal; **8,464 B** during a 1,280 B rewrite |
-| DNDSpellbook | **4,836 B** | Spell page 2,624 B | **7,460 B** normal; **8,740 B** during a 1,280 B rewrite |
+| DNDInventory | **5,072 B** | Item page 2,384 B | **7,456 B** normal; **8,736 B** during a 1,280 B rewrite |
+| DNDSpellbook | **5,108 B** | Spell page 2,624 B | **7,732 B** normal; **9,876 B** during sort-with-page resident; ordinary rewrite is 9,012 B |
 | DNDAdventure | **4,760 B** | 1,536 B bounded campaign-diagnostics scene-ID table | **6,296 B** during explicit diagnostics; ordinary scene state is 5,625 B |
 | DNDJournal | **1,352 B** | Two bounded 768 B scan buffers during index work | **2,888 B** during that transient scan |
 | DNDInitiative | **5,276 B** | Two 768 B character-patch buffers on explicit main-character sync | **6,812 B** during that transactional patch |
@@ -51,20 +51,22 @@ These numbers are **not total device heap consumption**. Framework objects and a
 
 ### DNDInventory
 
-- Fixed heap-owned `CollectionApp`: **4,800 B**. This includes the ten-record catalog result page, edit buffers, Inventory-resource aggregate and transient-status/action-ack state.
+- Fixed heap-owned `CollectionApp`: **5,072 B**. This includes the ten-record catalog result page, edit buffers, Inventory-resource aggregate, transient-status/action-ack state, a bounded rolling 64-entry catalog page-offset map (256 B), and three 32-bit owned-sidecar page offsets.
 - Full resident Item page: **2,384 B**.
-- Normal fixed + full-page project-owned working set: **7,184 B**.
-- A sidecar rewrite can add one **1,280-byte** bounded line buffer, giving a representative project-owned save peak of **8,464 B** before firmware `File`/GUI allocations.
+- Normal fixed + full-page project-owned working set: **7,456 B**.
+- A sidecar rewrite can add one **1,280-byte** bounded line buffer, giving a representative project-owned save peak of **8,736 B** before firmware `File`/GUI allocations.
+- Catalog parsing uses a **128-byte stack read buffer** and the bounded rolling offset map. Once a filtered catalog page offset has been learned, later nearby/sequential page navigation seeks near that page instead of rescanning from byte zero; Inventory rolls the same 64 offsets forward for catalogs exceeding 64 filtered pages. The character-owned sidecar similarly caches only the three possible aligned 8-record page offsets at the 24-item cap.
 - Starting-equipment asset composition uses one **256-byte** heap line buffer and streams assets. The one-time regrant uses the 1,280-byte streamed sidecar-copy buffer, releases it before asset composition, then uses the 256-byte asset buffer; those two temporaries are not intentionally overlapped.
 - List/detail drawing is RAM-only. No timer, queue, pub-sub subscription or background worker runs for collection scrolling.
 
 ### DNDSpellbook
 
-- Fixed heap-owned `CollectionApp`: **4,836 B**. This includes the ten-record catalog result page, editor/filter buffers and transient-status/action-ack state.
+- Fixed heap-owned `CollectionApp`: **5,108 B**. This includes the ten-record catalog result page, editor/filter buffers, transient-status/action-ack state, a bounded 64-entry catalog page-offset map (256 B), and three 32-bit owned-sidecar page offsets.
 - Full resident Spell page: **2,624 B**.
-- Normal fixed + full-page project-owned working set: **7,460 B**.
-- A sidecar rewrite can add one **1,280-byte** bounded line buffer, giving a representative project-owned save peak of **8,740 B** before firmware `File`/GUI allocations.
-- The full bundled Spell Catalog remains on storage and is streamed into the fixed ten-result page; it is never materialized as a whole in RAM.
+- Normal fixed + full-page project-owned working set: **7,732 B**.
+- An ordinary sidecar rewrite can add one **1,280-byte** bounded line buffer, giving **9,012 B** project-owned before firmware `File`/GUI allocations.
+- Deterministic level/name ordering allocates at most **864 B** for 24 compact sort keys plus the same **1,280-byte** line buffer. When triggered while the resident 8-spell page is still present, the conservative project-owned sort peak is therefore **9,876 B** (5,108 + 2,624 + 864 + 1,280). Startup sorting happens before the first page is hydrated, so its project-owned peak is lower. The keys contain only file offset, level and name; a second full Spell collection is never retained. The sorter now lives entirely in `dndspellbook_collection.c`, so DNDolphins, Inventory and Adventure do not carry Spellbook-only sorting code through their shared `dnd_storage.c` source.
+- The full bundled Spell Catalog remains on storage and is streamed into the fixed ten-result page; it is never materialized as a whole in RAM. Catalog parsing uses a **128-byte stack read buffer** plus the bounded offset map, and the character-owned sidecar caches only its three possible aligned 8-record page offsets.
 - List/detail drawing is RAM-only. Filter state introduces no timer, resident catalog copy or background worker.
 
 ### Other FAPs
@@ -114,14 +116,16 @@ A later FAP-ownership audit removed additional broad dependencies without changi
 - Under the same host `-Os` source-object comparison, splitting general rules changes the broad rules object from **1,793 B** to **1,120 B core + 691 B character/rest**. DNDInventory and DNDAdventure therefore omit about **673 B** of character/rest rule object content each, DNDSpellbook omits the former **1,793 B** rules object entirely, and DNDolphins' combined rule objects are effectively unchanged (+18 B in this host comparison).
 - The complete progression-store object is about **8,973 B** in that host comparison versus about **1,920 B** for the Initiative-only recharge object. Because firmware link-time section garbage collection may already discard unreachable sections, these raw object deltas must not be treated as final Loader savings. The exercised Turn-recharge link comparison above is the better evidence of a real code-path reduction.
 
-The largest remaining companion-FAP memory target is now **profile projection**, not another filename split. The verified ARM32 `PocketCharacter` layout is **3,976 B** before collection pages. That character core is embedded in the **4,800 B** DNDInventory app state, **4,836 B** DNDSpellbook app state and **4,760 B** DNDAdventure app state even though each companion needs only a subset of profile fields. Bounded read/write projections could reclaim several kilobytes per companion, but that requires narrow storage APIs and hardware validation and is intentionally deferred rather than mixed into this stability release.
+The largest remaining companion-FAP memory target is now **profile projection**, not another filename split. The verified ARM32 `PocketCharacter` layout is **3,976 B** before collection pages. That character core is embedded in the **5,072 B** DNDInventory app state, **5,108 B** DNDSpellbook app state and **4,760 B** DNDAdventure app state even though each companion needs only a subset of profile fields. Bounded read/write projections could reclaim several kilobytes per companion, but that requires narrow storage APIs and hardware validation and is intentionally deferred rather than mixed into this stability release.
 
 
 ## Collection ownership and paging
 
 - `inventory_{id}.txt`, `spellbook_{id}.txt`, `feats_{id}.txt` and `appliedgrants_{id}.txt` all remain under `/ext/apps_data/dndolphins/` regardless of which FAP edits them.
 - Currency is exclusively Inventory-owned. The sidecar stores `Currency=cp,sp,ep,gp,pp`; Item rewrites and appenders preserve an existing record but do not synthesize one. Adventure/Journal Item creation may therefore create an item-only sidecar. When DNDInventory opens an existing item-only sidecar, it writes a zero Currency record. Character-profile `Currency=` lines are ignored and never adopted into Inventory.
-- DNDInventory and DNDSpellbook each keep at most one aligned eight-record live page.
+- DNDInventory and DNDSpellbook each keep at most one aligned eight-record live page. Each standalone collection app retains only three 32-bit sidecar page offsets (records 0/8/16 at the 24-record cap). The initial scan learns the total and offsets; subsequent aligned page changes can seek directly rather than scanning from the beginning.
+- Their Item/Spell Name catalogs use a bounded 64-entry (256-byte) filtered-page offset map and a 128-byte buffered reader. Inventory rolls that same 64-entry window forward when a filter exceeds 64 pages; Spellbook retains the fixed map because its bundled filtered catalog remains within that bound. This materially reduces repeated single-byte SD reads and avoids rescanning the complete filtered catalog on every next/previous page without loading the catalog into heap.
+- Expanding the Item Catalog category choices does not enlarge the Inventory app state or catalog page cache: the selected filter remains one `uint8_t`, filter labels live in read-only program data, and the existing streamed 10-entry catalog page remains unchanged.
 - Add New prepares the actual tail page, grows the resident page in RAM, increments the logical total and immediately rewrites the authoritative sidecar.
 - List drawing is cache-only. SD reads/writes, page changes and allocations occur from input/screen-transition code rather than canvas rendering. Up/Down reuses the resident page until an eight-record boundary; short Left/Right performs one explicit aligned page read. No-op Press/Release events are ignored without committing a redraw.
 - Catalog selection, text edits, numeric edits, left/right changes, Hold-OK quick actions and Delete commit to the canonical sidecar immediately.
@@ -165,7 +169,7 @@ Persistent Features live in `feats_{id}.txt`, paged at eight records when a Feat
 2. Repeat DNDolphins ↔ DNDInventory and DNDolphins ↔ DNDSpellbook handoffs many times and watch for fragmentation or delayed Loader failures.
 3. Exercise companion active-profile resolution with `Active=0`, a nonzero valid ID, missing/unreadable metadata, and a present-but-missing character ID; confirm no cross-character discovery, verify `[id]` appears only on each companion's main screen, and confirm `[4294967295]` is impossible even under repeated error/relaunch paths.
 4. In DNDInventory, confirm opening alone creates no sidecar; test normal Grant Initial Inventory, the one-time Hold-OK regrant (`InitialInventory=1` → `2`), second-override rejection, missing-match fallback trinket, failed-write preservation, and repeated Add/Edit/Delete across 7→8→9 and 15→16→17.
-5. In DNDSpellbook, repeat Add/Edit/Delete, all filters, Prepare toggles and page-boundary transitions.
+5. In DNDSpellbook, repeat Add/Edit/Delete, all filters, Prepare toggles and page-boundary transitions; verify records remain ordered by level then case-insensitive name after add/rename/level edits and after restart.
 6. Enter/exit Weapon Attacks, Spell Attacks and Rituals repeatedly to confirm the logical index is allocated only inside that combat family, the first Item/Spell page is loaded on demand outside draw, and both index/page are released on exit. Verify Wizard unprepared known Ritual spells appear in Rituals without consuming a normal spell resource.
 7. Exercise Initiative Turn/Encounter recharge with a multi-page Feature sidecar.
 8. Stress DNDBestiary maximum-size encounter writes and DNDAdventure large pack indexes, including rows beyond the sparse-hint window and validated campaign installs.

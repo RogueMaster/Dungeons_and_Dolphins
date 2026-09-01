@@ -1559,7 +1559,8 @@ int32_t dndjournal_app(void* context) {
         if(launch_adventure) {
             if(!dnd_handoff_launch(launch_path, launch_args)) return -1;
         } else {
-            (void)dnd_handoff_launch_if_present(launch_path, launch_args);
+            (void)dnd_handoff_launch_if_present(
+                launch_path, POCKET_D20_RETURN_FOCUS_JOURNAL);
         }
     }
     return 0;

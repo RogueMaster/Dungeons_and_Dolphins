@@ -35,7 +35,7 @@
 
 - [ ] Build with allocator/free-heap instrumentation if available. Repeatedly enter/exit Profiles, Journal, Inventory, Spellbook, Weapon Attacks, Spell Attacks, Rituals, Adventure and Bestiary screens while forcing redraw/scroll. Confirm free heap returns to the same steady-state range after leaving each screen and does not decrease monotonically across cycles.
 - [ ] Confirm redraw alone does not cause SD activity: hold/move through screens that only redraw resident data and verify storage reads occur on screen entry, explicit input/cache boundaries or writes—not from the canvas callback.
-- [ ] Stress the source-derived project-owned working-set bounds from `MEMORY_AUDIT.md`: DNDolphins Spell/Ritual Combat 7,896 B project blocks, Inventory normal/save 7,184/8,464 B, Spellbook 7,460/8,740 B, Adventure+scene 5,625 B, Journal transient scan 2,888 B, Initiative fixed 5,276 B and Bestiary main window 4,108 B, remembering firmware/framework allocations are additional.
+- [ ] Stress the source-derived project-owned working-set bounds from `MEMORY_AUDIT.md`: DNDolphins Spell/Ritual Combat 8,216 B project blocks, Inventory normal/save 7,456/8,736 B, Spellbook normal/ordinary-save/sort-with-page 7,732/9,012/9,876 B, Adventure+scene 5,625 B, Journal transient scan 2,888 B, Initiative fixed 5,276 B and Bestiary main window 4,108 B, remembering firmware/framework allocations are additional.
 - [ ] Repeat Bestiary allocation-failure tests at startup/window/detail/encounter creation and confirm partially allocated project blocks are released without a later cumulative heap loss.
 - [ ] Run stack high-water checks under the manifest reservations (6/4/4/4/4/3/6 KB) and compare with the source-derived estimates rather than shrinking a stack solely to reduce Loader pressure.
 
@@ -169,7 +169,7 @@
 - [ ] Level a High Elf through total character levels 1/3/5 and confirm Prestidigitation, Detect Magic and Misty Step are granted once at the appropriate gates. Repeat representative Drow/Wood Elf, Tiefling, Aasimar, Dragonborn and Goliath checks.
 - [ ] On a multiclass character, confirm species progression follows total character level rather than the level of any individual class.
 - [ ] Re-run progression checks after the grants are applied and confirm `appliedgrants_{id}.txt` prevents duplicates.
-- [ ] In Item Catalog, Hold OK cycles All → Weapons → Armor → Ammunition → Gear → Tools → Magic → All and each filter restricts the visible catalog without changing Inventory-list Hold OK = Equip/Unequip.
+- [ ] In Item Catalog, Hold OK cycles All → Weapons → Armor → Ammunition → Gear → Tools → Mounts/Vehicles → Potions → Rings → Rods → Scrolls → Staffs → Wands → Wondrous → Magic → All. Confirm each specific filter restricts the visible catalog to that category, Magic remains an aggregate non-Mundane filter, and Inventory-list Hold OK remains Equip/Unequip.
 ### Stack-reservation validation
 
 - [ ] Stress DNDInventory Add/Edit/Delete, Currency/Resources, Grant Initial Inventory and multi-page catalog navigation under the restored 4 KB stack reservation; confirm no stack overflow/MPU fault.
@@ -187,11 +187,29 @@
 - Launch DNDSpellbook from DNDolphins with a populated Spellbook: the first frame is the Spell list with `+ Add New` row zero.
 - Launch DNDSpellbook with no Spellbook sidecar: the first frame is an empty Spell list with `+ Add New`; opening alone does not create the sidecar, and the first saved Spell creates it.
 
+### Return focus / paging performance / ordering
+
+- [ ] From each companion main screen, Short Back and confirm DNDolphins opens with the corresponding home row already highlighted: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary and Initiative. Repeat with Hold Back and confirm it exits to firmware instead of launching DNDolphins.
+- [ ] Open Initiative and confirm the title bar is dark on the main menu and during Combat; `[id]` is right-aligned on the main menu and `Round N` replaces it during Combat.
+- [ ] Open Item Name Catalog and compare with the established presentation: category initials are **not bracketed**, magic entries append `*`, Other entries show only their names, and the header shows `Page N <>`.
+- [ ] Page repeatedly forward/back through Item and Spell Name catalogs with restrictive and broad filters. Confirm later pages remain responsive and correct, Left/Right never skips or duplicates filtered entries, and changing a filter resets the learned page offsets safely.
+- [ ] Populate exactly 7/8/9 and 15/16/17 owned Items/Spells. Cross the 8-record boundaries repeatedly and confirm the correct records appear without blank/stale pages; after an edit/delete/rewrite, confirm the next page load remains correct after offset invalidation.
+- [ ] Create an intentionally unsorted Spellbook containing mixed levels and names. Open Spellbook and confirm the persisted/displayed order becomes level ascending, then case-insensitive alphabetical within each level. Add a spell, rename a spell and change a spell level; Back out of the editor and confirm ordering is restored without losing Known/Prepared/Always Prepared/free-cast metadata.
+- [ ] Build all companion FAPs and confirm Spellbook sorting resolves entirely from `dndspellbook_collection.c`: `dnd_storage.c/.h` must expose no Spellbook-sort symbol, and DNDolphins/Inventory/Adventure must not require any Spellbook-sort implementation.
+- [ ] Repeat the Inventory/Spellbook paging/catalog tests while monitoring device stack high-water/free heap. Confirm 4 KB stacks remain stable and the bounded offset caches do not show launch-to-launch heap growth.
+
 ### Inventory / Spellbook parity regression
 
 - Add a new Item and Spell. Confirm `Item added` / `Spell added` appears once in the editor header and clears on the next Short/Repeat/Long input without a timer or background worker; an UNSAVED/error notice must not be auto-cleared as a success notice.
 - Spellbook main list: Hold Up opens Spell Filters. Confirm `Spell Class: All Classes` is the default, Left/Right cycles All Classes and each character class, and All Classes returns the union of currently eligible multiclass spells.
 - Spell Filters: confirm `Eligibility: Allowed` is default and `All Spells` is opt-in; All Spells bypasses class/level eligibility only and still honors explicit Level/Ritual/School/Source/Status filters.
-- Spell and Item Catalogs: confirm page number plus `<>` is visible; Left/Right changes catalog pages; Item rows retain category markers and append `*` for magic entries.
+- Spell and Item Catalogs: confirm `Page N <>` is visible; Left/Right changes catalog pages; Item rows use unbracketed category initials, append `*` for magic entries, and leave Other entries unprefixed.
 - Hold OK on a known non-always-prepared Spell and on an Item: confirm immediate persistence and a temporary `[X]` prefix on the affected row; the acknowledgement clears on the next input.
 - Reconfirm full editor parity against the recovery baseline: 17 Spell fields and 36 Item fields, Name-field catalog, Hold-OK custom name, Delete, free-cast controls, Equip/Prepare quick actions and A/P/K/F Spell list marks.
+
+## Scroll catalog regression
+
+- Open Inventory -> Add New -> Name catalog, cycle to **Scrolls**, and confirm exactly the generic Spell Scroll (Cantrip) plus Spell Scroll (Level 1) through Spell Scroll (Level 9) rows are selectable. Confirm rarity is Common for Cantrip/L1, Uncommon for L2–3, Rare for L4–5, Very Rare for L6–8, and Legendary for L9; confirm no bundled per-spell Scroll rows appear.
+- Page the Scroll filter beyond page 64 and back through nearby pages; confirm the rolling 64-page seek window keeps all generated Scroll pages reachable and sequential paging remains correct.
+- Confirm generated Scroll rarity presentation treats levels 0–1 as Common, 2–3 as Uncommon, 4–5 as Rare, 6–8 as Very Rare and 9 as Legendary where rarity/magic metadata is surfaced.
+- Confirm selecting a generated Scroll does not fabricate or overwrite Item weight, currency, Detail or another field with a GP price; Item value is not part of the current schema.

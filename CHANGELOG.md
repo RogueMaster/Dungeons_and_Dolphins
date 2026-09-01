@@ -2,6 +2,18 @@
 
 Released work only. Normal releases are retained as concise summaries; closely related recovery spans may be consolidated when the individual troubleshooting chronology would obscure the released outcome.
 
+## 3.3.5 — Return focus, bounded paging, catalog filtering and Spellbook ordering
+
+- Companion Short Back returns to DNDolphins with the corresponding home-menu row focused: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary or Initiative. Hold Back remains a force-exit to firmware and never requests a parent handoff.
+- Restored DNDInitiative's dark title bar while keeping `[characterId]` main-menu-only and reserving the combat title-bar right side for the round counter. The `UINT32_MAX` profile sentinel remains guarded so it cannot render as `[4294967295]`; valid character ID `0` remains supported.
+- Restored Item Name-catalog presentation to the established compact format: category initial without brackets, `*` for magic entries, bare names for Other items, and `Page N <>` only in explicit catalog paging. Spell Name catalog uses the same explicit `Page N <>` convention; normal owned lists remain free of persistent paging glyphs.
+- Accelerated Inventory/Spellbook sidecar paging with three cached 32-bit aligned page offsets per collection at the 24-record cap. After the initial bounded scan, page changes can seek directly to records 0/8/16 instead of rescanning from byte zero.
+- Accelerated Item/Spell Name catalogs with a bounded rolling 64-page (256-byte) filtered offset map plus a 128-byte buffered reader. This reduces repeated SD rescans/single-byte reads without loading either catalog into RAM.
+- Recorded Spellbook entries are kept in deterministic **spell level, then case-insensitive alphabetical name** order. Sorting uses at most 24 compact transient keys and rewrites the sidecar only when it is actually out of order; it does not retain a second full Spell collection. The sorter is owned directly by `dndspellbook_collection.c`; shared `dnd_storage.c` no longer contains or exports Spellbook-only sorting code, preventing unrelated FAPs that link shared storage from carrying that implementation.
+- Expanded the Item Name-catalog Hold-OK filter cycle to All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic. The broad Magic option remains an aggregate non-Mundane filter without increasing the catalog cache size.
+- Bundled a compact generic Spell Scroll set under the Scroll category: **Spell Scroll (Cantrip)** and **Spell Scroll (Level 1)** through **Spell Scroll (Level 9)**, with `SRD5.2.1` source metadata and level-appropriate rarity (Common L0–1, Uncommon L2–3, Rare L4–5, Very Rare L6–8, Legendary L9).
+- Re-audited stack and project-owned heap after the paging/sort changes. Existing stack reservations remain appropriate; Inventory/Spellbook fixed app state rises only for the bounded offset maps, and the memory audit includes the transient Spellbook sort peak.
+
 ## 3.3.4 — Ritual Adept and stability audit
 
 - Added **Combat → Rituals** for Wizard Ritual Adept. The list is built from the active character's known Wizard spellbook entries that have the Ritual tag; preparation is not required. Ritual casting uses the existing spell result flow, consumes no spell slot/Pact slot/spell points/free cast, and reports the additional 10-minute ritual casting time.

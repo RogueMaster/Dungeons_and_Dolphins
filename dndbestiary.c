@@ -2416,9 +2416,10 @@ int32_t dndbestiary_app(void* context) {
     dndbestiary_free(app);
 
     if(launch_dnd) {
+        const char* return_args = launch_args ? launch_args : POCKET_D20_RETURN_FOCUS_BESTIARY;
         bool launch_ok = launch_initiative ?
                              dnd_handoff_launch(DNDINITIATIVE_FAP_PATH, launch_args) :
-                             dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, launch_args);
+                             dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, return_args);
         free(launch_args);
         if(launch_initiative && !launch_ok) return -1;
     }

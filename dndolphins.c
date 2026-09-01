@@ -372,6 +372,26 @@ static const char* const dndolphins_home_items[] = {
 
 static const char* const dndolphins_home_retry_save = "Retry Save";
 
+static void dndolphins_apply_return_focus(PocketD20App* app, const char* args) {
+    if(!app || !args) return;
+    uint16_t selection = UINT16_MAX;
+    if(strcmp(args, POCKET_D20_RETURN_FOCUS_INVENTORY) == 0)
+        selection = 7U;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_SPELLBOOK) == 0)
+        selection = 5U;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_ADVENTURE) == 0)
+        selection = 9U;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_JOURNAL) == 0)
+        selection = 8U;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_INITIATIVE) == 0)
+        selection = 12U;
+    else if(strcmp(args, POCKET_D20_RETURN_FOCUS_BESTIARY) == 0)
+        selection = 10U;
+    if(selection == UINT16_MAX) return;
+    app->selection = selection;
+    app->scroll = selection >= 5U ? (uint16_t)(selection - 4U) : 0U;
+}
+
 static const char* const dndolphins_profile_actions[] = {
     "Switch / Open",
     "Rename Active",
@@ -3573,11 +3593,6 @@ static uint8_t dndolphins_spell_casting_ability(PocketD20App* app, uint8_t logic
 static int8_t dndolphins_spell_attack_modifier_for(PocketD20App* app, uint8_t logical_index) {
     PocketSpell* spell = dndolphins_spell_at(app, logical_index, NULL);
     return dndolphins_spells_attack_modifier_for(&app->data.character, spell);
-}
-
-static int8_t dndolphins_spell_save_dc_for(PocketD20App* app, uint8_t logical_index) {
-    PocketSpell* spell = dndolphins_spell_at(app, logical_index, NULL);
-    return dndolphins_spells_save_dc_for(&app->data.character, spell);
 }
 
 static int8_t dndolphins_spell_attack_modifier_cached_for(
@@ -7466,9 +7481,9 @@ static void dndolphins_app_free(PocketD20App* app) {
 }
 
 int32_t dndolphins_app(void* context) {
-    UNUSED(context);
     PocketD20App* app = dndolphins_app_alloc();
     if(!app) return -1;
+    dndolphins_apply_return_focus(app, (const char*)context);
     view_dispatcher_switch_to_view(app->dispatcher, PocketViewMain);
     view_dispatcher_run(app->dispatcher);
 

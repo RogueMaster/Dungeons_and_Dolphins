@@ -225,12 +225,19 @@ typedef struct {
     uint8_t buffer[POCKET_D20_READ_BUFFER];
     uint16_t position;
     uint16_t count;
+    uint32_t raw_offset;
     bool eof;
 } PocketD20Reader;
 
-static void dnd_storage_reader_init(PocketD20Reader* reader, File* file) {
+static void dnd_storage_reader_init_at(
+    PocketD20Reader* reader, File* file, uint32_t raw_offset) {
     memset(reader, 0, sizeof(*reader));
     reader->file = file;
+    reader->raw_offset = raw_offset;
+}
+
+static void dnd_storage_reader_init(PocketD20Reader* reader, File* file) {
+    dnd_storage_reader_init_at(reader, file, 0U);
 }
 
 static bool dnd_storage_reader_next(PocketD20Reader* reader, char* value) {
@@ -244,6 +251,7 @@ static bool dnd_storage_reader_next(PocketD20Reader* reader, char* value) {
         }
     }
     *value = (char)reader->buffer[reader->position++];
+    if(reader->raw_offset != UINT32_MAX) ++reader->raw_offset;
     return true;
 }
 
@@ -841,15 +849,30 @@ bool dnd_storage_spell_class_counts(
         storage, profile, dnd_storage_count_spell_record, &context, total_count);
 }
 
-bool dnd_storage_load_spellbook_window(
+static bool dnd_storage_load_spellbook_window_internal(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     PocketCharacter* character,
-    uint8_t* total_count) {
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages) {
     if(!storage || !character || !total_count) return false;
     dnd_data_clear_spells(character);
-    *total_count = 0U;
+
+    const uint8_t page_index = (uint8_t)(start / POCKET_D20_COLLECTION_CACHE_SIZE);
+    const bool indexed = page_offsets && valid_pages;
+    const bool direct = indexed && page_index < POCKET_D20_COLLECTION_PAGE_COUNT &&
+                        *valid_pages > page_index && *total_count >= start;
+    const uint8_t known_total = *total_count;
+    if(!direct) {
+        *total_count = 0U;
+        if(indexed) {
+            memset(page_offsets, 0, sizeof(uint32_t) * POCKET_D20_COLLECTION_PAGE_COUNT);
+            *valid_pages = 0U;
+        }
+    }
+
     char path[POCKET_D20_PATH_LEN];
     dnd_storage_spellbook_path(path, sizeof(path), profile);
     if(!storage_file_exists(storage, path)) return true;
@@ -859,6 +882,17 @@ bool dnd_storage_load_spellbook_window(
         storage_file_free(file);
         return false;
     }
+
+    uint32_t initial_offset = 0U;
+    if(direct) {
+        initial_offset = page_offsets[page_index];
+        if(initial_offset && !storage_file_seek(file, initial_offset, true)) {
+            storage_file_close(file);
+            storage_file_free(file);
+            return false;
+        }
+    }
+
     char* line = malloc(POCKET_D20_COLLECTION_LINE_LEN);
     if(!line) {
         storage_file_close(file);
@@ -866,22 +900,32 @@ bool dnd_storage_load_spellbook_window(
         return false;
     }
     PocketD20Reader reader;
-    dnd_storage_reader_init(&reader, file);
+    dnd_storage_reader_init_at(&reader, file, initial_offset);
     bool success = true;
-    uint8_t logical = 0U;
-    while(dnd_storage_read_line(&reader, line, POCKET_D20_COLLECTION_LINE_LEN)) {
+    uint8_t logical = direct ? start : 0U;
+    const uint8_t window_end = (uint8_t)(start + POCKET_D20_COLLECTION_CACHE_SIZE);
+    while(logical < POCKET_D20_MAX_SPELLS) {
+        uint32_t line_offset = reader.raw_offset;
+        if(!dnd_storage_read_line(&reader, line, POCKET_D20_COLLECTION_LINE_LEN)) break;
         if(strncmp(line, "S|", 2U)) continue;
         PocketSpell parsed;
         uint8_t known = 0U, always = 0U, free_current = 0U, free_max = 0U;
         if(!dnd_storage_parse_spell_record(
                line, &parsed, &known, &always, &free_current, &free_max))
             continue;
-        if(logical >= start &&
-           logical < (uint8_t)(start + POCKET_D20_COLLECTION_CACHE_SIZE)) {
-            /* Grow only as records are actually retained. An empty or one-record
-               sidecar must not pay the heap cost of an eight-record page. The
-               normal reserve helper grows 1 -> 2 -> 4 -> 8 and never exceeds the
-               eight-record logical window because this branch retains at most eight. */
+
+        if(!direct && indexed &&
+           (logical % POCKET_D20_COLLECTION_CACHE_SIZE) == 0U) {
+            uint8_t discovered_page =
+                (uint8_t)(logical / POCKET_D20_COLLECTION_CACHE_SIZE);
+            if(discovered_page < POCKET_D20_COLLECTION_PAGE_COUNT) {
+                page_offsets[discovered_page] = line_offset;
+                if(*valid_pages <= discovered_page)
+                    *valid_pages = (uint8_t)(discovered_page + 1U);
+            }
+        }
+
+        if(logical >= start && logical < window_end) {
             if(character->spell_count >= character->spell_capacity &&
                !dnd_data_reserve_spells(
                    character, (uint8_t)(character->spell_count + 1U))) {
@@ -895,15 +939,38 @@ bool dnd_storage_load_spellbook_window(
             character->spell_free_casts_current[local] = free_current;
             character->spell_free_casts_max[local] = free_max;
         }
-        if(logical < POCKET_D20_MAX_SPELLS) ++logical;
+        ++logical;
+        if(direct && logical >= window_end) break;
     }
     if(storage_file_get_error(file) != FSE_OK) success = false;
-    *total_count = logical;
+    *total_count = direct ? known_total : logical;
     free(line);
     storage_file_close(file);
     storage_file_free(file);
     if(!success) dnd_data_clear_spells(character);
     return success;
+}
+
+bool dnd_storage_load_spellbook_window(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count) {
+    return dnd_storage_load_spellbook_window_internal(
+        storage, profile, start, character, total_count, NULL, NULL);
+}
+
+bool dnd_storage_load_spellbook_window_indexed(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages) {
+    return dnd_storage_load_spellbook_window_internal(
+        storage, profile, start, character, total_count, page_offsets, valid_pages);
 }
 
 static bool dnd_storage_rewrite_spellbook(
@@ -1580,15 +1647,30 @@ bool dnd_storage_regrant_items_from_assets(
     return success;
 }
 
-bool dnd_storage_load_items_window(
+static bool dnd_storage_load_items_window_internal(
     Storage* storage,
     uint32_t profile,
     uint8_t start,
     PocketCharacter* character,
-    uint8_t* total_count) {
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages) {
     if(!storage || !character || !total_count) return false;
     dnd_data_clear_items(character);
-    *total_count = 0U;
+
+    const uint8_t page_index = (uint8_t)(start / POCKET_D20_COLLECTION_CACHE_SIZE);
+    const bool indexed = page_offsets && valid_pages;
+    const bool direct = indexed && page_index < POCKET_D20_COLLECTION_PAGE_COUNT &&
+                        *valid_pages > page_index && *total_count >= start;
+    const uint8_t known_total = *total_count;
+    if(!direct) {
+        *total_count = 0U;
+        if(indexed) {
+            memset(page_offsets, 0, sizeof(uint32_t) * POCKET_D20_COLLECTION_PAGE_COUNT);
+            *valid_pages = 0U;
+        }
+    }
+
     char path[POCKET_D20_PATH_LEN];
     dnd_storage_items_path(path, sizeof(path), profile);
     if(!storage_file_exists(storage, path)) return true;
@@ -1598,6 +1680,17 @@ bool dnd_storage_load_items_window(
         storage_file_free(file);
         return false;
     }
+
+    uint32_t initial_offset = 0U;
+    if(direct) {
+        initial_offset = page_offsets[page_index];
+        if(initial_offset && !storage_file_seek(file, initial_offset, true)) {
+            storage_file_close(file);
+            storage_file_free(file);
+            return false;
+        }
+    }
+
     char* line = malloc(POCKET_D20_COLLECTION_LINE_LEN);
     if(!line) {
         storage_file_close(file);
@@ -1605,17 +1698,29 @@ bool dnd_storage_load_items_window(
         return false;
     }
     PocketD20Reader reader;
-    dnd_storage_reader_init(&reader, file);
+    dnd_storage_reader_init_at(&reader, file, initial_offset);
     bool success = true;
-    uint8_t logical = 0U;
-    while(dnd_storage_read_line(&reader, line, POCKET_D20_COLLECTION_LINE_LEN)) {
+    uint8_t logical = direct ? start : 0U;
+    const uint8_t window_end = (uint8_t)(start + POCKET_D20_COLLECTION_CACHE_SIZE);
+    while(logical < POCKET_D20_MAX_ITEMS) {
+        uint32_t line_offset = reader.raw_offset;
+        if(!dnd_storage_read_line(&reader, line, POCKET_D20_COLLECTION_LINE_LEN)) break;
         if(strncmp(line, "I|", 2U)) continue;
         PocketItem parsed;
         if(!dnd_storage_parse_item_record(line, &parsed)) continue;
-        if(logical >= start &&
-           logical < (uint8_t)(start + POCKET_D20_COLLECTION_CACHE_SIZE)) {
-            /* Match spellbook paging: allocate for the records that are present,
-               growing 1 -> 2 -> 4 -> 8 instead of reserving all eight up front. */
+
+        if(!direct && indexed &&
+           (logical % POCKET_D20_COLLECTION_CACHE_SIZE) == 0U) {
+            uint8_t discovered_page =
+                (uint8_t)(logical / POCKET_D20_COLLECTION_CACHE_SIZE);
+            if(discovered_page < POCKET_D20_COLLECTION_PAGE_COUNT) {
+                page_offsets[discovered_page] = line_offset;
+                if(*valid_pages <= discovered_page)
+                    *valid_pages = (uint8_t)(discovered_page + 1U);
+            }
+        }
+
+        if(logical >= start && logical < window_end) {
             if(character->item_count >= character->item_capacity &&
                !dnd_data_reserve_items(
                    character, (uint8_t)(character->item_count + 1U))) {
@@ -1624,15 +1729,38 @@ bool dnd_storage_load_items_window(
             }
             character->items[character->item_count++] = parsed;
         }
-        if(logical < POCKET_D20_MAX_ITEMS) ++logical;
+        ++logical;
+        if(direct && logical >= window_end) break;
     }
     if(storage_file_get_error(file) != FSE_OK) success = false;
-    *total_count = logical;
+    *total_count = direct ? known_total : logical;
     free(line);
     storage_file_close(file);
     storage_file_free(file);
     if(!success) dnd_data_clear_items(character);
     return success;
+}
+
+bool dnd_storage_load_items_window(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count) {
+    return dnd_storage_load_items_window_internal(
+        storage, profile, start, character, total_count, NULL, NULL);
+}
+
+bool dnd_storage_load_items_window_indexed(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages) {
+    return dnd_storage_load_items_window_internal(
+        storage, profile, start, character, total_count, page_offsets, valid_pages);
 }
 
 static bool dnd_storage_rewrite_items(

@@ -18,13 +18,13 @@
 - [x] Opens directly to the active character Inventory list with `+ Add New` selected; no intermediate screen.
 
 - [x] Uses the shared `/ext/apps_data/dndolphins/inventory_{id}.txt` sidecar; no separate DNDInventory character-data copy.
-- [x] Eight-record resident paging with storage-backed whole-collection calculations; normal list has no persistent `<>` glyph, while page-boundary loading remains bounded and `+ Add New` remains visible with up to four Items.
+- [x] Eight-record resident paging with storage-backed whole-collection calculations; normal list has no persistent `<>` glyph, while `+ Add New` remains visible with up to four Items. The first bounded scan learns the three possible aligned sidecar offsets (0/8/16), so later page-boundary loads can seek directly.
 - [x] Short or Hold OK on **+ Add New** stages a blank Item and opens the full editor immediately.
 - [x] Full 36-field Item editor retained, including quantity/weight, equip/attune, weapon/armor values, ammunition, charges, containers and custom names/notes.
-- [x] Item Catalog selection from the Name field.
-- [x] Hold OK Item Catalog category filters: All, Weapons, Armor, Ammunition, Gear, Tools and Magic.
+- [x] Item Catalog selection from the Name field, streamed through a bounded 256-byte filtered-page offset map and 128-byte buffered reader rather than whole-catalog loading.
+- [x] Hold OK Item Catalog category filters: All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic; Magic remains an aggregate rarity filter while the specific magic-item classes can be selected directly.
 - [x] Hold OK on an Inventory row toggles Equipped/Unequipped and saves immediately.
-- [x] Successful quick Equip/Unequip restores the earlier `[X]` row acknowledgement; Item Catalog rows retain category markers, magic `*`, and catalog page `<>` hints.
+- [x] Successful quick Equip/Unequip restores the earlier `[X]` row acknowledgement; Item Catalog rows use unbracketed category initials, append `*` for magic entries, leave Other entries unprefixed, and show explicit `Page N <>` catalog paging.
 - [x] Successful `Item added` is a one-shot status cleared on the next real input; unsaved/error statuses remain persistent.
 - [x] Add/Edit/Delete/catalog choices save immediately to the canonical sidecar.
 - [x] Hold Up from the Inventory list opens Inventory Tools without replacing any Hold-OK action.
@@ -39,23 +39,23 @@
 - [x] Opens directly to the active character Spellbook list with `+ Add New` selected; a missing sidecar is shown as an empty list and is not created until the first save.
 
 - [x] Uses the shared `/ext/apps_data/dndolphins/spellbook_{id}.txt` sidecar; no separate DNDSpellbook character-data copy.
-- [x] Eight-record resident paging; normal list has no persistent `<>` glyph, while page-boundary loading remains bounded and `+ Add New` remains visible with up to four Spells.
+- [x] Eight-record resident paging; normal list has no persistent `<>` glyph, while `+ Add New` remains visible with up to four Spells. The first bounded scan learns the three possible aligned sidecar offsets (0/8/16), so later page-boundary loads can seek directly.
 - [x] Short or Hold OK on **+ Add New** stages a blank Spell and opens the full editor immediately.
 - [x] Full 17-field Spell editor retained, including Source Class, Level, Known/Prepared/Always Prepared/Ritual, free casts, stable ID/source/school/grant metadata and Delete.
 - [x] Hold OK on a known Spellbook row toggles Prepared/Unprepared and saves immediately; Always Prepared remains protected. List rows restore `A`/`P`/`K`/`-` state marks plus `F` for an available free cast (for example `AF`).
 - [x] Spellbook list drawing is cache-only and has no timer/pub-sub/background worker; no-op Press/Release input events do not force redraws.
-- [x] Bundled Spell Catalog contains 448 unique spells with Level, Class list, School, Ritual and Source metadata.
+- [x] Bundled Spell Catalog contains 448 unique spells with Level, Class list, School, Ritual and Source metadata; catalog paging uses a bounded 256-byte filtered-page offset map and 128-byte buffered reader.
 - [x] Add Spell filters Level/Spell Class/School/Ritual/Source/Status during streaming so bounded pages remain filled with matching results; Hold Up from the Spellbook list opens this filter screen directly.
 - [x] Spell Class filtering defaults to **All Classes**, the union of currently eligible spells across every class on a multiclass character, with individual-class filtering available explicitly. `Eligibility: Allowed` remains the normal default and `Eligibility: All Spells` restores the older opt-in show-all catalog behavior.
-- [x] Spell Catalog headers retain page `<>` hints; successful quick Prepare/Unprepare restores the earlier `[X]` row acknowledgement. Successful `Spell added` is a one-shot status cleared on the next real input.
+- [x] Spell Catalog headers retain explicit `Page N <>` hints; successful quick Prepare/Unprepare restores the earlier `[X]` row acknowledgement. Successful `Spell added` is a one-shot status cleared on the next real input.
 - [x] Eldritch Knight/Arcane Trickster use the Wizard spell list for catalog eligibility.
-- [x] Add/Edit/Delete/catalog choices and free-cast changes save immediately to the canonical sidecar.
+- [x] Add/Edit/Delete/catalog choices and free-cast changes save immediately to the canonical sidecar. Recorded spells are maintained in spell-level then case-insensitive alphabetical-name order using at most 24 compact transient sort keys, never a second full Spell collection. Sorting is owned by `dndspellbook_collection.c`; shared storage exports no Spellbook-sort function.
 
 ## Companion apps
 - [x] Wizard Spell Attacks use combat-appropriate preparation state: cantrips remain available; level-1+ Wizard spells require Prepared/Always Prepared or a current Free Cast, and an unprepared free-cast spell offers Free Cast only.
 - [x] Combat → Rituals implements Wizard Ritual Adept as a separate known-spellbook Ritual list; preparation is not required, cantrips/non-Wizard/non-Ritual entries are excluded, and ritual casting consumes no spell resource while reporting +10 minutes.
 - [x] Routine successful save/add/catalog/Equip/Prepare/grant notices are transient; failure/UNSAVED notices remain visible.
-- [x] Shared companion Back convention: Short Back from each companion main screen returns to DNDolphins only when its FAP exists; Hold Back exits to firmware without a DNDolphins handoff; normal menus contain no redundant Return/Open-DNDolphins row.
+- [x] Shared companion Back convention: Short Back from each companion main screen returns to DNDolphins only when its FAP exists and restores focus to that companion's corresponding DNDolphins home row; Hold Back exits to firmware without a DNDolphins handoff; normal menus contain no redundant Return/Open-DNDolphins row.
 
 - [x] DNDAdventure declarative campaigns, checks, rewards, flags/achievements and Journal milestones.
 - [x] Campaign inbox preview validates compatibility, content and entry-scene availability before Hold OK installation.
@@ -63,7 +63,7 @@
 - [x] Bundled Reef Wardens and Ghost Protocol campaigns.
 - [x] DNDJournal standalone per-character entries, newest first, with one-shot milestone class leveling and Item-entry inventory creation.
 - [x] Milestones remain Journal-facing; Continue active Adventure resumes the persisted active campaign/scene without creating duplicate Journal or Adventure progress.
-- [x] DNDInitiative standalone roster/combat state and Bestiary handoff, including full numeric participant editing, manual reordering, active-combat AC/condition controls and End Current Combat.
+- [x] DNDInitiative standalone roster/combat state and Bestiary handoff, including full numeric participant editing, manual reordering, active-combat AC/condition controls and End Current Combat; main/combat screens use the dark title bar with `[id]` on the main menu and `Round N` during combat.
 - [x] DNDBestiary bundled catalog, filters, encounters, custom monsters and installable packs.
 - [x] Default custom Dolphin/Capybara seed only when no user custom pack exists.
 
@@ -72,7 +72,7 @@
 - [x] Seven FAPs: DNDolphins, DNDInventory, DNDSpellbook, DNDAdventure, DNDJournal, DNDInitiative and DNDBestiary.
 - [x] Explicit full-path FAP launches.
 - [x] Outgoing-app teardown before handoff; no artificial pre-launch sleep is used because delaying the outgoing FAP delays reclamation rather than creating Loader headroom.
-- [x] Stack reservations: DNDolphins 6 KB; DNDInventory 4 KB; DNDSpellbook 4 KB; DNDAdventure 4 KB; DNDJournal 4 KB; DNDInitiative 3 KB; DNDBestiary 6 KB.
+- [x] Stack reservations re-audited after buffered catalog paging/sorting: DNDolphins 6 KB; DNDInventory 4 KB; DNDSpellbook 4 KB; DNDAdventure 4 KB; DNDJournal 4 KB; DNDInitiative 3 KB; DNDBestiary 6 KB. The new sort keys are heap-owned; the catalog reader adds only a 128-byte local buffer to Inventory/Spellbook catalog-load paths.
 - [x] Companion profile badges reject the internal `UINT32_MAX` sentinel; `[4294967295]` cannot be displayed as a character ID while valid `[0]` remains supported.
 - [x] Seven-FAP draw-path call-graph audit: project-owned draw paths perform no storage I/O, heap allocation/free, collection rewrite or storage-backed page advancement; remaining draw-time loops are bounded fixed-buffer text formatting only.
 - [x] Main DNDolphins collection UI/catalog code and full Item/Spell catalogs are no longer linked/packaged into the main FAP asset set.
@@ -101,3 +101,10 @@
 ### Combat parity
 - [x] Weapon Attacks still stream owned weapon records, consume ammunition from the Item sidecar, apply STR/DEX/Finesse/Ranged choice, proficiency, magic and exhaustion modifiers, support advantage/disadvantage, natural 1/20, versatile/extra damage dice and critical doubling.
 - [x] Spell Attacks still stream castable owned spells, preserve the 165-entry mapped combat table plus Notes `XdY` fallback, class-specific spell attack/save modifiers, cantrip scaling/upcasting, and cantrip/slot/Pact/spell-point/free-cast/ritual resource choices.
+
+## Item catalog scroll coverage
+
+- [x] Scrolls are a first-class granular Item Name-catalog filter.
+- [x] Bundled generic Spell Scroll rows classify as Scroll rather than Gear.
+- [x] Bundled Spell Scroll catalog is compact: one Cantrip row plus Levels 1–9, all under the Scroll category with level-appropriate rarity; no per-spell Scroll rows are bundled.
+- [x] No fake GP value is written because the current Item/catalog schema has no cost field.

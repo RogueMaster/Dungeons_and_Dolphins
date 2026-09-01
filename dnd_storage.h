@@ -12,6 +12,7 @@ typedef struct {
 
 #define POCKET_D20_PROFILE_CACHE_SIZE 8U
 #define POCKET_D20_COLLECTION_CACHE_SIZE 8U
+#define POCKET_D20_COLLECTION_PAGE_COUNT 3U
 
 typedef struct {
     uint32_t active_profile;
@@ -95,6 +96,26 @@ bool dnd_storage_visit_items(
     PocketD20ItemRecordVisitor visitor,
     void* context,
     uint8_t* total_count);
+/* Indexed collection-window loaders. The first uncached load scans the small
+   sidecar once to learn total count and page offsets; later page loads seek
+   directly to an aligned eight-record page. Callers invalidate valid_pages
+   after a successful rewrite because line offsets may have changed. */
+bool dnd_storage_load_spellbook_window_indexed(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages);
+bool dnd_storage_load_items_window_indexed(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t start,
+    PocketCharacter* character,
+    uint8_t* total_count,
+    uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages);
 bool dnd_storage_spell_class_counts(
     Storage* storage,
     uint32_t profile,

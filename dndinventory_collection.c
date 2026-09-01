@@ -25,7 +25,9 @@
 #define DNDINVENTORY_COLLECTION_VIEW_NUMBER 2U
 #define DNDINVENTORY_COLLECTION_ROWS 5U
 #define DNDINVENTORY_COLLECTION_CATALOG_PAGE 10U
+#define DNDINVENTORY_COLLECTION_CATALOG_OFFSET_PAGES 64U
 #define DNDINVENTORY_COLLECTION_LINE_MAX 256U
+#define DNDINVENTORY_COLLECTION_CATALOG_READ_BUFFER 128U
 #define DNDINVENTORY_COLLECTION_ITEM_CATALOG APP_ASSETS_PATH("catalogs/items.txt")
 
 typedef enum {
@@ -76,6 +78,14 @@ typedef enum {
     DndInventoryItemFilterAmmunition,
     DndInventoryItemFilterGear,
     DndInventoryItemFilterTools,
+    DndInventoryItemFilterMountVehicles,
+    DndInventoryItemFilterPotions,
+    DndInventoryItemFilterRings,
+    DndInventoryItemFilterRods,
+    DndInventoryItemFilterScrolls,
+    DndInventoryItemFilterStaffs,
+    DndInventoryItemFilterWands,
+    DndInventoryItemFilterWondrous,
     DndInventoryItemFilterMagic,
     DndInventoryItemFilterCount,
 } DndInventoryItemFilter;
@@ -167,7 +177,22 @@ static const char* const dndinventory_collection_attack_ability_names[] = {"Auto
 
 
 static const char* const dndinventory_collection_item_filter_names[] = {
-    "All", "Weapons", "Armor", "Ammunition", "Gear", "Tools", "Magic"};
+    "All",
+    "Weapons",
+    "Armor",
+    "Ammunition",
+    "Gear",
+    "Tools",
+    "Mounts/Vehicles",
+    "Potions",
+    "Rings",
+    "Rods",
+    "Scrolls",
+    "Staffs",
+    "Wands",
+    "Wondrous",
+    "Magic",
+};
 
 typedef struct {
     Gui* gui;
@@ -185,6 +210,8 @@ typedef struct {
     uint8_t return_to_dnd;
     uint8_t total;
     uint8_t cache_start;
+    uint32_t record_page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT];
+    uint8_t record_offset_valid_pages;
     uint16_t selection;
     uint16_t scroll;
     uint8_t record_index;
@@ -200,8 +227,10 @@ typedef struct {
     DndInventoryCatalogEntry catalog[DNDINVENTORY_COLLECTION_CATALOG_PAGE];
     uint8_t catalog_count;
     uint16_t catalog_page_start;
-    uint16_t catalog_total;
+    uint16_t catalog_offset_base_page;
     uint8_t catalog_has_more;
+    uint32_t catalog_page_offsets[DNDINVENTORY_COLLECTION_CATALOG_OFFSET_PAGES];
+    uint8_t catalog_offset_valid_pages;
     uint8_t item_filter;
     uint8_t tool_selection;
     uint8_t tool_scroll;
@@ -409,6 +438,16 @@ static bool dndinventory_collection_item_filter_allows(DndInventoryCollectionApp
     case DndInventoryItemFilterAmmunition: return ammunition;
     case DndInventoryItemFilterGear: return category == DndInventoryItemCategoryGear && !ammunition;
     case DndInventoryItemFilterTools: return category == DndInventoryItemCategoryTool;
+    case DndInventoryItemFilterMountVehicles:
+        return category == DndInventoryItemCategoryMountVehicle;
+    case DndInventoryItemFilterPotions: return category == DndInventoryItemCategoryPotion;
+    case DndInventoryItemFilterRings: return category == DndInventoryItemCategoryRing;
+    case DndInventoryItemFilterRods: return category == DndInventoryItemCategoryRod;
+    case DndInventoryItemFilterScrolls: return category == DndInventoryItemCategoryScroll;
+    case DndInventoryItemFilterStaffs: return category == DndInventoryItemCategoryStaff;
+    case DndInventoryItemFilterWands: return category == DndInventoryItemCategoryWand;
+    case DndInventoryItemFilterWondrous:
+        return category == DndInventoryItemCategoryWondrous;
     case DndInventoryItemFilterMagic: return magic;
     default: return true;
     }
@@ -467,6 +506,7 @@ static bool dndinventory_collection_save_currency(DndInventoryCollectionApp* app
     };
     bool ok = dnd_storage_save_inventory_currency(
         app->storage, app->profile, c, currency);
+    if(ok) app->record_offset_valid_pages = 0U;
     if(ok) dndinventory_collection_set_transient_status(app, "Saved");
     else dndinventory_collection_set_status(app, "UNSAVED");
     return ok;
@@ -499,8 +539,10 @@ static bool dndinventory_collection_load_currency(DndInventoryCollectionApp* app
     c->currency_gp = 0;
     c->currency_pp = 0;
     int32_t zero_currency[5] = {0, 0, 0, 0, 0};
-    return dnd_storage_save_inventory_currency(
+    bool saved = dnd_storage_save_inventory_currency(
         app->storage, app->profile, c, zero_currency);
+    if(saved) app->record_offset_valid_pages = 0U;
+    return saved;
 }
 
 static bool dndinventory_collection_refresh_item_aggregate(DndInventoryCollectionApp* app) {
@@ -587,6 +629,7 @@ static bool dndinventory_collection_grant_initial_inventory(DndInventoryCollecti
         dndinventory_collection_set_transient_status(app, "No starting gear");
         return true;
     }
+    app->record_offset_valid_pages = 0U;
     if(!dndinventory_collection_load_page(app, 0U)) {
         dndinventory_collection_set_status(app, "Granted; reload failed");
         return true;
@@ -627,6 +670,7 @@ static bool dndinventory_collection_regrant_initial_inventory(DndInventoryCollec
         dndinventory_collection_set_status(app, "Regrant unavailable");
         return false;
     }
+    app->record_offset_valid_pages = 0U;
     if(!dndinventory_collection_load_page(app, 0U)) {
         dndinventory_collection_set_status(app, "Regranted; reload failed");
         return true;
@@ -656,21 +700,94 @@ static void dndinventory_collection_focus_list(DndInventoryCollectionApp* app, u
     app->scroll = scroll;
 }
 
-static bool dndinventory_collection_read_line(File* file, char* line, size_t size) {
-    if(!file || !line || size < 2U) return false;
+typedef struct {
+    File* file;
+    uint8_t buffer[DNDINVENTORY_COLLECTION_CATALOG_READ_BUFFER];
+    uint16_t position;
+    uint16_t count;
+    uint32_t raw_offset;
+} DndInventoryCatalogReader;
+
+static void dndinventory_collection_catalog_reader_init(
+    DndInventoryCatalogReader* reader, File* file, uint32_t raw_offset) {
+    memset(reader, 0, sizeof(*reader));
+    reader->file = file;
+    reader->raw_offset = raw_offset;
+}
+
+static bool dndinventory_collection_catalog_reader_next(
+    DndInventoryCatalogReader* reader, char* value) {
+    if(reader->position >= reader->count) {
+        reader->count = (uint16_t)storage_file_read(
+            reader->file, reader->buffer, sizeof(reader->buffer));
+        reader->position = 0U;
+        if(!reader->count) return false;
+    }
+    *value = (char)reader->buffer[reader->position++];
+    if(reader->raw_offset != UINT32_MAX) ++reader->raw_offset;
+    return true;
+}
+
+static bool dndinventory_collection_catalog_read_line(
+    DndInventoryCatalogReader* reader, char* line, size_t size) {
+    if(!reader || !line || size < 2U) return false;
     size_t used = 0U;
+    char ch = '\0';
     bool got = false;
     while(true) {
-        char ch = '\0';
-        size_t count = storage_file_read(file, &ch, 1U);
-        if(count != 1U) break;
+        if(!dndinventory_collection_catalog_reader_next(reader, &ch)) break;
         got = true;
-        if(ch == '\r') continue;
         if(ch == '\n') break;
-        if(used + 1U < size) line[used++] = ch;
+        if(ch != '\r' && used + 1U < size) line[used++] = ch;
     }
     line[used] = '\0';
-    return got || used;
+    return got || used > 0U;
+}
+
+static void dndinventory_collection_reset_catalog_offsets(DndInventoryCollectionApp* app) {
+    if(!app) return;
+    memset(app->catalog_page_offsets, 0, sizeof(app->catalog_page_offsets));
+    app->catalog_page_offsets[0] = 0U;
+    app->catalog_offset_base_page = 0U;
+    app->catalog_offset_valid_pages = 1U;
+}
+
+static void dndinventory_collection_cache_catalog_offset(
+    DndInventoryCollectionApp* app,
+    uint16_t page_index,
+    uint32_t raw_offset) {
+    if(!app) return;
+    if(!app->catalog_offset_valid_pages)
+        dndinventory_collection_reset_catalog_offsets(app);
+
+    if(page_index < app->catalog_offset_base_page) return;
+
+    uint16_t relative = (uint16_t)(page_index - app->catalog_offset_base_page);
+    if(relative >= DNDINVENTORY_COLLECTION_CATALOG_OFFSET_PAGES) {
+        uint16_t shift =
+            (uint16_t)(relative - DNDINVENTORY_COLLECTION_CATALOG_OFFSET_PAGES + 1U);
+        if(shift >= app->catalog_offset_valid_pages) {
+            app->catalog_offset_base_page = page_index;
+            app->catalog_page_offsets[0] = raw_offset;
+            app->catalog_offset_valid_pages = 1U;
+            return;
+        }
+        memmove(
+            app->catalog_page_offsets,
+            app->catalog_page_offsets + shift,
+            (app->catalog_offset_valid_pages - shift) * sizeof(app->catalog_page_offsets[0]));
+        app->catalog_offset_base_page =
+            (uint16_t)(app->catalog_offset_base_page + shift);
+        app->catalog_offset_valid_pages =
+            (uint8_t)(app->catalog_offset_valid_pages - shift);
+        relative = (uint16_t)(page_index - app->catalog_offset_base_page);
+    }
+
+    if(relative < DNDINVENTORY_COLLECTION_CATALOG_OFFSET_PAGES) {
+        app->catalog_page_offsets[relative] = raw_offset;
+        if(app->catalog_offset_valid_pages <= relative)
+            app->catalog_offset_valid_pages = (uint8_t)(relative + 1U);
+    }
 }
 
 static void dndinventory_collection_list_adjust_scroll(DndInventoryCollectionApp* app) {
@@ -871,9 +988,15 @@ static bool dndinventory_collection_load_profile(
 }
 
 static bool dndinventory_collection_load_page(DndInventoryCollectionApp* app, uint8_t start) {
-    uint8_t total = 0U;
-    if(!dnd_storage_load_items_window(
-           app->storage, app->profile, start, &app->data.character, &total))
+    uint8_t total = app->total;
+    if(!dnd_storage_load_items_window_indexed(
+           app->storage,
+           app->profile,
+           start,
+           &app->data.character,
+           &total,
+           app->record_page_offsets,
+           &app->record_offset_valid_pages))
         return false;
     app->total = total;
     app->cache_start = start;
@@ -896,7 +1019,10 @@ static bool dndinventory_collection_save_page(DndInventoryCollectionApp* app) {
     }
     bool ok = dnd_storage_save_items_window(
         app->storage, app->profile, app->cache_start, &app->data.character);
-    if(ok) app->item_aggregate_valid = 0U;
+    if(ok) {
+        app->item_aggregate_valid = 0U;
+        app->record_offset_valid_pages = 0U;
+    }
     if(ok) dndinventory_collection_set_transient_status(app, "Saved");
     else dndinventory_collection_set_status(app, "UNSAVED");
     return ok;
@@ -987,6 +1113,7 @@ static bool dndinventory_collection_delete_current(DndInventoryCollectionApp* ap
         dndinventory_collection_set_status(app, "Delete failed");
         return false;
     }
+    app->record_offset_valid_pages = 0U;
     if(app->total) --app->total;
     uint8_t target = 0U;
     if(app->total) {
@@ -1039,8 +1166,22 @@ static bool dndinventory_collection_parse_catalog_line(
 
 static bool dndinventory_collection_load_catalog(DndInventoryCollectionApp* app) {
     app->catalog_count = 0U;
-    app->catalog_total = 0U;
     app->catalog_has_more = 0U;
+
+    uint16_t page_index =
+        app->catalog_page_start / DNDINVENTORY_COLLECTION_CATALOG_PAGE;
+    if(!app->catalog_offset_valid_pages)
+        dndinventory_collection_reset_catalog_offsets(app);
+
+    if(page_index < app->catalog_offset_base_page)
+        dndinventory_collection_reset_catalog_offsets(app);
+
+    uint16_t cached_end = (uint16_t)(
+        app->catalog_offset_base_page + app->catalog_offset_valid_pages - 1U);
+    uint16_t seek_page = page_index <= cached_end ? page_index : cached_end;
+    uint16_t seek_slot =
+        (uint16_t)(seek_page - app->catalog_offset_base_page);
+
     File* file = storage_file_alloc(app->storage);
     if(!file) return false;
     if(!storage_file_open(
@@ -1052,38 +1193,54 @@ static bool dndinventory_collection_load_catalog(DndInventoryCollectionApp* app)
         dndinventory_collection_set_status(app, "Catalog unavailable");
         return false;
     }
+
+    uint32_t raw_offset = app->catalog_page_offsets[seek_slot];
+    if(raw_offset && !storage_file_seek(file, raw_offset, true)) {
+        storage_file_close(file);
+        storage_file_free(file);
+        return false;
+    }
+
+    DndInventoryCatalogReader reader;
+    dndinventory_collection_catalog_reader_init(&reader, file, raw_offset);
     char line[DNDINVENTORY_COLLECTION_LINE_MAX];
-    uint16_t matched = 0U;
-    while(dndinventory_collection_read_line(file, line, sizeof(line))) {
+    uint16_t matched =
+        (uint16_t)(seek_page * DNDINVENTORY_COLLECTION_CATALOG_PAGE);
+    const uint16_t target_start = app->catalog_page_start;
+    const uint16_t target_end =
+        (uint16_t)(target_start + DNDINVENTORY_COLLECTION_CATALOG_PAGE);
+
+    while(dndinventory_collection_catalog_read_line(&reader, line, sizeof(line))) {
         DndInventoryCatalogEntry parsed;
         if(!dndinventory_collection_parse_catalog_line(app, line, &parsed)) continue;
+
+        if(matched >= target_end) {
+            app->catalog_has_more = 1U;
+            break;
+        }
+
         parsed.absolute_index = matched;
-        if(matched >= app->catalog_page_start &&
-           matched <
-               (uint16_t)(app->catalog_page_start +
-                          DNDINVENTORY_COLLECTION_CATALOG_PAGE))
+        if(matched >= target_start && app->catalog_count < DNDINVENTORY_COLLECTION_CATALOG_PAGE)
             app->catalog[app->catalog_count++] = parsed;
         ++matched;
+
+        if((matched % DNDINVENTORY_COLLECTION_CATALOG_PAGE) == 0U) {
+            uint16_t next_page =
+                matched / DNDINVENTORY_COLLECTION_CATALOG_PAGE;
+            dndinventory_collection_cache_catalog_offset(
+                app, next_page, reader.raw_offset);
+        }
     }
-    app->catalog_total = matched;
-    app->catalog_has_more =
-        (uint16_t)(app->catalog_page_start + app->catalog_count) < matched;
+
+    bool success = storage_file_get_error(file) == FSE_OK;
     storage_file_close(file);
     storage_file_free(file);
-    if(app->catalog_page_start >= matched && app->catalog_page_start) {
-        app->catalog_page_start =
-            matched ?
-                (uint16_t)(((matched - 1U) /
-                            DNDINVENTORY_COLLECTION_CATALOG_PAGE) *
-                           DNDINVENTORY_COLLECTION_CATALOG_PAGE) :
-                0U;
-        return dndinventory_collection_load_catalog(app);
-    }
-    return true;
+    return success;
 }
 
 static void dndinventory_collection_open_catalog(DndInventoryCollectionApp* app) {
     app->screen = DndInventoryCollectionScreenCatalog;
+    dndinventory_collection_reset_catalog_offsets(app);
     app->catalog_page_start = 0U;
     app->selection = 0U;
     if(!dndinventory_collection_load_catalog(app))
@@ -1256,7 +1413,7 @@ static void dndinventory_collection_draw_catalog(
     snprintf(
         page,
         sizeof(page),
-        "P%u%s <>",
+        "Page %u%s <>",
         (unsigned)(app->catalog_page_start / DNDINVENTORY_COLLECTION_CATALOG_PAGE + 1U),
         app->catalog_has_more ? "+" : "");
     dndinventory_collection_draw_header(
@@ -1271,13 +1428,17 @@ static void dndinventory_collection_draw_catalog(
         if(index >= app->catalog_count) break;
         DndInventoryCatalogEntry* entry = &app->catalog[index];
         char text[56];
-        snprintf(
-            text,
-            sizeof(text),
-            "[%s%c] %.45s",
-            dndinventory_collection_item_mark(entry->category),
-            entry->magic ? '*' : ' ',
-            entry->name);
+        if(entry->category != DndInventoryItemCategoryOther) {
+            snprintf(
+                text,
+                sizeof(text),
+                "%s%c %.45s",
+                dndinventory_collection_item_mark(entry->category),
+                entry->magic ? '*' : ' ',
+                entry->name);
+        } else {
+            dndinventory_collection_copy(text, sizeof(text), entry->name);
+        }
         dndinventory_collection_draw_row(
             canvas, row, index == app->selection, text);
     }
@@ -1896,6 +2057,7 @@ static bool dndinventory_collection_input(InputEvent* event, void* context) {
             app->item_filter =
                 (uint8_t)((app->item_filter + 1U) %
                           DndInventoryItemFilterCount);
+            dndinventory_collection_reset_catalog_offsets(app);
             app->catalog_page_start = 0U;
             app->selection = 0U;
             (void)dndinventory_collection_load_catalog(app);
@@ -2015,6 +2177,6 @@ int32_t dndinventory_collection_run(void* context) {
     bool return_to_dnd = app->return_to_dnd;
     dndinventory_collection_free(app);
     if(return_to_dnd)
-        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, NULL);
+        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, POCKET_D20_RETURN_FOCUS_INVENTORY);
     return 0;
 }

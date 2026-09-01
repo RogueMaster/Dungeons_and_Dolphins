@@ -1102,6 +1102,6 @@ int32_t dndadventure_app(void* context) {
     bool return_to_dnd = app->return_to_dnd;
     dndadventure_app_free(app);
     if(return_to_dnd)
-        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, NULL);
+        (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, POCKET_D20_RETURN_FOCUS_ADVENTURE);
     return 0;
 }
