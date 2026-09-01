@@ -313,6 +313,40 @@ bool dndolphins_progression_store_features_count(Storage* storage, uint32_t prof
     return ok;
 }
 
+bool dndolphins_progression_store_features_contains_name(
+    Storage* storage, uint32_t profile, const char* name, bool* found) {
+    if(found) *found = false;
+    if(!storage || !name || !name[0] || !found) return false;
+    char path[DND_PROGRESS_PATH_LEN];
+    dndolphins_progression_store_feature_path(path, sizeof(path), profile);
+    if(!storage_file_exists(storage, path)) return true;
+    File* file = storage_file_alloc(storage);
+    if(!file || !storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        if(file) storage_file_free(file);
+        return false;
+    }
+    DndProgressReader reader;
+    dndolphins_progression_store_reader_init(&reader, file);
+    char line[DND_PROGRESS_LINE_LEN];
+    bool ok = true;
+    while(dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
+        if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
+        PocketFeature feature;
+        if(!dndolphins_progression_store_parse_feature(line, &feature)) {
+            ok = false;
+            break;
+        }
+        if(strcmp(feature.name, name) == 0) {
+            *found = true;
+            break;
+        }
+    }
+    if(storage_file_get_error(file) != FSE_OK) ok = false;
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
 bool dndolphins_progression_store_features_load_window(
     Storage* storage,
     uint32_t profile,

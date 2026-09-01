@@ -1737,6 +1737,12 @@ static bool dnd_storage_rewrite_items(
                     ++logical;
                     continue;
                 }
+                if(delete_index >= 0) {
+                    if(parsed.container_index == delete_index)
+                        parsed.container_index = -1;
+                    else if(parsed.container_index > delete_index)
+                        --parsed.container_index;
+                }
                 if(replacement && logical >= replace_start &&
                    logical < (uint8_t)(replace_start + replacement->item_count)) {
                     uint8_t local = (uint8_t)(logical - replace_start);
@@ -2358,8 +2364,8 @@ static bool dnd_storage_parse_profile_filename(const char* filename, PocketProfi
     return true;
 }
 
-static bool
-    dnd_storage_find_profile_path(Storage* storage, uint32_t profile, char* output, size_t size) {
+bool
+dnd_storage_find_profile_path(Storage* storage, uint32_t profile, char* output, size_t size) {
     File* directory = storage_file_alloc(storage);
     if(!directory) return false;
     if(!storage_dir_open(directory, POCKET_D20_DATA_DIR)) {

@@ -3,6 +3,7 @@
 #include "dndinitiative_feature_recharge.h"
 
 #include <furi.h>
+#include <furi_hal.h>
 #include <furi_hal_random.h>
 #include <gui/gui.h>
 #include <gui/view.h>
@@ -20,6 +21,7 @@
 #define INIT_CONDITION_LEN 64U
 #define INIT_PATH_LEN 128U
 #define INIT_FILE_PATH APP_DATA_PATH("ch_%lu.%s")
+#define INIT_HISTORY_ROOT APP_DATA_PATH("history")
 
 typedef struct {
     char name[INIT_NAME_LEN];
@@ -38,6 +40,7 @@ typedef enum {
     InitiativeScreenRoster,
     InitiativeScreenSetup,
     InitiativeScreenCombat,
+    InitiativeScreenEndCombat,
     InitiativeScreenEdit,
 } InitiativeScreen;
 
@@ -96,6 +99,8 @@ typedef struct {
     InitiativeScreen screen;
     char status[32];
 } InitiativeApp;
+
+static void dndinitiative_focus_combat_member(InitiativeApp* app, uint8_t index);
 
 static void dndinitiative_copy(char* out, size_t size, const char* in) {
     if(!size) return;
@@ -780,6 +785,143 @@ static void dndinitiative_import_args(InitiativeApp* app, const char* args) {
     }
 }
 
+static bool dndinitiative_member_is_party(const InitiativeApp* app, const InitiativeMember* member) {
+    if(!app || !member || !member->name[0]) return false;
+    if(app->main_character_name[0] && !strcmp(member->name, app->main_character_name)) return true;
+    for(uint8_t i = 0U; i < app->roster_count; ++i) {
+        if(app->roster[i].name[0] && !strcmp(member->name, app->roster[i].name)) return true;
+    }
+    return false;
+}
+
+static void dndinitiative_history_field(char* out, size_t size, const char* in) {
+    if(!out || !size) return;
+    size_t used = 0U;
+    if(in) {
+        while(*in && used + 1U < size) {
+            char ch = *in++;
+            out[used++] = (ch == '|' || ch == '\r' || ch == '\n') ? ' ' : ch;
+        }
+    }
+    out[used] = '\0';
+}
+
+static bool dndinitiative_history_write_raw(File* file, const char* text) {
+    if(!file || !text) return false;
+    size_t length = strlen(text);
+    return storage_file_write(file, text, length) == length;
+}
+
+static bool dndinitiative_history_write_member(
+    File* file, char kind, const InitiativeMember* member) {
+    if(!file || !member) return false;
+    char name[INIT_NAME_LEN];
+    char conditions[INIT_CONDITION_LEN];
+    dndinitiative_history_field(name, sizeof(name), member->name);
+    dndinitiative_history_field(conditions, sizeof(conditions), member->conditions);
+    char line[192];
+    int length = snprintf(
+        line,
+        sizeof(line),
+        "%c|%s|%d|%d|%d|%s\n",
+        kind,
+        name,
+        member->hp_current,
+        member->hp_max,
+        member->armor_class,
+        conditions);
+    return length > 0 && (size_t)length < sizeof(line) &&
+           storage_file_write(file, line, (size_t)length) == (size_t)length;
+}
+
+static bool dndinitiative_save_completed_history(InitiativeApp* app) {
+    if(!app || !app->storage || !app->combat_count || app->character_id == UINT32_MAX)
+        return false;
+    if(!dnd_fs_ensure_directory(app->storage, INIT_HISTORY_ROOT)) return false;
+    DateTime now;
+    furi_hal_rtc_get_datetime(&now);
+    char final_path[INIT_PATH_LEN];
+    char temp_path[INIT_PATH_LEN];
+    char filename[64];
+    bool path_ready = false;
+    for(uint8_t suffix = 0U; suffix < 100U; ++suffix) {
+        int length = snprintf(
+            filename,
+            sizeof(filename),
+            "ch_%lu_%04u%02u%02u_%02u%02u%02u_%02u.txt",
+            (unsigned long)app->character_id,
+            (unsigned)now.year,
+            (unsigned)now.month,
+            (unsigned)now.day,
+            (unsigned)now.hour,
+            (unsigned)now.minute,
+            (unsigned)now.second,
+            (unsigned)suffix);
+        if(length <= 0 || (size_t)length >= sizeof(filename) ||
+           !dnd_fs_child_path(final_path, sizeof(final_path), INIT_HISTORY_ROOT, NULL, filename))
+            return false;
+        if(!storage_file_exists(app->storage, final_path)) {
+            path_ready = true;
+            break;
+        }
+    }
+    if(!path_ready) return false;
+    int temp_length = snprintf(temp_path, sizeof(temp_path), "%s.tmp", final_path);
+    if(temp_length <= 0 || (size_t)temp_length >= sizeof(temp_path)) return false;
+    storage_common_remove(app->storage, temp_path);
+    File* file = storage_file_alloc(app->storage);
+    if(!file) return false;
+    bool ok = storage_file_open(file, temp_path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    char header[192];
+    if(ok) ok = dndinitiative_history_write_raw(file, "DNDInitiativeHistory=1\n");
+    if(ok) {
+        int length = snprintf(
+            header,
+            sizeof(header),
+            "Profile=%lu\nEnded=%04u-%02u-%02u %02u:%02u:%02u\nRounds=%u\n",
+            (unsigned long)app->character_id,
+            (unsigned)now.year,
+            (unsigned)now.month,
+            (unsigned)now.day,
+            (unsigned)now.hour,
+            (unsigned)now.minute,
+            (unsigned)now.second,
+            (unsigned)app->round);
+        ok = length > 0 && (size_t)length < sizeof(header) &&
+             storage_file_write(file, header, (size_t)length) == (size_t)length;
+    }
+    for(uint8_t i = 0U; ok && i < app->combat_count; ++i) {
+        const InitiativeMember* member = &app->combat[i];
+        bool party = dndinitiative_member_is_party(app, member);
+        if(!party && member->hp_current <= 0) continue;
+        ok = dndinitiative_history_write_member(file, party ? 'P' : 'O', member);
+    }
+    if(ok) ok = storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    if(!ok) {
+        storage_common_remove(app->storage, temp_path);
+        return false;
+    }
+    if(storage_common_rename(app->storage, temp_path, final_path) != FSE_OK) {
+        storage_common_remove(app->storage, temp_path);
+        return false;
+    }
+    return true;
+}
+
+static void dndinitiative_end_combat(InitiativeApp* app, const char* status) {
+    if(!app) return;
+    app->active = 0U;
+    app->combat_count = 0U;
+    app->current_turn = 0U;
+    app->round = 1U;
+    app->screen = InitiativeScreenMenu;
+    app->selection = app->scroll = 0U;
+    dndinitiative_copy(app->status, sizeof(app->status), status);
+    dndinitiative_save(app);
+}
+
 static void dndinitiative_row(Canvas* canvas, uint8_t row, bool selected, const char* text) {
     uint8_t y = (uint8_t)(13U + row * 10U);
     if(selected) {
@@ -812,7 +954,13 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
         canvas_draw_str(canvas, profile_x, 8, profile_id);
     } else if(app->screen == InitiativeScreenCombat) {
         char round_text[24];
-        snprintf(round_text, sizeof(round_text), "Round %u", app->round);
+        snprintf(
+            round_text,
+            sizeof(round_text),
+            "R%u T%u/%u",
+            app->round,
+            app->combat_count ? (uint8_t)(app->current_turn + 1U) : 0U,
+            app->combat_count);
         uint16_t round_width = canvas_string_width(canvas, round_text);
         uint8_t round_x = round_width < 125U ? (uint8_t)(126U - round_width) : 1U;
         canvas_draw_str(canvas, round_x, 8, round_text);
@@ -873,6 +1021,14 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
             snprintf(text, sizeof(text), "%c %.10s I%d HP%d AC%d %.5s", i == app->current_turn ? '>' : ' ', app->combat[i].name, app->combat[i].total, app->combat[i].hp_current, app->combat[i].armor_class, app->combat[i].conditions);
             dndinitiative_row(canvas, row, i == app->selection, text);
         }
+    } else if(app->screen == InitiativeScreenEndCombat) {
+        static const char* const choices[] = {
+            "End + Save History",
+            "End Without History",
+            "Cancel",
+        };
+        for(uint8_t row = 0U; row < 3U; ++row)
+            dndinitiative_row(canvas, row, row == app->selection, choices[row]);
     } else {
         InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] : &app->roster[app->selection];
         char rows[9][48];
@@ -936,9 +1092,8 @@ static void dndinitiative_start(InitiativeApp* app) {
     app->active = app->combat_count ? 1U : 0U;
     app->round = 1U;
     app->current_turn = 0U;
-    app->selection = 0U;
-    app->scroll = 0U;
     app->screen = InitiativeScreenCombat;
+    dndinitiative_focus_combat_member(app, app->current_turn);
     dndinitiative_save(app);
 }
 
@@ -948,6 +1103,30 @@ static void dndinitiative_move(uint8_t* selection, uint8_t count, int8_t directi
     if(next < 0) next = count - 1U;
     if(next >= count) next = 0;
     *selection = (uint8_t)next;
+}
+
+static void dndinitiative_keep_visible(uint8_t selection, uint8_t count, uint8_t* scroll) {
+    if(!scroll || !count) {
+        if(scroll) *scroll = 0U;
+        return;
+    }
+    uint8_t maximum_scroll = count > 5U ? (uint8_t)(count - 5U) : 0U;
+    if(selection < *scroll) *scroll = selection;
+    else if(selection >= (uint8_t)(*scroll + 5U)) *scroll = (uint8_t)(selection - 4U);
+    if(*scroll > maximum_scroll) *scroll = maximum_scroll;
+}
+
+static void dndinitiative_focus_combat_member(InitiativeApp* app, uint8_t index) {
+    if(!app || !app->combat_count) {
+        if(app) app->selection = app->scroll = 0U;
+        return;
+    }
+    if(index >= app->combat_count) index = (uint8_t)(app->combat_count - 1U);
+    app->selection = index;
+    uint8_t maximum_scroll = app->combat_count > 5U ? (uint8_t)(app->combat_count - 5U) : 0U;
+    uint8_t centered = index > 2U ? (uint8_t)(index - 2U) : 0U;
+    if(centered > maximum_scroll) centered = maximum_scroll;
+    app->scroll = centered;
 }
 
 static void dndinitiative_text_done(void* context) {
@@ -1057,7 +1236,7 @@ static void dndinitiative_previous_turn(InitiativeApp* app) {
         --app->round;
         app->current_turn = (uint8_t)(app->combat_count - 1U);
     }
-    app->selection = app->current_turn;
+    dndinitiative_focus_combat_member(app, app->current_turn);
     dndinitiative_save(app);
 }
 
@@ -1088,8 +1267,13 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
             app->return_to_dnd = 1U;
             view_dispatcher_stop(app->dispatcher);
             return true;
-        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) dndinitiative_move(&app->selection, 6U, -1);
-        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, 6U, 1);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
+            dndinitiative_move(&app->selection, 6U, -1);
+            dndinitiative_keep_visible(app->selection, 6U, &app->scroll);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
+            dndinitiative_move(&app->selection, 6U, 1);
+            dndinitiative_keep_visible(app->selection, 6U, &app->scroll);
+        }
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
                 app->selection == 5U && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             int8_t delta = event->key == InputKeyRight ? 1 : -1;
@@ -1100,26 +1284,60 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
             dndinitiative_save(app);
         } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == 0U) dndinitiative_seed_setup(app);
-            else if(app->selection == 1U) { if(app->active) app->screen = InitiativeScreenCombat; }
+            else if(app->selection == 1U) {
+                if(app->active) {
+                    app->screen = InitiativeScreenCombat;
+                    dndinitiative_focus_combat_member(app, app->current_turn);
+                }
+            }
             else if(app->selection == 2U) { app->screen = InitiativeScreenRoster; app->selection = app->scroll = 0U; }
             else if(app->selection == 3U) { if(app->combat_count) { app->screen = InitiativeScreenSetup; app->selection = app->scroll = 0U; } }
             else if(app->selection == 4U) {
-                app->active = 0U;
-                app->combat_count = 0U;
-                app->current_turn = 0U;
-                app->round = 1U;
-                app->selection = app->scroll = 0U;
-                dndinitiative_copy(app->status, sizeof(app->status), "Combat ended");
-                dndinitiative_save(app);
+                if(app->combat_count) {
+                    app->screen = InitiativeScreenEndCombat;
+                    app->selection = app->scroll = 0U;
+                } else {
+                    dndinitiative_copy(app->status, sizeof(app->status), "No current combat");
+                }
             } else if(app->selection == 5U) {
                 app->roll_mode = (uint8_t)((app->roll_mode + 1U) % 3U);
                 dndinitiative_save(app);
             }
         }
+    } else if(app->screen == InitiativeScreenEndCombat) {
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+           event->key == InputKeyUp)
+            dndinitiative_move(&app->selection, 3U, -1);
+        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+                event->key == InputKeyDown)
+            dndinitiative_move(&app->selection, 3U, 1);
+        else if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            app->screen = InitiativeScreenMenu;
+            app->selection = 4U;
+            app->scroll = 0U;
+        } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+            if(app->selection == 0U) {
+                if(dndinitiative_save_completed_history(app))
+                    dndinitiative_end_combat(app, "History saved");
+                else
+                    dndinitiative_copy(app->status, sizeof(app->status), "History save failed");
+            } else if(app->selection == 1U) {
+                dndinitiative_end_combat(app, "Combat ended");
+            } else {
+                app->screen = InitiativeScreenMenu;
+                app->selection = 4U;
+                app->scroll = 0U;
+            }
+        }
     } else if(app->screen == InitiativeScreenRoster) {
         uint8_t total = (uint8_t)(app->roster_count + 1U);
-        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) dndinitiative_move(&app->selection, total, -1);
-        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, total, 1);
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
+            dndinitiative_move(&app->selection, total, -1);
+            dndinitiative_keep_visible(app->selection, total, &app->scroll);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
+            dndinitiative_move(&app->selection, total, 1);
+            dndinitiative_keep_visible(app->selection, total, &app->scroll);
+        }
         else if(event->type == InputTypeShort && event->key == InputKeyBack) { app->screen = InitiativeScreenMenu; app->selection = app->scroll = 0U; }
         else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == app->roster_count && app->roster_count < INIT_MAX) {
@@ -1131,8 +1349,13 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
         }
     } else if(app->screen == InitiativeScreenSetup) {
         uint8_t total = (uint8_t)(app->combat_count + 3U);
-        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) dndinitiative_move(&app->selection, total, -1);
-        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, total, 1);
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
+            dndinitiative_move(&app->selection, total, -1);
+            dndinitiative_keep_visible(app->selection, total, &app->scroll);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
+            dndinitiative_move(&app->selection, total, 1);
+            dndinitiative_keep_visible(app->selection, total, &app->scroll);
+        }
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && app->selection > 0U && app->selection <= app->combat_count && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             InitiativeMember* member = &app->combat[app->selection - 1U]; member->total = dndinitiative_clamp(member->total + (event->key == InputKeyRight ? 1 : -1), -99, 199); dndinitiative_save(app);
         } else if(event->type == InputTypeLong && event->key == InputKeyUp && app->selection > 0U && app->selection <= app->combat_count) {
@@ -1160,29 +1383,70 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
             else dndinitiative_start(app);
         }
     } else if(app->screen == InitiativeScreenCombat) {
-        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) dndinitiative_move(&app->selection, app->combat_count, -1);
-        else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, app->combat_count, 1);
+        if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
+            dndinitiative_move(&app->selection, app->combat_count, -1);
+            dndinitiative_keep_visible(app->selection, app->combat_count, &app->scroll);
+        } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
+            dndinitiative_move(&app->selection, app->combat_count, 1);
+            dndinitiative_keep_visible(app->selection, app->combat_count, &app->scroll);
+        }
         else if(event->type == InputTypeShort && event->key == InputKeyBack) { app->screen = InitiativeScreenMenu; app->selection = app->scroll = 0U; }
         else if(event->type == InputTypeLong && event->key == InputKeyUp && app->combat_count) { dndinitiative_previous_turn(app); }
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && (event->key == InputKeyLeft || event->key == InputKeyRight) && app->combat_count) { InitiativeMember* m=&app->combat[app->selection]; m->hp_current=dndinitiative_clamp(m->hp_current+(event->key==InputKeyRight?1:-1),-999,999); dndinitiative_sync_main_if_needed(app,m); dndinitiative_save(app); }
         else if(event->type == InputTypeLong && event->key == InputKeyOk && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->edit_field=app->scroll=0U; app->delete_armed=0U; app->screen=InitiativeScreenEdit; }
         else if(event->type == InputTypeLong && event->key == InputKeyDown && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->input_member=app->selection; dndinitiative_begin_text(app,InitiativeTextConditions,"Participant conditions",app->combat[app->selection].conditions); }
-        else if(event->type == InputTypeLong && event->key == InputKeyLeft && app->combat_count && app->selection>0U) { dndinitiative_swap(app,app->selection,(uint8_t)(app->selection-1U)); --app->selection; dndinitiative_save(app); }
-        else if(event->type == InputTypeLong && event->key == InputKeyRight && app->combat_count && app->selection+1U<app->combat_count) { dndinitiative_swap(app,app->selection,(uint8_t)(app->selection+1U)); ++app->selection; dndinitiative_save(app); }
-        else if(event->type == InputTypeShort && event->key == InputKeyOk && app->combat_count) { dndinitiative_patch_character(app,NULL,1U); ++app->current_turn; if(app->current_turn>=app->combat_count){app->current_turn=0U;++app->round;if(!app->round)app->round=1U;} app->selection=app->current_turn; dndinitiative_save(app); }
+        else if(event->type == InputTypeLong && event->key == InputKeyLeft && app->combat_count && app->selection>0U) {
+            dndinitiative_swap(app, app->selection, (uint8_t)(app->selection - 1U));
+            --app->selection;
+            dndinitiative_keep_visible(app->selection, app->combat_count, &app->scroll);
+            dndinitiative_save(app);
+        }
+        else if(event->type == InputTypeLong && event->key == InputKeyRight && app->combat_count && app->selection+1U<app->combat_count) {
+            dndinitiative_swap(app, app->selection, (uint8_t)(app->selection + 1U));
+            ++app->selection;
+            dndinitiative_keep_visible(app->selection, app->combat_count, &app->scroll);
+            dndinitiative_save(app);
+        }
+        else if(event->type == InputTypeShort && event->key == InputKeyOk && app->combat_count) {
+            dndinitiative_patch_character(app, NULL, 1U);
+            ++app->current_turn;
+            if(app->current_turn >= app->combat_count) {
+                app->current_turn = 0U;
+                ++app->round;
+                if(!app->round) app->round = 1U;
+            }
+            dndinitiative_focus_combat_member(app, app->current_turn);
+            dndinitiative_save(app);
+        }
     } else {
         InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] : &app->roster[app->selection];
         uint8_t edit_count = app->edit_combat ? 9U : 8U;
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) {
             app->delete_armed = 0U;
             dndinitiative_move(&app->edit_field, edit_count, -1);
+            dndinitiative_keep_visible(app->edit_field, edit_count, &app->scroll);
         } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) {
             app->delete_armed = 0U;
             dndinitiative_move(&app->edit_field, edit_count, 1);
+            dndinitiative_keep_visible(app->edit_field, edit_count, &app->scroll);
         } else if(event->type == InputTypeShort && event->key == InputKeyBack) {
-            if(app->edit_setup) app->screen=InitiativeScreenSetup;
-            else app->screen=app->edit_combat?InitiativeScreenCombat:InitiativeScreenRoster;
-            app->selection=app->scroll=0U;
+            uint8_t edited_member = app->selection;
+            if(app->edit_setup) {
+                app->screen = InitiativeScreenSetup;
+                app->selection = (uint8_t)(edited_member + 1U);
+                app->scroll = 0U;
+                dndinitiative_keep_visible(
+                    app->selection, (uint8_t)(app->combat_count + 3U), &app->scroll);
+            } else if(app->edit_combat) {
+                app->screen = InitiativeScreenCombat;
+                dndinitiative_focus_combat_member(app, edited_member);
+            } else {
+                app->screen = InitiativeScreenRoster;
+                app->selection = edited_member;
+                app->scroll = 0U;
+                dndinitiative_keep_visible(
+                    app->selection, (uint8_t)(app->roster_count + 1U), &app->scroll);
+            }
         } else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && (event->key==InputKeyLeft||event->key==InputKeyRight)) {
             int16_t d=event->key==InputKeyRight?1:-1;
             if(app->edit_combat) {
@@ -1225,7 +1489,15 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                     --app->combat_count;
                     if(!app->combat_count) { app->active=0U; app->current_turn=0U; }
                     else if(app->current_turn>=app->combat_count) app->current_turn=0U;
-                    app->screen=app->edit_setup?InitiativeScreenSetup:InitiativeScreenCombat; app->selection=app->scroll=0U; dndinitiative_save(app);
+                    if(app->edit_setup) {
+                        app->screen = InitiativeScreenSetup;
+                        app->selection = app->combat_count ? 1U : 0U;
+                        app->scroll = 0U;
+                    } else {
+                        app->screen = InitiativeScreenCombat;
+                        dndinitiative_focus_combat_member(app, app->current_turn);
+                    }
+                    dndinitiative_save(app);
                 } else app->delete_armed=1U;
             } else {
                 if(app->edit_field==1U) dndinitiative_begin_number(app,InitiativeNumberModifier,false,app->selection,"Initiative modifier",member->modifier,-50,50);

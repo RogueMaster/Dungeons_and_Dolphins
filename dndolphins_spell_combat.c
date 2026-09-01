@@ -69,6 +69,7 @@ static const PocketSpellDamageMap dndolphins_spell_combat_damage_map[] = {
     {"Cure Wounds", 2, 8, 0, 0, 0, 2, 0, 0, 0, 1, PocketSpellResolutionHealing, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"False Life", 2, 4, 0, 0, 4, 0, 0, 5, 0, 0, PocketSpellResolutionTemporaryHP, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Healing Word", 2, 4, 0, 0, 0, 2, 0, 0, 0, 1, PocketSpellResolutionHealing, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
+    {"Heroism", 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, PocketSpellResolutionTemporaryHP, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Burning Hands", 3, 6, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Chromatic Orb", 3, 8, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionAttack, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Dissonant Whispers", 3, 6, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
@@ -89,6 +90,7 @@ static const PocketSpellDamageMap dndolphins_spell_combat_damage_map[] = {
     {"Aganazzar's Scorcher", 3, 8, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Phantasmal Force", 2, 8, 0, 0, 0, 0, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Death Armor", 2, 4, 0, 0, 0, 0, 0, 0, 0, 0, PocketSpellResolutionTriggered, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
+    {"Aid", 0, 0, 0, 0, 5, 0, 0, 5, 0, 0, PocketSpellResolutionVitality, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Acid Arrow", 4, 4, 2, 4, 0, 1, 1, 0, 0, 0, PocketSpellResolutionAttack, 0, 0, 0, 0, 0, 0, PocketSpellResolutionTriggered, PocketSpellSecondaryLater, 0, 0, PocketSpellDerivedNone},
     {"Dragon's Breath", 3, 6, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Flame Blade", 3, 6, 0, 0, 0, 1, 0, 0, 0, 1, PocketSpellResolutionAttack, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
@@ -191,6 +193,7 @@ static const PocketSpellDamageMap dndolphins_spell_combat_damage_map[] = {
     {"Investiture of Wind", 2, 10, 0, 0, 0, 0, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
 
     {"Arcane Sword", 4, 12, 0, 0, 0, 0, 0, 0, 0, 1, PocketSpellResolutionAttack, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
+    {"Heal", 0, 0, 0, 0, 70, 0, 0, 10, 0, 0, PocketSpellResolutionHealing, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Regenerate", 4, 8, 0, 0, 15, 0, 0, 0, 0, 0, PocketSpellResolutionHealing, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},
     {"Conjure Celestial", 6, 12, 4, 12, 0, 1, 1, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 1, PocketSpellResolutionHealing, PocketSpellSecondaryAlternative, 0, 0, PocketSpellDerivedNone},
     {"Delayed Blast Fireball", 12, 6, 0, 0, 0, 1, 0, 0, 0, 0, PocketSpellResolutionSave, 0, 0, 0, 0, 0, 0, PocketSpellResolutionNone, PocketSpellSecondaryNone, 0, 0, PocketSpellDerivedNone},

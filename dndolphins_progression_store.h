@@ -18,6 +18,8 @@ typedef enum {
 
 bool dndolphins_progression_store_features_exist(Storage* storage, uint32_t profile);
 bool dndolphins_progression_store_features_count(Storage* storage, uint32_t profile, uint8_t* total_count);
+bool dndolphins_progression_store_features_contains_name(
+    Storage* storage, uint32_t profile, const char* name, bool* found);
 bool dndolphins_progression_store_features_load_window(
     Storage* storage,
     uint32_t profile,

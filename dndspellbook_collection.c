@@ -1,6 +1,7 @@
 #include "dndspellbook_collection.h"
 
 #include "dnd_profile_handoff.h"
+#include "dnd_profile_projection.h"
 #include "dnd_fs.h"
 #include "dnd_data.h"
 #include "dnd_spell_eligibility.h"
@@ -92,13 +93,29 @@ static const char* const dndspellbook_collection_source_names[] = {
     "Any", "Core", "Xanathar", "Forgotten Realms", "Ravenloft", "Other"};
 
 typedef struct {
+    char name[POCKET_D20_CHARACTER_NAME_LEN];
+    uint8_t class_count;
+    PocketClassLevel classes[POCKET_D20_MAX_CLASSES];
+    uint8_t spell_count;
+    PocketSpell* spells;
+    uint8_t* spell_known;
+    uint8_t* spell_always_prepared;
+    uint8_t* spell_free_casts_current;
+    uint8_t* spell_free_casts_max;
+} DndSpellbookCharacterState;
+
+typedef struct {
+    DndSpellbookCharacterState character;
+} DndSpellbookAppData;
+
+typedef struct {
     Gui* gui;
     Storage* storage;
     ViewDispatcher* dispatcher;
     View* view;
     TextInput* text_input;
     NumberInput* number_input;
-    PocketSaveData data;
+    DndSpellbookAppData data;
     DndSpellbookCollectionScreen screen;
     DndSpellbookCollectionEdit edit;
     uint32_t profile;
@@ -330,7 +347,7 @@ static uint16_t dndspellbook_collection_class_mask(char* classes) {
 }
 
 static bool dndspellbook_collection_class_allows(
-    const PocketCharacter* character,
+    const DndSpellbookCharacterState* character,
     uint8_t class_index,
     uint8_t level,
     uint16_t mask) {
@@ -347,7 +364,7 @@ static bool dndspellbook_collection_spell_allowed(
     DndSpellbookCollectionApp* app,
     uint8_t level,
     uint16_t mask) {
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     if(app->filter_show_all) return true;
     if(app->filter_class < character->class_count)
         return dndspellbook_collection_class_allows(character, app->filter_class, level, mask);
@@ -361,7 +378,7 @@ static uint8_t dndspellbook_collection_resolve_class(
     uint8_t level,
     uint16_t mask,
     uint8_t preferred) {
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     if(app->filter_class < character->class_count &&
        dndspellbook_collection_class_allows(character, app->filter_class, level, mask))
         return app->filter_class;
@@ -373,25 +390,93 @@ static uint8_t dndspellbook_collection_resolve_class(
     return preferred < character->class_count ? preferred : 0U;
 }
 
+static void dndspellbook_collection_clear_page(DndSpellbookCharacterState* character) {
+    if(!character) return;
+    free(character->spells);
+    free(character->spell_known);
+    free(character->spell_always_prepared);
+    free(character->spell_free_casts_current);
+    free(character->spell_free_casts_max);
+    character->spells = NULL;
+    character->spell_known = NULL;
+    character->spell_always_prepared = NULL;
+    character->spell_free_casts_current = NULL;
+    character->spell_free_casts_max = NULL;
+    character->spell_count = 0U;
+}
+
+static PocketCharacter* dndspellbook_collection_io_character(
+    const DndSpellbookCharacterState* state,
+    bool attach_page) {
+    PocketCharacter* io = calloc(1U, sizeof(PocketCharacter));
+    if(!io || !state) return io;
+    dndspellbook_collection_copy(io->name, sizeof(io->name), state->name);
+    io->class_count = state->class_count;
+    for(uint8_t i = 0U; i < state->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+        io->classes[i] = state->classes[i];
+    if(attach_page) {
+        io->spell_count = state->spell_count;
+        io->spell_capacity = state->spell_count;
+        io->spells = state->spells;
+        io->spell_known = state->spell_known;
+        io->spell_always_prepared = state->spell_always_prepared;
+        io->spell_free_casts_current = state->spell_free_casts_current;
+        io->spell_free_casts_max = state->spell_free_casts_max;
+    }
+    return io;
+}
+
+static void dndspellbook_collection_free_io_character(PocketCharacter* io, bool owns_page) {
+    if(!io) return;
+    if(owns_page) dnd_data_clear_spells(io);
+    else {
+        io->spells = NULL;
+        io->spell_known = NULL;
+        io->spell_always_prepared = NULL;
+        io->spell_free_casts_current = NULL;
+        io->spell_free_casts_max = NULL;
+    }
+    free(io);
+}
+
 static bool dndspellbook_collection_load_page(DndSpellbookCollectionApp* app, uint8_t start) {
+    PocketCharacter* io = dndspellbook_collection_io_character(&app->data.character, false);
+    if(!io) return false;
     uint8_t total = app->total;
-    if(!dnd_storage_load_spellbook_window_indexed(
-           app->storage,
-           app->profile,
-           start,
-           &app->data.character,
-           &total,
-           app->record_page_offsets,
-           &app->record_offset_valid_pages))
-        return false;
-    app->total = total;
-    app->cache_start = start;
-    return true;
+    bool ok = dnd_storage_load_spellbook_window_indexed(
+        app->storage,
+        app->profile,
+        start,
+        io,
+        &total,
+        app->record_page_offsets,
+        &app->record_offset_valid_pages);
+    if(ok) {
+        dndspellbook_collection_clear_page(&app->data.character);
+        app->data.character.spells = io->spells;
+        app->data.character.spell_known = io->spell_known;
+        app->data.character.spell_always_prepared = io->spell_always_prepared;
+        app->data.character.spell_free_casts_current = io->spell_free_casts_current;
+        app->data.character.spell_free_casts_max = io->spell_free_casts_max;
+        app->data.character.spell_count = io->spell_count;
+        io->spells = NULL;
+        io->spell_known = NULL;
+        io->spell_always_prepared = NULL;
+        io->spell_free_casts_current = NULL;
+        io->spell_free_casts_max = NULL;
+        io->spell_count = io->spell_capacity = 0U;
+        app->total = total;
+        app->cache_start = start;
+    }
+    dndspellbook_collection_free_io_character(io, true);
+    return ok;
 }
 
 static bool dndspellbook_collection_save_page(DndSpellbookCollectionApp* app) {
-    bool ok = dnd_storage_save_spellbook_window(
-        app->storage, app->profile, app->cache_start, &app->data.character);
+    PocketCharacter* io = dndspellbook_collection_io_character(&app->data.character, true);
+    bool ok = io && dnd_storage_save_spellbook_window(
+        app->storage, app->profile, app->cache_start, io);
+    dndspellbook_collection_free_io_character(io, false);
     if(ok) app->record_offset_valid_pages = 0U;
     if(ok) dndspellbook_collection_set_transient_status(app, "Saved");
     else dndspellbook_collection_set_status(app, "UNSAVED");
@@ -477,14 +562,39 @@ static bool dndspellbook_collection_add_blank(DndSpellbookCollectionApp* app) {
         dndspellbook_collection_set_status(app, "Tail read failed");
         return false;
     }
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     uint8_t expected = (uint8_t)(app->total - target);
     if(character->spell_count != expected ||
-       character->spell_count >= POCKET_D20_COLLECTION_CACHE_SIZE ||
-       !dnd_data_reserve_spells(character, (uint8_t)(character->spell_count + 1U))) {
+       character->spell_count >= POCKET_D20_COLLECTION_CACHE_SIZE) {
         dndspellbook_collection_set_status(app, "Spell add failed");
         return false;
     }
+    uint8_t required = (uint8_t)(character->spell_count + 1U);
+    PocketSpell* spells = realloc(character->spells, (size_t)required * sizeof(PocketSpell));
+    uint8_t* known = realloc(character->spell_known, required);
+    uint8_t* always = realloc(character->spell_always_prepared, required);
+    uint8_t* free_current = realloc(character->spell_free_casts_current, required);
+    uint8_t* free_max = realloc(character->spell_free_casts_max, required);
+    if(!spells || !known || !always || !free_current || !free_max) {
+        /* realloc success cannot safely be rolled back across five parallel arrays;
+           reload the persisted tail to restore a coherent bounded page. */
+        if(spells) character->spells = spells;
+        if(known) character->spell_known = known;
+        if(always) character->spell_always_prepared = always;
+        if(free_current) character->spell_free_casts_current = free_current;
+        if(free_max) character->spell_free_casts_max = free_max;
+        (void)dndspellbook_collection_load_page(app, target);
+        dndspellbook_collection_set_status(app, "Spell add failed");
+        return false;
+    }
+    character->spells = spells;
+    character->spell_known = known;
+    character->spell_always_prepared = always;
+    character->spell_free_casts_current = free_current;
+    character->spell_free_casts_max = free_max;
+    character->spell_always_prepared[character->spell_count] = 0U;
+    character->spell_free_casts_current[character->spell_count] = 0U;
+    character->spell_free_casts_max[character->spell_count] = 0U;
     uint8_t local = character->spell_count;
     PocketSpell* spell = &character->spells[local];
     memset(spell, 0, sizeof(*spell));
@@ -507,8 +617,11 @@ static bool dndspellbook_collection_add_blank(DndSpellbookCollectionApp* app) {
 
 static bool dndspellbook_collection_delete_current(DndSpellbookCollectionApp* app) {
     if(app->record_index >= app->total) return false;
-    if(!dnd_storage_delete_spell(
-           app->storage, app->profile, &app->data.character, app->record_index)) {
+    PocketCharacter* owner = dndspellbook_collection_io_character(&app->data.character, false);
+    bool deleted = owner && dnd_storage_delete_spell(
+           app->storage, app->profile, owner, app->record_index);
+    dndspellbook_collection_free_io_character(owner, false);
+    if(!deleted) {
         dndspellbook_collection_set_status(app, "Delete failed");
         return false;
     }
@@ -658,7 +771,7 @@ static bool dndspellbook_collection_sort_key_from_line(
     return key->name[0] != '\0';
 }
 
-static uint8_t dndspellbook_collection_character_level(const PocketCharacter* character) {
+static uint8_t dndspellbook_collection_character_level(const DndSpellbookCharacterState* character) {
     uint16_t total = 0U;
     if(character) {
         for(uint8_t i = 0U; i < character->class_count; ++i) total += character->classes[i].level;
@@ -1211,7 +1324,7 @@ static void dndspellbook_collection_format_detail(
     uint8_t field,
     char* out,
     size_t size) {
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     uint8_t local = 0U;
     PocketSpell* spell = dndspellbook_collection_spell_cached(app, app->record_index, &local);
     if(!spell) {
@@ -1334,7 +1447,7 @@ static void dndspellbook_collection_draw_catalog(Canvas* canvas, DndSpellbookCol
 
 static void dndspellbook_collection_draw_filters(Canvas* canvas, DndSpellbookCollectionApp* app) {
     char rows[7][48];
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     if(app->filter_level < 0)
         dndspellbook_collection_copy(rows[0], sizeof(rows[0]), "Level: Any");
     else if(app->filter_level == 0)
@@ -1481,7 +1594,7 @@ static bool dndspellbook_collection_begin_number(DndSpellbookCollectionApp* app,
 }
 
 static void dndspellbook_collection_adjust(DndSpellbookCollectionApp* app, uint8_t field, int8_t delta) {
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     uint8_t local = 0U;
     PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(!spell) return;
@@ -1619,7 +1732,7 @@ static void dndspellbook_collection_detail_hold_ok(DndSpellbookCollectionApp* ap
 }
 
 static void dndspellbook_collection_filter_adjust(DndSpellbookCollectionApp* app, int8_t delta) {
-    PocketCharacter* character = &app->data.character;
+    DndSpellbookCharacterState* character = &app->data.character;
     switch(app->filter_selection) {
     case 0: {
         int16_t next = app->filter_level + delta;
@@ -1846,8 +1959,13 @@ static bool dndspellbook_collection_load_profile(
     if(!dnd_profile_ref_active_id(app->storage, &requested)) return false;
     app->profile = requested;
 
-    bool recovered = false;
-    if(!dnd_storage_load_profile(app->storage, requested, &app->data, &recovered)) return false;
+    DndSpellbookProfileProjection projection;
+    if(!dnd_profile_projection_load_spellbook(app->storage, requested, &projection)) return false;
+    dndspellbook_collection_copy(
+        app->data.character.name, sizeof(app->data.character.name), projection.name);
+    app->data.character.class_count = projection.class_count;
+    for(uint8_t i = 0U; i < projection.class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+        app->data.character.classes[i] = projection.classes[i];
     return true;
 }
 
@@ -1907,7 +2025,7 @@ fail:
     if(app->number_input) number_input_free(app->number_input);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-    dnd_data_clear(&app->data);
+    dndspellbook_collection_clear_page(&app->data.character);
     if(app->storage) furi_record_close(RECORD_STORAGE);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
@@ -1926,7 +2044,7 @@ static void dndspellbook_collection_free(DndSpellbookCollectionApp* app) {
     if(app->number_input) number_input_free(app->number_input);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-    dnd_data_clear(&app->data);
+    dndspellbook_collection_clear_page(&app->data.character);
     if(app->storage) furi_record_close(RECORD_STORAGE);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);

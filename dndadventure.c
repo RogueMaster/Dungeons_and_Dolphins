@@ -3,6 +3,7 @@
 #include "dndadventure_campaigns.h"
 #include "dnd_fs.h"
 #include "dnd_profile_handoff.h"
+#include "dnd_profile_projection.h"
 #include "dnd_rules.h"
 #include "dndadventure_item_reward.h"
 #include "dnd_storage.h"
@@ -69,7 +70,7 @@ typedef struct {
     ViewDispatcher* dispatcher;
     View* view;
 
-    PocketSaveData character_data;
+    DndAdventureProfileProjection character;
     uint32_t profile;
     uint8_t character_loaded;
     uint8_t return_to_dnd;
@@ -109,6 +110,31 @@ static void dndadventure_copy(char* destination, size_t size, const char* source
 
 static void dndadventure_set_status(DndAdventureApp* app, const char* status) {
     dndadventure_copy(app->status, sizeof(app->status), status);
+}
+
+static uint8_t dndadventure_character_level(const DndAdventureProfileProjection* character) {
+    uint16_t total = 0U;
+    if(character) {
+        for(uint8_t i = 0U; i < character->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+            total += character->class_levels[i];
+    }
+    if(total < 1U) return 1U;
+    return total > 20U ? 20U : (uint8_t)total;
+}
+
+static int8_t dndadventure_skill_modifier(
+    const DndAdventureProfileProjection* character,
+    uint8_t skill) {
+    if(!character || skill >= POCKET_D20_SKILL_COUNT) return 0;
+    uint8_t ability = dnd_rules_core_skill_abilities[skill];
+    int16_t total = dnd_rules_core_ability_modifier(character->ability_scores[ability]) +
+                    character->skill_misc[skill];
+    uint8_t pb = (uint8_t)(2U + (dndadventure_character_level(character) - 1U) / 4U);
+    if(character->skill_proficiency[skill] == PocketProficiencyProficient) total += pb;
+    else if(character->skill_proficiency[skill] == PocketProficiencyExpertise) total += pb * 2U;
+    if(total < -128) total = -128;
+    if(total > 127) total = 127;
+    return (int8_t)total;
 }
 
 static bool dndadventure_parse_u32(const char* text, uint32_t maximum, uint32_t* output) {
@@ -327,7 +353,7 @@ static void dndadventure_reward_item(DndAdventureApp* app, const char* name) {
     if(!dndadventure_item_reward_grant_reward(
            app->storage,
            app->profile,
-           &app->character_data.character,
+           &app->character,
            name,
            "Adventure reward"))
         dndadventure_set_status(app, "Item reward save failed");
@@ -438,7 +464,7 @@ static bool dndadventure_apply_choice(DndAdventureApp* app, const DndAdventureCh
             return false;
         }
         natural = (uint8_t)dnd_rules_core_roll_dice(1U, 20U);
-        modifier = dnd_rules_core_skill_modifier(&app->character_data.character, (uint8_t)choice->skill);
+        modifier = dndadventure_skill_modifier(&app->character, (uint8_t)choice->skill);
         app->last_natural = natural;
         app->last_modifier = modifier;
         app->last_skill = choice->skill;
@@ -990,16 +1016,10 @@ static bool dndadventure_load_character(DndAdventureApp* app, const char* args) 
         return false;
     }
 
-    bool recovered = false;
-    app->character_loaded = dnd_storage_load_profile(
-                                app->storage, app->profile, &app->character_data, &recovered) ?
+    app->character_loaded = dnd_profile_projection_load_adventure(
+                                app->storage, app->profile, &app->character) ?
                                 1U :
                                 0U;
-    if(app->character_loaded && recovered)
-        app->character_loaded = dnd_storage_restore_backup(
-                                    app->storage, app->profile, &app->character_data) ?
-                                    1U :
-                                    0U;
     return app->character_loaded != 0U;
 }
 
@@ -1070,7 +1090,6 @@ static DndAdventureApp* dndadventure_app_alloc(const char* args) {
 fail:
     dndadventure_scene_free(app);
     dndadventure_campaigns_cache_reset();
-    dnd_data_clear(&app->character_data);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
     if(app->storage) furi_record_close(RECORD_STORAGE);
@@ -1087,7 +1106,6 @@ static void dndadventure_app_free(DndAdventureApp* app) {
     if(app->dispatcher && app->view) view_dispatcher_remove_view(app->dispatcher, 0U);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-    dnd_data_clear(&app->character_data);
     if(app->storage) furi_record_close(RECORD_STORAGE);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);

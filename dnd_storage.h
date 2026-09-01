@@ -208,6 +208,10 @@ bool dnd_storage_delete_item(
     const PocketCharacter* owner,
     uint8_t index);
 
+/* Resolve the current canonical profile filename for a profile id. Read-only
+   projections use this to stream only fields they own/need. */
+bool dnd_storage_find_profile_path(Storage* storage, uint32_t profile, char* output, size_t size);
+
 bool dnd_storage_load_profile(
     Storage* storage,
     uint32_t profile,

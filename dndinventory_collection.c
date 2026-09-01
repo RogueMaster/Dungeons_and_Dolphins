@@ -201,7 +201,7 @@ typedef struct {
     View* view;
     TextInput* text_input;
     NumberInput* number_input;
-    PocketSaveData data;
+    DndInventoryAppData data;
     DndInventoryCollectionScreen screen;
     DndInventoryCollectionScreen return_screen;
     DndInventoryCollectionEdit edit;
@@ -535,9 +535,80 @@ static void dndinventory_collection_apply_item_preset(PocketItem* item, const ch
     }
 }
 
+static void dndinventory_collection_projection_from_state(
+    const DndInventoryCharacterState* state,
+    DndInventoryProfileProjection* projection) {
+    memset(projection, 0, sizeof(*projection));
+    if(!state) return;
+    dndinventory_collection_copy(projection->name, sizeof(projection->name), state->name);
+    dndinventory_collection_copy(projection->species, sizeof(projection->species), state->species);
+    dndinventory_collection_copy(projection->background, sizeof(projection->background), state->background);
+    projection->class_count = state->class_count;
+    for(uint8_t i = 0U; i < state->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+        projection->classes[i] = state->classes[i];
+    memcpy(projection->ability_scores, state->ability_scores, sizeof(projection->ability_scores));
+    projection->armor_class = state->armor_class;
+    projection->exhaustion = state->exhaustion;
+    projection->encumbrance_mode = state->encumbrance_mode;
+    projection->carrying_capacity_override = state->carrying_capacity_override;
+}
+
+static void dndinventory_collection_state_from_projection(
+    DndInventoryCharacterState* state,
+    const DndInventoryProfileProjection* projection) {
+    PocketItem* items = state->items;
+    uint8_t item_count = state->item_count;
+    memset(state, 0, sizeof(*state));
+    state->items = items;
+    state->item_count = item_count;
+    if(!projection) return;
+    dndinventory_collection_copy(state->name, sizeof(state->name), projection->name);
+    dndinventory_collection_copy(state->species, sizeof(state->species), projection->species);
+    dndinventory_collection_copy(state->background, sizeof(state->background), projection->background);
+    state->class_count = projection->class_count;
+    for(uint8_t i = 0U; i < projection->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+        state->classes[i] = projection->classes[i];
+    memcpy(state->ability_scores, projection->ability_scores, sizeof(state->ability_scores));
+    state->armor_class = projection->armor_class;
+    state->exhaustion = projection->exhaustion;
+    state->encumbrance_mode = projection->encumbrance_mode;
+    state->carrying_capacity_override = projection->carrying_capacity_override;
+}
+
+static PocketCharacter* dndinventory_collection_io_character(
+    const DndInventoryCharacterState* state,
+    bool attach_items) {
+    PocketCharacter* io = calloc(1U, sizeof(PocketCharacter));
+    if(!io || !state) return io;
+    dndinventory_collection_copy(io->name, sizeof(io->name), state->name);
+    io->class_count = state->class_count;
+    for(uint8_t i = 0U; i < state->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+        io->classes[i] = state->classes[i];
+    io->currency_cp = state->currency_cp;
+    io->currency_sp = state->currency_sp;
+    io->currency_ep = state->currency_ep;
+    io->currency_gp = state->currency_gp;
+    io->currency_pp = state->currency_pp;
+    if(attach_items) {
+        io->item_count = state->item_count;
+        io->item_capacity = state->item_count;
+        io->items = state->items;
+    }
+    return io;
+}
+
+static void dndinventory_collection_free_io_character(PocketCharacter* io, bool owns_items) {
+    if(!io) return;
+    if(owns_items) dnd_data_clear_items(io);
+    else io->items = NULL;
+    free(io);
+}
+
 static bool dndinventory_collection_save_character(DndInventoryCollectionApp* app) {
     if(!app || !app->have_profile) return false;
-    bool ok = dnd_storage_save_profile_updated(app->storage, app->profile, &app->data);
+    DndInventoryProfileProjection projection;
+    dndinventory_collection_projection_from_state(&app->data.character, &projection);
+    bool ok = dnd_profile_projection_save_inventory_owned(app->storage, app->profile, &projection);
     if(ok) dndinventory_collection_set_transient_status(app, "Saved");
     else dndinventory_collection_set_status(app, "UNSAVED");
     return ok;
@@ -545,7 +616,7 @@ static bool dndinventory_collection_save_character(DndInventoryCollectionApp* ap
 
 static bool dndinventory_collection_save_currency(DndInventoryCollectionApp* app) {
     if(!app || !app->have_profile) return false;
-    PocketCharacter* c = &app->data.character;
+    DndInventoryCharacterState* c = &app->data.character;
     int32_t currency[5] = {
         c->currency_cp,
         c->currency_sp,
@@ -553,8 +624,10 @@ static bool dndinventory_collection_save_currency(DndInventoryCollectionApp* app
         c->currency_gp,
         c->currency_pp,
     };
-    bool ok = dnd_storage_save_inventory_currency(
-        app->storage, app->profile, c, currency);
+    PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+    bool ok = owner && dnd_storage_save_inventory_currency(
+        app->storage, app->profile, owner, currency);
+    dndinventory_collection_free_io_character(owner, false);
     if(ok) app->record_offset_valid_pages = 0U;
     if(ok) dndinventory_collection_set_transient_status(app, "Saved");
     else dndinventory_collection_set_status(app, "UNSAVED");
@@ -564,7 +637,7 @@ static bool dndinventory_collection_save_currency(DndInventoryCollectionApp* app
 static bool dndinventory_collection_load_currency(DndInventoryCollectionApp* app) {
     if(!app || !app->have_profile) return false;
     if(!dnd_storage_items_exist(app->storage, app->profile)) return true;
-    PocketCharacter* c = &app->data.character;
+    DndInventoryCharacterState* c = &app->data.character;
     int32_t currency[5];
     bool found = false;
     if(!dnd_storage_load_inventory_currency(
@@ -588,8 +661,10 @@ static bool dndinventory_collection_load_currency(DndInventoryCollectionApp* app
     c->currency_gp = 0;
     c->currency_pp = 0;
     int32_t zero_currency[5] = {0, 0, 0, 0, 0};
-    bool saved = dnd_storage_save_inventory_currency(
-        app->storage, app->profile, c, zero_currency);
+    PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+    bool saved = owner && dnd_storage_save_inventory_currency(
+        app->storage, app->profile, owner, zero_currency);
+    dndinventory_collection_free_io_character(owner, false);
     if(saved) app->record_offset_valid_pages = 0U;
     return saved;
 }
@@ -670,7 +745,7 @@ static bool dndinventory_collection_grant_initial_inventory(DndInventoryCollecti
     }
     bool initialized = false;
     if(!dndinventory_items_initialize_inventory(
-           app->storage, app->profile, &app->data, &initialized)) {
+           app->storage, app->profile, &app->data.character, &initialized)) {
         dndinventory_collection_set_status(app, "Grant failed");
         return false;
     }
@@ -711,7 +786,7 @@ static bool dndinventory_collection_regrant_initial_inventory(DndInventoryCollec
 
     bool regranted = false;
     if(!dndinventory_items_regrant_inventory_once(
-           app->storage, app->profile, &app->data, &regranted)) {
+           app->storage, app->profile, &app->data.character, &regranted)) {
         dndinventory_collection_set_status(app, "Regrant failed");
         return false;
     }
@@ -952,7 +1027,7 @@ static void dndinventory_collection_draw_inventory_tools(Canvas* canvas, DndInve
 }
 
 static void dndinventory_collection_draw_currency(Canvas* canvas, DndInventoryCollectionApp* app) {
-    const PocketCharacter* c = &app->data.character;
+    const DndInventoryCharacterState* c = &app->data.character;
     char rows[5][48];
     snprintf(rows[0], sizeof(rows[0]), "Copper: %ld", (long)c->currency_cp);
     snprintf(rows[1], sizeof(rows[1]), "Silver: %ld", (long)c->currency_sp);
@@ -965,7 +1040,7 @@ static void dndinventory_collection_draw_currency(Canvas* canvas, DndInventoryCo
 }
 
 static void dndinventory_collection_draw_resources(Canvas* canvas, DndInventoryCollectionApp* app) {
-    const PocketCharacter* c = &app->data.character;
+    const DndInventoryCharacterState* c = &app->data.character;
     const DndInventoryItemAggregate* aggregate = &app->item_aggregate;
     bool aggregate_ok = app->item_aggregate_valid != 0U;
     int16_t carried = aggregate_ok ? aggregate->carried_weight_tenths : 0;
@@ -1031,25 +1106,35 @@ static bool dndinventory_collection_load_profile(
     if(!dnd_profile_ref_active_id(app->storage, &requested)) return false;
     app->profile = requested;
 
-    bool recovered = false;
-    if(!dnd_storage_load_profile(app->storage, requested, &app->data, &recovered)) return false;
+    DndInventoryProfileProjection projection;
+    if(!dnd_profile_projection_load_inventory(app->storage, requested, &projection)) return false;
+    dndinventory_collection_state_from_projection(&app->data.character, &projection);
     return true;
 }
 
 static bool dndinventory_collection_load_page(DndInventoryCollectionApp* app, uint8_t start) {
+    PocketCharacter* io = dndinventory_collection_io_character(&app->data.character, false);
+    if(!io) return false;
     uint8_t total = app->total;
-    if(!dnd_storage_load_items_window_indexed(
-           app->storage,
-           app->profile,
-           start,
-           &app->data.character,
-           &total,
-           app->record_page_offsets,
-           &app->record_offset_valid_pages))
-        return false;
-    app->total = total;
-    app->cache_start = start;
-    return true;
+    bool ok = dnd_storage_load_items_window_indexed(
+        app->storage,
+        app->profile,
+        start,
+        io,
+        &total,
+        app->record_page_offsets,
+        &app->record_offset_valid_pages);
+    if(ok) {
+        free(app->data.character.items);
+        app->data.character.items = io->items;
+        app->data.character.item_count = io->item_count;
+        io->items = NULL;
+        io->item_count = io->item_capacity = 0U;
+        app->total = total;
+        app->cache_start = start;
+    }
+    dndinventory_collection_free_io_character(io, true);
+    return ok;
 }
 
 static bool dndinventory_collection_save_page(DndInventoryCollectionApp* app) {
@@ -1057,17 +1142,22 @@ static bool dndinventory_collection_save_page(DndInventoryCollectionApp* app) {
        write, establish the sidecar with Currency= before committing the Item
        page. Shared/non-Inventory Item writers deliberately do not do this. */
     if(!dnd_storage_items_exist(app->storage, app->profile)) {
-        const PocketCharacter* c = &app->data.character;
+        const DndInventoryCharacterState* c = &app->data.character;
         int32_t currency[5] = {
             c->currency_cp, c->currency_sp, c->currency_ep, c->currency_gp, c->currency_pp};
-        if(!dnd_storage_save_inventory_currency(
-               app->storage, app->profile, c, currency)) {
+        PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+        bool currency_saved = owner && dnd_storage_save_inventory_currency(
+               app->storage, app->profile, owner, currency);
+        dndinventory_collection_free_io_character(owner, false);
+        if(!currency_saved) {
             dndinventory_collection_set_status(app, "UNSAVED");
             return false;
         }
     }
-    bool ok = dnd_storage_save_items_window(
-        app->storage, app->profile, app->cache_start, &app->data.character);
+    PocketCharacter* io = dndinventory_collection_io_character(&app->data.character, true);
+    bool ok = io && dnd_storage_save_items_window(
+        app->storage, app->profile, app->cache_start, io);
+    dndinventory_collection_free_io_character(io, false);
     if(ok) {
         app->item_aggregate_valid = 0U;
         app->record_offset_valid_pages = 0U;
@@ -1124,13 +1214,18 @@ static bool dndinventory_collection_add_blank(DndInventoryCollectionApp* app) {
         dndinventory_collection_set_status(app, "Tail read failed");
         return false;
     }
-    PocketCharacter* c = &app->data.character;
+    DndInventoryCharacterState* c = &app->data.character;
     uint8_t expected = (uint8_t)(app->total - target);
-    if(c->item_count != expected || c->item_count >= POCKET_D20_COLLECTION_CACHE_SIZE ||
-       !dnd_data_reserve_items(c, (uint8_t)(c->item_count + 1U))) {
+    if(c->item_count != expected || c->item_count >= POCKET_D20_COLLECTION_CACHE_SIZE) {
         dndinventory_collection_set_status(app, "Item add failed");
         return false;
     }
+    PocketItem* resized = realloc(c->items, (size_t)(c->item_count + 1U) * sizeof(PocketItem));
+    if(!resized) {
+        dndinventory_collection_set_status(app, "Item add failed");
+        return false;
+    }
+    c->items = resized;
     PocketItem* item = &c->items[c->item_count];
     memset(item, 0, sizeof(*item));
     dndinventory_collection_copy(item->name, sizeof(item->name), "New Item");
@@ -1157,8 +1252,11 @@ static bool dndinventory_collection_add_blank(DndInventoryCollectionApp* app) {
 
 static bool dndinventory_collection_delete_current(DndInventoryCollectionApp* app) {
     if(app->record_index >= app->total) return false;
-    if(!dnd_storage_delete_item(
-           app->storage, app->profile, &app->data.character, app->record_index)) {
+    PocketCharacter* owner = dndinventory_collection_io_character(&app->data.character, false);
+    bool deleted = owner && dnd_storage_delete_item(
+           app->storage, app->profile, owner, app->record_index);
+    dndinventory_collection_free_io_character(owner, false);
+    if(!deleted) {
         dndinventory_collection_set_status(app, "Delete failed");
         return false;
     }
@@ -1322,7 +1420,7 @@ static void dndinventory_collection_format_detail(
     uint8_t field,
     char* out,
     size_t size) {
-    PocketCharacter* c = &app->data.character;
+    DndInventoryCharacterState* c = &app->data.character;
     PocketItem* item = dndinventory_collection_item_cached(app, app->record_index);
     if(!item) {
         dndinventory_collection_copy(out, size, "Read error");
@@ -1331,7 +1429,7 @@ static void dndinventory_collection_format_detail(
     switch(field) {
     case 0: snprintf(out, size, "Name: %.31s", item->name); break;
     case 1: snprintf(out, size, "Notes: %.31s", item->detail); break;
-    case 2: snprintf(out, size, "Quantity: %d", item->quantity); break;
+    case 2: snprintf(out, size, "Stack Qty: %d", item->quantity); break;
     case 3:
         snprintf(
             out,
@@ -1374,11 +1472,22 @@ static void dndinventory_collection_format_detail(
             out,
             size,
             "Attack %+d / %ud%u",
-            dnd_weapon_rules_attack_modifier(c, item),
+            dndinventory_rules_weapon_attack_modifier(c, item),
             item->damage_dice,
             item->use_versatile ? item->versatile_die : item->damage_die);
         break;
-    case 28: snprintf(out, size, "Container: %s", item->container_index < 0 ? "Carried" : "Inside item"); break;
+    case 28:
+        if(item->container_index < 0) {
+            dndinventory_collection_copy(out, size, "Container: Carried");
+        } else {
+            PocketItem* container = dndinventory_collection_item_cached(
+                app, (uint8_t)item->container_index);
+            if(container && container->name[0])
+                snprintf(out, size, "Container: %.21s", container->name);
+            else
+                snprintf(out, size, "Container: Item %u", (unsigned)item->container_index + 1U);
+        }
+        break;
     case 29: snprintf(out, size, "Charges: %d/%d", item->charges_current, item->charges_max); break;
     case 30: snprintf(out, size, "Charges max: %d", item->charges_max); break;
     case 31: snprintf(out, size, "Armor base AC: %u", item->armor_base); break;
@@ -1580,7 +1689,7 @@ static bool dndinventory_collection_number_spec(
     PocketItem* item = dndinventory_collection_item(app, app->record_index);
     if(!item) return false;
     switch(field) {
-    case 2U: *header = "Item quantity"; *value = item->quantity; break;
+    case 2U: *header = "Stack quantity"; *value = item->quantity; break;
     case 3U: *header = "Weight in tenths lb"; *value = item->weight_tenths; *maximum = 9999; break;
     case 9U: *header = "Magic bonus"; *value = item->magic_bonus; *minimum = -10; *maximum = 10; break;
     case 10U: *header = "Damage dice count"; *value = item->damage_dice; *maximum = 20; break;
@@ -1713,7 +1822,18 @@ static void dndinventory_collection_adjust(
     case 24: item->extra_die = dndinventory_collection_cycle_die(item->extra_die, delta); break;
     case 25: item->ammo_current = dndinventory_collection_clamp_i16((int32_t)item->ammo_current + delta, 0, item->ammo_max); break;
     case 26: item->ammo_max = dndinventory_collection_clamp_i16((int32_t)item->ammo_max + delta, 0, 999); if(item->ammo_current > item->ammo_max) item->ammo_current = item->ammo_max; break;
-    case 28: { int16_t next = (int16_t)item->container_index + delta; if(next < -1) next = (int16_t)app->total - 1; if(next >= (int16_t)app->total) next = -1; item->container_index = (int8_t)next; break; }
+    case 28: {
+        int16_t next = (int16_t)item->container_index + delta;
+        if(next < -1) next = (int16_t)app->total - 1;
+        if(next >= (int16_t)app->total) next = -1;
+        if(next == (int16_t)app->record_index) {
+            next += delta;
+            if(next < -1) next = (int16_t)app->total - 1;
+            if(next >= (int16_t)app->total) next = -1;
+        }
+        item->container_index = (int8_t)next;
+        break;
+    }
     case 29: item->charges_current = dndinventory_collection_clamp_i16((int32_t)item->charges_current + delta, 0, item->charges_max); break;
     case 30: item->charges_max = dndinventory_collection_clamp_i16((int32_t)item->charges_max + delta, 0, 999); if(item->charges_current > item->charges_max) item->charges_current = item->charges_max; break;
     case 31: item->armor_base = dndinventory_collection_clamp_u8((int16_t)item->armor_base + delta, 30U); break;
@@ -1815,7 +1935,9 @@ static void dndinventory_collection_detail_ok(DndInventoryCollectionApp* app) {
     else if(field == 1U)
         dndinventory_collection_begin_text(
             app, DndInventoryCollectionEditDetail, "Item notes", item->detail);
-    else if((field >= 2U && field <= 26U) ||
+    else if(field == 2U)
+        (void)dndinventory_collection_begin_number(app, field);
+    else if((field >= 3U && field <= 26U) ||
             (field >= 28U && field <= 33U))
         dndinventory_collection_adjust(app, field, 1);
     else if(field == 34U)
@@ -1901,6 +2023,19 @@ static bool dndinventory_collection_input(InputEvent* event, void* context) {
             (void)dndinventory_collection_move_list(app, -1);
         } else if(move && event->key == InputKeyDown) {
             (void)dndinventory_collection_move_list(app, 1);
+        } else if(
+            event->type == InputTypeLong && app->selection &&
+            (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            uint8_t logical = (uint8_t)(app->selection - 1U);
+            PocketItem* item = dndinventory_collection_item(app, logical);
+            if(item) {
+                item->quantity = dndinventory_collection_clamp_i16(
+                    (int32_t)item->quantity + (event->key == InputKeyRight ? 1 : -1),
+                    0,
+                    999);
+                if(dndinventory_collection_save_page(app))
+                    dndinventory_collection_set_transient_status(app, "Stack quantity saved");
+            }
         } else if(event->type == InputTypeShort && event->key == InputKeyLeft) {
             (void)dndinventory_collection_page_list(app, -1);
         } else if(event->type == InputTypeShort && event->key == InputKeyRight) {
@@ -1994,7 +2129,7 @@ static bool dndinventory_collection_input(InputEvent* event, void* context) {
                 app, app->tool_selection);
         }
     } else if(app->screen == DndInventoryCollectionScreenResources) {
-        PocketCharacter* c = &app->data.character;
+        DndInventoryCharacterState* c = &app->data.character;
         if(move && event->key == InputKeyUp)
             app->tool_selection =
                 app->tool_selection ? app->tool_selection - 1U : 8U;
@@ -2188,7 +2323,8 @@ fail:
     if(app->number_input) number_input_free(app->number_input);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-    dnd_data_clear(&app->data);
+    free(app->data.character.items);
+    app->data.character.items = NULL;
     if(app->storage) furi_record_close(RECORD_STORAGE);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
@@ -2210,7 +2346,8 @@ static void dndinventory_collection_free(DndInventoryCollectionApp* app) {
     if(app->number_input) number_input_free(app->number_input);
     if(app->view) view_free(app->view);
     if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-    dnd_data_clear(&app->data);
+    free(app->data.character.items);
+    app->data.character.items = NULL;
     if(app->storage) furi_record_close(RECORD_STORAGE);
     if(app->gui) furi_record_close(RECORD_GUI);
     free(app);
