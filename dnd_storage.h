@@ -70,20 +70,6 @@ typedef bool (*PocketD20SpellRecordVisitor)(
 typedef bool (*PocketD20ItemRecordVisitor)(
     uint8_t logical_index, const PocketItem* item, void* context);
 
-typedef struct {
-    uint8_t known[POCKET_D20_MAX_CLASSES];
-    uint8_t prepared[POCKET_D20_MAX_CLASSES];
-} PocketD20SpellClassCounts;
-
-typedef struct {
-    int16_t carried_weight_tenths;
-    int16_t equipped_weight_tenths;
-    uint8_t attuned_count;
-    uint8_t armor_base;
-    int8_t armor_dex_cap;
-    uint8_t shield_bonus;
-} PocketD20ItemAggregate;
-
 bool dnd_storage_visit_spells(
     Storage* storage,
     uint32_t profile,
@@ -116,19 +102,7 @@ bool dnd_storage_load_items_window_indexed(
     uint8_t* total_count,
     uint32_t page_offsets[POCKET_D20_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages);
-bool dnd_storage_spell_class_counts(
-    Storage* storage,
-    uint32_t profile,
-    PocketD20SpellClassCounts* counts,
-    uint8_t* total_count);
-bool dnd_storage_item_aggregate(
-    Storage* storage,
-    uint32_t profile,
-    PocketD20ItemAggregate* aggregate,
-    uint8_t* total_count);
 bool dnd_storage_items_exist(Storage* storage, uint32_t profile);
-bool dnd_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile);
-bool dnd_storage_ensure_items_sidecar(Storage* storage, uint32_t profile);
 bool dnd_storage_remove_live_items(Storage* storage, uint32_t profile);
 /* Currency is owned exclusively by the Inventory sidecar. Character profile
    Currency= fields are neither loaded nor serialized. */
@@ -157,18 +131,20 @@ typedef struct {
 } PocketD20ItemSeedAsset;
 
 /* Low-level item-sidecar composition. Feature policy (which assets/keys to use,
-   when initialization occurs, and how currency is applied) belongs to items.c. */
+   when initialization occurs, and how currency is applied) belongs to items.c.
+   currency_total is both the starting balance and the persisted final balance. */
 bool dnd_storage_create_items_from_assets(
     Storage* storage,
     uint32_t profile,
     const PocketCharacter* owner,
     const PocketD20ItemSeedAsset* assets,
     uint8_t asset_count,
-    int32_t currency[5],
+    int32_t currency_total[5],
     bool* created);
 /* Explicit one-time Inventory override helper. Existing records are preserved,
    matching seed records are appended, Currency= is increased, and a successful
-   publish writes InitialInventory=2 so the override cannot be repeated. */
+   publish writes InitialInventory=2 so the override cannot be repeated. The
+   returned currency_total is the exact balance committed to the sidecar. */
 bool dnd_storage_regrant_items_from_assets(
     Storage* storage,
     uint32_t profile,
@@ -176,7 +152,7 @@ bool dnd_storage_regrant_items_from_assets(
     const PocketD20ItemSeedAsset* assets,
     uint8_t asset_count,
     const PocketD20ItemSeedAsset* fallback_asset,
-    int32_t currency_added[5],
+    int32_t currency_total[5],
     bool* applied);
 
 bool dnd_storage_load_spellbook_window(

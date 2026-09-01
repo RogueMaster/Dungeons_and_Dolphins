@@ -5,6 +5,46 @@
 
 #include <string.h>
 
+typedef struct {
+    DndDolphinsSpellClassCounts* counts;
+} DndDolphinsSpellCountContext;
+
+static bool dndolphins_spells_count_record(
+    uint8_t logical_index,
+    const PocketSpell* spell,
+    uint8_t known,
+    uint8_t always_prepared,
+    uint8_t free_casts_current,
+    uint8_t free_casts_max,
+    void* context) {
+    (void)logical_index;
+    (void)free_casts_current;
+    (void)free_casts_max;
+    DndDolphinsSpellCountContext* count_context = context;
+    if(!count_context || !count_context->counts || !spell ||
+       spell->class_index >= POCKET_D20_MAX_CLASSES)
+        return true;
+    uint8_t class_index = spell->class_index;
+    if(known && count_context->counts->known[class_index] < UINT8_MAX)
+        ++count_context->counts->known[class_index];
+    if((spell->prepared || always_prepared) &&
+       count_context->counts->prepared[class_index] < UINT8_MAX)
+        ++count_context->counts->prepared[class_index];
+    return true;
+}
+
+bool dndolphins_spells_class_counts(
+    Storage* storage,
+    uint32_t profile,
+    DndDolphinsSpellClassCounts* counts,
+    uint8_t* total_count) {
+    if(!storage || !counts) return false;
+    memset(counts, 0, sizeof(*counts));
+    DndDolphinsSpellCountContext context = {.counts = counts};
+    return dnd_storage_visit_spells(
+        storage, profile, dndolphins_spells_count_record, &context, total_count);
+}
+
 uint8_t dndolphins_spells_casting_ability_for(
     const PocketCharacter* character, const PocketSpell* spell) {
     if(spell) {

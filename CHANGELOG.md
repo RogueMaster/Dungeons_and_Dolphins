@@ -2,6 +2,14 @@
 
 Released work only. Normal releases are retained as concise summaries; closely related recovery spans may be consolidated when the individual troubleshooting chronology would obscure the released outcome.
 
+## 3.3.6 — Inventory currency grants and navigation focus
+
+- Made normal **Grant Initial Inventory** persist the existing balance plus class/species/background starting currency in the same synced `inventory_{id}.txt` creation as the granted Item records and `InitialInventory=1`, removing the second metadata rewrite that previously separated Item creation from final currency persistence. The exact committed balance is mirrored back into the Inventory app state.
+- Made the one-time Inventory regrant return the exact combined `Currency=` balance committed by its transactional sidecar rewrite, so the UI no longer derives the displayed result from potentially stale in-memory currency after the regrant. Existing Items and the one-time `InitialInventory=2` protection remain unchanged.
+- Changed active Initiative Combat navigation so **Short Back** returns to the Initiative main menu without ending the active encounter; Resume returns to that combat. **Hold Up** now moves the current turn backward, including crossing to the previous round's last participant when applicable.
+- Preserved the Initiative quick-AC shortcut by making Hold Up on a selected participant in the pre-combat Setup list raise AC; active Combat retains short Left/Right HP changes, Hold Down condition editing, Hold Left/Right reordering and Hold OK full participant editing.
+- DNDolphins now remembers the selected home-menu row when entering an internal submenu and restores that same row/scroll position when Back returns Home instead of resetting focus to the first option. The added `uint16_t` focus field consumes existing ARM32 alignment padding, so the measured fixed DNDolphins app-state size remains unchanged.
+
 ## 3.3.5 — Return focus, bounded paging, catalog filtering and Spellbook ordering
 
 - Companion Short Back returns to DNDolphins with the corresponding home-menu row focused: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary or Initiative. Hold Back remains a force-exit to firmware and never requests a parent handoff.
@@ -13,6 +21,8 @@ Released work only. Normal releases are retained as concise summaries; closely r
 - Expanded the Item Name-catalog Hold-OK filter cycle to All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic. The broad Magic option remains an aggregate non-Mundane filter without increasing the catalog cache size.
 - Bundled a compact generic Spell Scroll set under the Scroll category: **Spell Scroll (Cantrip)** and **Spell Scroll (Level 1)** through **Spell Scroll (Level 9)**, with `SRD5.2.1` source metadata and level-appropriate rarity (Common L0–1, Uncommon L2–3, Rare L4–5, Very Rare L6–8, Legendary L9).
 - Re-audited stack and project-owned heap after the paging/sort changes. Existing stack reservations remain appropriate; Inventory/Spellbook fixed app state rises only for the bounded offset maps, and the memory audit includes the transient Spellbook sort peak.
+- Completed a follow-up source-ownership/header pass without changing save formats or behavior. DNDolphins-only roll-mode/value-recording dice moved out of shared rules into `dndolphins_dice.*`; Initiative/effective-speed helpers moved into `dndolphins_rules_character.*`; spell class-count derivation moved into `dndolphins_spells.*`; Inventory equipped/weight aggregation moved into `dndinventory_collection.c`; the Eldritch Knight/Arcane Trickster Wizard-list alias test moved into Spellbook; and sidecar-creation helpers that never leave `dnd_storage.c` are now private. Shared transactional sidecar/profile parsing stays centralized where splitting it would duplicate parsers or rewrite logic.
+- Removed the stale DNDolphins spell-save-DC wrapper left behind by the ownership cleanup, fixing the `-Werror=unused-function` build failure while retaining the active save-DC implementation in `dndolphins_spells.c`.
 
 ## 3.3.4 — Ritual Adept and stability audit
 

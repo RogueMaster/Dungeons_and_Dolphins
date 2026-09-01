@@ -4,15 +4,17 @@ Rule ownership is by feature domain rather than by the word “rule.”
 
 ## Shared rules
 
-`dnd_rules_core.c` and `dnd_rules.h` own generic dice, ability modifiers, total level, proficiency, saves, skills, initiative, XP/level helpers, exhaustion/speed and other shared character math. DNDolphins-only rest and character-mutation behavior lives in `dndolphins_rules_character.*`.
+`dnd_rules_core.c` and `dnd_rules.h` expose only the compact rule math still needed across FAP boundaries: single-die/summed-dice rolling, ability modifiers, total level, proficiency, saves, skills and exhaustion. DNDolphins-only Initiative/effective-speed calculations and rest/character-mutation behavior live in `dndolphins_rules_character.*`. DNDolphins-only advantage/disadvantage d20 selection and value-recording multi-die rolls live in `dndolphins_dice.*`; their enum/API is no longer part of the shared rules header.
 
 ## Items
 
-`dnd_weapon_rules.*` owns shared weapon ability, attack and damage calculations. `dndolphins_weapon_combat.*` owns DNDolphins combat-time item access; `dndinventory_rules.c` and `dndinventory_items.c` own carrying capacity, currency, equipment AC and starting-inventory policy; `dndadventure_item_reward.*` owns Adventure reward appends.
+`dnd_weapon_rules.*` owns the weapon ability/attack-modifier math shared by DNDolphins and DNDInventory. DNDolphins attack/damage roll result types and combat-time Item access live in `dndolphins_weapon_combat.*`; the shared rules header no longer carries those DNDolphins-only result structs. `dndinventory_rules.c`, `dndinventory_items.c` and `dndinventory_collection.c` own carrying capacity, currency, equipment AC, starting-inventory policy and derived equipped/weight aggregation; `dndadventure_item_reward.*` owns Adventure reward appends.
+
+Starting-inventory currency is treated as part of the same grant transaction as the starting Item records. The Inventory sidecar publishes the existing balance plus the selected class/species/background grant, the Item rows, and the one-shot grant marker in one synced write; the UI then adopts the exact committed `Currency=` total. The one permitted regrant likewise returns the exact combined balance written by the transactional rewrite instead of recomputing it from potentially stale UI state.
 
 ## Spells
 
-`dndolphins_spells.*` owns casting ability, spell attack/save DC, class spell-level limits, native and multiclass slot calculation (including Eldritch Knight/Arcane Trickster third-caster handling), Pact/shared-slot initialization, spell-point costs and cast-resource options. `dndolphins_spell_combat.*` remains the structured spell effect/damage mapping layer.
+`dndolphins_spells.*` owns casting ability, spell attack/save DC, DNDolphins class spell-count derivation, native and multiclass slot calculation, Pact/shared-slot initialization, spell-point costs and cast-resource options. The small class maximum-spell-level rule remains in `dnd_spell_eligibility.*` because both DNDolphins progression and DNDSpellbook catalog eligibility use it. Spellbook owns its own Eldritch Knight/Arcane Trickster Wizard-list alias test. `dndolphins_spell_combat.*` remains the structured spell effect/damage mapping layer.
 
 Wizard combat eligibility distinguishes the spellbook from the prepared list. Wizard cantrips are available as known cantrips. A level-1+ Wizard spell is eligible for the Combat → Spell Attacks list only when `prepared`, `always_prepared`, or `free_casts_current > 0`. If an unprepared Wizard spell is present only because a Free Cast remains, its combat cast-option list contains only the Free Cast; normal slots, Pact slots and spell points are not offered. Non-Wizard classes keep their existing Known/Prepared model.
 

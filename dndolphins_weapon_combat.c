@@ -36,9 +36,9 @@ PocketDamageRoll dndolphins_weapon_combat_roll_damage(
         result.weapon_roll_count = POCKET_D20_MAX_DAMAGE_ROLLS;
     if(result.extra_roll_count > POCKET_D20_MAX_DAMAGE_ROLLS - result.weapon_roll_count)
         result.extra_roll_count = POCKET_D20_MAX_DAMAGE_ROLLS - result.weapon_roll_count;
-    result.weapon_total = (int16_t)dnd_rules_core_roll_dice_values(
+    result.weapon_total = (int16_t)dndolphins_dice_roll_values(
         result.weapon_roll_count, die, result.rolls, result.weapon_roll_count);
-    result.extra_total = (int16_t)dnd_rules_core_roll_dice_values(
+    result.extra_total = (int16_t)dndolphins_dice_roll_values(
         result.extra_roll_count,
         item->extra_die,
         result.rolls + result.weapon_roll_count,

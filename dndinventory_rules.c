@@ -22,7 +22,7 @@ void dndinventory_rules_normalize_currency(PocketCharacter* character) {
 
 int16_t dndinventory_rules_calculated_armor_class(
     const PocketCharacter* character,
-    const PocketD20ItemAggregate* aggregate) {
+    const DndInventoryItemAggregate* aggregate) {
     int16_t armor = 10;
     int16_t dexterity =
         dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityDexterity]);

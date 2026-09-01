@@ -1050,6 +1050,19 @@ static void dndinitiative_begin_number(
 }
 
 
+static void dndinitiative_previous_turn(InitiativeApp* app) {
+    if(!app || !app->combat_count) return;
+    if(app->current_turn) {
+        --app->current_turn;
+    } else if(app->round > 1U) {
+        --app->round;
+        app->current_turn = (uint8_t)(app->combat_count - 1U);
+    }
+    app->selection = app->current_turn;
+    dndinitiative_save(app);
+}
+
+
 static bool dndinitiative_input(InputEvent* event, void* context) {
     InitiativeApp* app = context;
     if(event->type != InputTypeShort && event->type != InputTypeRepeat && event->type != InputTypeLong) return true;
@@ -1123,6 +1136,11 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, total, 1);
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && app->selection > 0U && app->selection <= app->combat_count && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             InitiativeMember* member = &app->combat[app->selection - 1U]; member->total = dndinitiative_clamp(member->total + (event->key == InputKeyRight ? 1 : -1), -99, 199); dndinitiative_save(app);
+        } else if(event->type == InputTypeLong && event->key == InputKeyUp && app->selection > 0U && app->selection <= app->combat_count) {
+            InitiativeMember* member = &app->combat[app->selection - 1U];
+            member->armor_class = dndinitiative_clamp(member->armor_class + 1, 0, 99);
+            dndinitiative_sync_main_if_needed(app, member);
+            dndinitiative_save(app);
         } else if(event->type == InputTypeLong && app->selection > 0U && app->selection <= app->combat_count && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             uint8_t index = (uint8_t)(app->selection - 1U);
             if(event->key == InputKeyLeft && index > 0U) { dndinitiative_swap(app, index, (uint8_t)(index - 1U)); --app->selection; dndinitiative_save(app); }
@@ -1145,10 +1163,10 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
     } else if(app->screen == InitiativeScreenCombat) {
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyUp) dndinitiative_move(&app->selection, app->combat_count, -1);
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && event->key == InputKeyDown) dndinitiative_move(&app->selection, app->combat_count, 1);
-        else if(event->type == InputTypeShort && event->key == InputKeyBack && app->combat_count) { if(app->current_turn) --app->current_turn; else if(app->round>1U){--app->round;app->current_turn=(uint8_t)(app->combat_count-1U);} app->selection=app->current_turn; dndinitiative_save(app); }
+        else if(event->type == InputTypeShort && event->key == InputKeyBack) { app->screen = InitiativeScreenMenu; app->selection = app->scroll = 0U; }
+        else if(event->type == InputTypeLong && event->key == InputKeyUp && app->combat_count) { dndinitiative_previous_turn(app); }
         else if((event->type == InputTypeShort || event->type == InputTypeRepeat) && (event->key == InputKeyLeft || event->key == InputKeyRight) && app->combat_count) { InitiativeMember* m=&app->combat[app->selection]; m->hp_current=dndinitiative_clamp(m->hp_current+(event->key==InputKeyRight?1:-1),-999,999); dndinitiative_sync_main_if_needed(app,m); dndinitiative_save(app); }
         else if(event->type == InputTypeLong && event->key == InputKeyOk && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->edit_field=app->scroll=0U; app->delete_armed=0U; app->screen=InitiativeScreenEdit; }
-        else if(event->type == InputTypeLong && event->key == InputKeyUp && app->combat_count) { InitiativeMember* m=&app->combat[app->selection]; m->armor_class=dndinitiative_clamp(m->armor_class+1,0,99); dndinitiative_sync_main_if_needed(app,m); dndinitiative_save(app); }
         else if(event->type == InputTypeLong && event->key == InputKeyDown && app->combat_count) { app->edit_combat=1U; app->edit_setup=0U; app->input_member=app->selection; dndinitiative_begin_text(app,InitiativeTextConditions,"Participant conditions",app->combat[app->selection].conditions); }
         else if(event->type == InputTypeLong && event->key == InputKeyLeft && app->combat_count && app->selection>0U) { dndinitiative_swap(app,app->selection,(uint8_t)(app->selection-1U)); --app->selection; dndinitiative_save(app); }
         else if(event->type == InputTypeLong && event->key == InputKeyRight && app->combat_count && app->selection+1U<app->combat_count) { dndinitiative_swap(app,app->selection,(uint8_t)(app->selection+1U)); ++app->selection; dndinitiative_save(app); }

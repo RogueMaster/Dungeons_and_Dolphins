@@ -416,13 +416,13 @@ static bool dnd_storage_ensure_collection_sidecar(
     return success && storage_file_exists(storage, path);
 }
 
-bool dnd_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile) {
+static bool dnd_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile) {
     char path[POCKET_D20_PATH_LEN];
     dnd_storage_spellbook_path(path, sizeof(path), profile);
     return dnd_storage_ensure_collection_sidecar(storage, path, "DNDSpellbook=1\n");
 }
 
-bool dnd_storage_ensure_items_sidecar(Storage* storage, uint32_t profile) {
+static bool dnd_storage_ensure_items_sidecar(Storage* storage, uint32_t profile) {
     char path[POCKET_D20_PATH_LEN];
     dnd_storage_items_path(path, sizeof(path), profile);
     return dnd_storage_ensure_collection_sidecar(storage, path, "DNDItems=1\n");
@@ -807,46 +807,6 @@ bool dnd_storage_visit_spells(
     storage_file_close(file);
     storage_file_free(file);
     return success;
-}
-
-typedef struct {
-    PocketD20SpellClassCounts* counts;
-} PocketD20SpellCountContext;
-
-static bool dnd_storage_count_spell_record(
-    uint8_t logical_index,
-    const PocketSpell* spell,
-    uint8_t known,
-    uint8_t always_prepared,
-    uint8_t free_casts_current,
-    uint8_t free_casts_max,
-    void* context) {
-    (void)logical_index;
-    (void)free_casts_current;
-    (void)free_casts_max;
-    PocketD20SpellCountContext* count_context = context;
-    if(!count_context || !count_context->counts || !spell ||
-       spell->class_index >= POCKET_D20_MAX_CLASSES)
-        return true;
-    uint8_t class_index = spell->class_index;
-    if(known && count_context->counts->known[class_index] < UINT8_MAX)
-        ++count_context->counts->known[class_index];
-    if((spell->prepared || always_prepared) &&
-       count_context->counts->prepared[class_index] < UINT8_MAX)
-        ++count_context->counts->prepared[class_index];
-    return true;
-}
-
-bool dnd_storage_spell_class_counts(
-    Storage* storage,
-    uint32_t profile,
-    PocketD20SpellClassCounts* counts,
-    uint8_t* total_count) {
-    if(!storage || !counts) return false;
-    memset(counts, 0, sizeof(*counts));
-    PocketD20SpellCountContext context = {.counts = counts};
-    return dnd_storage_visit_spells(
-        storage, profile, dnd_storage_count_spell_record, &context, total_count);
 }
 
 static bool dnd_storage_load_spellbook_window_internal(
@@ -1272,55 +1232,6 @@ bool dnd_storage_visit_items(
     return success;
 }
 
-typedef struct {
-    PocketD20ItemAggregate* aggregate;
-} PocketD20ItemAggregateContext;
-
-static bool dnd_storage_aggregate_item_record(
-    uint8_t logical_index, const PocketItem* item, void* context) {
-    (void)logical_index;
-    PocketD20ItemAggregateContext* aggregate_context = context;
-    if(!aggregate_context || !aggregate_context->aggregate || !item) return true;
-    PocketD20ItemAggregate* aggregate = aggregate_context->aggregate;
-    if(item->quantity > 0) {
-        int32_t weight = (int32_t)item->weight_tenths * item->quantity;
-        int32_t carried = (int32_t)aggregate->carried_weight_tenths + weight;
-        aggregate->carried_weight_tenths = carried > INT16_MAX ? INT16_MAX :
-                                             carried < INT16_MIN ? INT16_MIN : (int16_t)carried;
-        if(item->equipped) {
-            int32_t equipped = (int32_t)aggregate->equipped_weight_tenths + weight;
-            aggregate->equipped_weight_tenths = equipped > INT16_MAX ? INT16_MAX :
-                                                   equipped < INT16_MIN ? INT16_MIN :
-                                                                          (int16_t)equipped;
-        }
-    }
-    if(item->attuned && aggregate->attuned_count < UINT8_MAX) ++aggregate->attuned_count;
-    if(item->equipped) {
-        if(item->shield_bonus) {
-            uint16_t shield = (uint16_t)aggregate->shield_bonus + item->shield_bonus;
-            aggregate->shield_bonus = shield > UINT8_MAX ? UINT8_MAX : (uint8_t)shield;
-        }
-        if(item->armor_base && !aggregate->armor_base) {
-            aggregate->armor_base = item->armor_base;
-            aggregate->armor_dex_cap = item->armor_dex_cap;
-        }
-    }
-    return true;
-}
-
-bool dnd_storage_item_aggregate(
-    Storage* storage,
-    uint32_t profile,
-    PocketD20ItemAggregate* aggregate,
-    uint8_t* total_count) {
-    if(!storage || !aggregate) return false;
-    memset(aggregate, 0, sizeof(*aggregate));
-    aggregate->armor_dex_cap = -1;
-    PocketD20ItemAggregateContext context = {.aggregate = aggregate};
-    return dnd_storage_visit_items(
-        storage, profile, dnd_storage_aggregate_item_record, &context, total_count);
-}
-
 bool dnd_storage_items_exist(Storage* storage, uint32_t profile) {
     if(!storage) return false;
     char path[POCKET_D20_PATH_LEN];
@@ -1490,11 +1401,10 @@ bool dnd_storage_create_items_from_assets(
     const PocketCharacter* owner,
     const PocketD20ItemSeedAsset* assets,
     uint8_t asset_count,
-    int32_t currency[5],
+    int32_t currency_total[5],
     bool* created) {
     if(created) *created = false;
-    if(currency) memset(currency, 0, 5U * sizeof(currency[0]));
-    if(!storage || !owner || (!assets && asset_count) || !currency) return false;
+    if(!storage || !owner || (!assets && asset_count) || !currency_total) return false;
     if(dnd_storage_items_exist(storage, profile)) return true;
 
     char live[POCKET_D20_PATH_LEN];
@@ -1523,16 +1433,15 @@ bool dnd_storage_create_items_from_assets(
             assets[index].match,
             output,
             &item_count,
-            currency);
+            currency_total);
     }
-    if(success) success = dnd_storage_write_inventory_currency(output, currency);
+    if(success) success = dnd_storage_write_inventory_currency(output, currency_total);
     if(success) success = dnd_storage_write_raw(output, "InitialInventory=1\n");
     if(success) success = storage_file_sync(output);
     storage_file_close(output);
     storage_file_free(output);
     if(!success) {
         storage_common_remove(storage, live);
-        memset(currency, 0, 5U * sizeof(currency[0]));
         return false;
     }
     if(created) *created = true;
@@ -1547,11 +1456,11 @@ bool dnd_storage_regrant_items_from_assets(
     const PocketD20ItemSeedAsset* assets,
     uint8_t asset_count,
     const PocketD20ItemSeedAsset* fallback_asset,
-    int32_t currency_added[5],
+    int32_t currency_total[5],
     bool* applied) {
-    if(currency_added) memset(currency_added, 0, 5U * sizeof(currency_added[0]));
+    if(currency_total) memset(currency_total, 0, 5U * sizeof(currency_total[0]));
     if(applied) *applied = false;
-    if(!storage || !owner || (!assets && asset_count) || !currency_added || !applied) return false;
+    if(!storage || !owner || (!assets && asset_count) || !currency_total || !applied) return false;
 
     char live[POCKET_D20_PATH_LEN];
     dnd_storage_items_path(live, sizeof(live), profile);
@@ -1636,14 +1545,17 @@ bool dnd_storage_regrant_items_from_assets(
     int32_t combined[5];
     for(uint8_t i = 0U; i < 5U; ++i) {
         combined[i] = dnd_storage_add_currency_saturated(current_currency[i], delta[i]);
-        currency_added[i] = delta[i];
     }
     if(success && changed) success = dnd_storage_write_inventory_currency(output, combined);
     if(success && changed) success = dnd_storage_write_raw(output, "InitialInventory=2\n");
     if(!changed) success = false;
     success = dnd_storage_publish_collection_snapshot(storage, output, snapshot, path, success);
-    if(success) *applied = true;
-    else memset(currency_added, 0, 5U * sizeof(currency_added[0]));
+    if(success) {
+        memcpy(currency_total, combined, sizeof(combined));
+        *applied = true;
+    } else {
+        memset(currency_total, 0, 5U * sizeof(currency_total[0]));
+    }
     return success;
 }
 

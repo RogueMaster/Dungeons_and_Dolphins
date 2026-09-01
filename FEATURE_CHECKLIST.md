@@ -30,7 +30,7 @@
 - [x] Hold Up from the Inventory list opens Inventory Tools without replacing any Hold-OK action.
 - [x] Inventory list drawing is cache-only and has no timer/pub-sub/background worker; no-op Press/Release input events do not force redraws.
 - [x] Currency and Inventory Resources are owned by DNDInventory and retain their previous editing/calculation controls; DNDInventory also initializes `Currency=0,0,0,0,0` when it opens an existing item-only sidecar that lacks Currency. Other FAP Item appenders never create the Currency record.
-- [x] Grant Initial Inventory is explicit: opening DNDInventory alone leaves an absent Inventory sidecar absent; Short OK performs the normal one-shot class/species/background grant (`InitialInventory=1`), while Hold OK after that grant may deliberately regrant once and consumes the override as `InitialInventory=2`. Existing Items are preserved during that single override.
+- [x] Grant Initial Inventory is explicit: opening DNDInventory alone leaves an absent Inventory sidecar absent; Short OK performs the normal one-shot class/species/background grant (`InitialInventory=1`) with Items and the final existing+granted `Currency=` balance committed in the same synced sidecar write. Hold OK after that grant may deliberately regrant once and consumes the override as `InitialInventory=2`; the regrant UI adopts the exact combined balance committed by that rewrite. Existing Items are preserved during the single override.
 - [x] Random d100 trinket is fallback-only when normal starting-equipment composition fails or yields no equipment/currency; successful normal starting equipment receives no extra trinket.
 - [x] If normal and fallback seeding cannot be written, an empty canonical sidecar can still be established so manual Add New remains usable.
 
@@ -63,13 +63,14 @@
 - [x] Bundled Reef Wardens and Ghost Protocol campaigns.
 - [x] DNDJournal standalone per-character entries, newest first, with one-shot milestone class leveling and Item-entry inventory creation.
 - [x] Milestones remain Journal-facing; Continue active Adventure resumes the persisted active campaign/scene without creating duplicate Journal or Adventure progress.
-- [x] DNDInitiative standalone roster/combat state and Bestiary handoff, including full numeric participant editing, manual reordering, active-combat AC/condition controls and End Current Combat; main/combat screens use the dark title bar with `[id]` on the main menu and `Round N` during combat.
+- [x] DNDInitiative standalone roster/combat state and Bestiary handoff, including full numeric participant editing, manual reordering, Setup quick-AC adjustment, active-combat condition controls, Short-Back return to the main menu, Hold-Up previous-turn navigation and End Current Combat; main/combat screens use the dark title bar with `[id]` on the main menu and `Round N` during combat.
 - [x] DNDBestiary bundled catalog, filters, encounters, custom monsters and installable packs.
 - [x] Default custom Dolphin/Capybara seed only when no user custom pack exists.
 
 ## Runtime
 
 - [x] Seven FAPs: DNDolphins, DNDInventory, DNDSpellbook, DNDAdventure, DNDJournal, DNDInitiative and DNDBestiary.
+- [x] DNDolphins internal submenu Back navigation restores the same highlighted home-menu row instead of resetting Home focus to the first row.
 - [x] Explicit full-path FAP launches.
 - [x] Outgoing-app teardown before handoff; no artificial pre-launch sleep is used because delaying the outgoing FAP delays reclamation rather than creating Loader headroom.
 - [x] Stack reservations re-audited after buffered catalog paging/sorting: DNDolphins 6 KB; DNDInventory 4 KB; DNDSpellbook 4 KB; DNDAdventure 4 KB; DNDJournal 4 KB; DNDInitiative 3 KB; DNDBestiary 6 KB. The new sort keys are heap-owned; the catalog reader adds only a 128-byte local buffer to Inventory/Spellbook catalog-load paths.

@@ -24,6 +24,11 @@ typedef struct {
 
 #define POCKET_D20_MAX_SPELL_CAST_OPTIONS 24U
 
+typedef struct {
+    uint8_t known[POCKET_D20_MAX_CLASSES];
+    uint8_t prepared[POCKET_D20_MAX_CLASSES];
+} DndDolphinsSpellClassCounts;
+
 uint8_t dndolphins_spells_casting_ability_for(
     const PocketCharacter* character, const PocketSpell* spell);
 int8_t dndolphins_spells_attack_modifier(const PocketCharacter* character);
@@ -57,6 +62,12 @@ uint8_t dndolphins_spells_build_cast_options(
     uint8_t free_casts_current,
     PocketSpellCastOption* options,
     uint8_t capacity);
+
+bool dndolphins_spells_class_counts(
+    Storage* storage,
+    uint32_t profile,
+    DndDolphinsSpellClassCounts* counts,
+    uint8_t* total_count);
 
 bool dndolphins_spells_collect_combat_indices(
     Storage* storage,

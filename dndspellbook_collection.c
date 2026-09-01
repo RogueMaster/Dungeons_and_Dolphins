@@ -252,6 +252,15 @@ static void dndspellbook_collection_redraw(DndSpellbookCollectionApp* app) {
     view_commit_model(app->view, true);
 }
 
+static bool dndspellbook_collection_class_uses_wizard_spell_list(
+    const PocketClassLevel* class_level) {
+    if(!class_level) return false;
+    return (!strcmp(class_level->name, "Fighter") &&
+            !strcmp(class_level->subclass, "Eldritch Knight")) ||
+           (!strcmp(class_level->name, "Rogue") &&
+            !strcmp(class_level->subclass, "Arcane Trickster"));
+}
+
 static uint16_t dndspellbook_collection_class_mask_from_name(const char* name) {
     if(!name) return 0U;
     if(strcmp(name, "Artificer") == 0) return DndSpellbookClassMaskArtificer;
@@ -327,7 +336,7 @@ static bool dndspellbook_collection_class_allows(
     uint16_t mask) {
     if(!character || class_index >= character->class_count) return false;
     const PocketClassLevel* class_level = &character->classes[class_index];
-    uint16_t selected = dnd_spell_eligibility_class_uses_wizard_spell_list(class_level) ?
+    uint16_t selected = dndspellbook_collection_class_uses_wizard_spell_list(class_level) ?
                             DndSpellbookClassMaskWizard :
                             dndspellbook_collection_class_mask_from_name(class_level->name);
     return selected && (mask & selected) &&

@@ -126,35 +126,9 @@ int8_t dnd_rules_core_skill_modifier(const PocketCharacter* character, uint8_t s
                     dnd_rules_core_exhaustion_penalty(character));
 }
 
-int8_t dnd_rules_core_initiative_modifier(const PocketCharacter* character) {
-    return (int8_t)(dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityDexterity]) +
-                    character->initiative_misc + dnd_rules_core_exhaustion_penalty(character));
-}
-
-int16_t dnd_rules_core_effective_speed(const PocketCharacter* character) {
-    int16_t speed = character->speed - (5 * character->exhaustion);
-    return speed > 0 ? speed : 0;
-}
-
 uint16_t dnd_rules_core_roll_dice(uint8_t count, uint8_t sides) {
-    return dnd_rules_core_roll_dice_values(count, sides, NULL, 0U);
-}
-
-uint8_t dnd_rules_core_roll_d20_mode(PocketRollMode mode) {
-    uint8_t first = dnd_rules_core_roll_die(20U);
-    if(mode != PocketRollAdvantage && mode != PocketRollDisadvantage) return first;
-    uint8_t second = dnd_rules_core_roll_die(20U);
-    if(mode == PocketRollAdvantage) return second > first ? second : first;
-    return second < first ? second : first;
-}
-
-uint16_t dnd_rules_core_roll_dice_values(
-    uint8_t count, uint8_t sides, uint8_t* values, uint8_t capacity) {
     uint16_t total = 0U;
-    for(uint8_t i = 0U; i < count; ++i) {
-        uint8_t roll = dnd_rules_core_roll_die(sides);
-        total += roll;
-        if(values && i < capacity) values[i] = roll;
-    }
+    for(uint8_t i = 0U; i < count; ++i)
+        total += dnd_rules_core_roll_die(sides);
     return total;
 }

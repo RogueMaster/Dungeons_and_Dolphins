@@ -234,7 +234,7 @@ typedef struct {
     uint8_t item_filter;
     uint8_t tool_selection;
     uint8_t tool_scroll;
-    PocketD20ItemAggregate item_aggregate;
+    DndInventoryItemAggregate item_aggregate;
     uint8_t item_aggregate_valid;
     uint8_t grant_state;
 } DndInventoryCollectionApp;
@@ -277,6 +277,55 @@ static uint8_t dndinventory_collection_clamp_u8(int32_t value, uint8_t maximum) 
     if(value < 0) return 0U;
     if(value > maximum) return maximum;
     return (uint8_t)value;
+}
+
+typedef struct {
+    DndInventoryItemAggregate* aggregate;
+} DndInventoryItemAggregateContext;
+
+static bool dndinventory_collection_aggregate_item_record(
+    uint8_t logical_index, const PocketItem* item, void* context) {
+    (void)logical_index;
+    DndInventoryItemAggregateContext* aggregate_context = context;
+    if(!aggregate_context || !aggregate_context->aggregate || !item) return true;
+    DndInventoryItemAggregate* aggregate = aggregate_context->aggregate;
+    if(item->quantity > 0) {
+        int32_t weight = (int32_t)item->weight_tenths * item->quantity;
+        int32_t carried = (int32_t)aggregate->carried_weight_tenths + weight;
+        aggregate->carried_weight_tenths = carried > INT16_MAX ? INT16_MAX :
+                                             carried < INT16_MIN ? INT16_MIN : (int16_t)carried;
+        if(item->equipped) {
+            int32_t equipped = (int32_t)aggregate->equipped_weight_tenths + weight;
+            aggregate->equipped_weight_tenths = equipped > INT16_MAX ? INT16_MAX :
+                                                   equipped < INT16_MIN ? INT16_MIN :
+                                                                          (int16_t)equipped;
+        }
+    }
+    if(item->attuned && aggregate->attuned_count < UINT8_MAX) ++aggregate->attuned_count;
+    if(item->equipped) {
+        if(item->shield_bonus) {
+            uint16_t shield = (uint16_t)aggregate->shield_bonus + item->shield_bonus;
+            aggregate->shield_bonus = shield > UINT8_MAX ? UINT8_MAX : (uint8_t)shield;
+        }
+        if(item->armor_base && !aggregate->armor_base) {
+            aggregate->armor_base = item->armor_base;
+            aggregate->armor_dex_cap = item->armor_dex_cap;
+        }
+    }
+    return true;
+}
+
+static bool dndinventory_collection_item_aggregate(
+    Storage* storage,
+    uint32_t profile,
+    DndInventoryItemAggregate* aggregate,
+    uint8_t* total_count) {
+    if(!storage || !aggregate) return false;
+    memset(aggregate, 0, sizeof(*aggregate));
+    aggregate->armor_dex_cap = -1;
+    DndInventoryItemAggregateContext context = {.aggregate = aggregate};
+    return dnd_storage_visit_items(
+        storage, profile, dndinventory_collection_aggregate_item_record, &context, total_count);
 }
 
 static uint8_t dndinventory_collection_cycle_die(uint8_t current, int8_t delta) {
@@ -554,7 +603,7 @@ static bool dndinventory_collection_refresh_item_aggregate(DndInventoryCollectio
         return true;
     }
     uint8_t total = 0U;
-    bool ok = dnd_storage_item_aggregate(
+    bool ok = dndinventory_collection_item_aggregate(
         app->storage, app->profile, &app->item_aggregate, &total);
     app->item_aggregate_valid = ok ? 1U : 0U;
     return ok;
@@ -917,7 +966,7 @@ static void dndinventory_collection_draw_currency(Canvas* canvas, DndInventoryCo
 
 static void dndinventory_collection_draw_resources(Canvas* canvas, DndInventoryCollectionApp* app) {
     const PocketCharacter* c = &app->data.character;
-    const PocketD20ItemAggregate* aggregate = &app->item_aggregate;
+    const DndInventoryItemAggregate* aggregate = &app->item_aggregate;
     bool aggregate_ok = app->item_aggregate_valid != 0U;
     int16_t carried = aggregate_ok ? aggregate->carried_weight_tenths : 0;
     int16_t equipped = aggregate_ok ? aggregate->equipped_weight_tenths : 0;

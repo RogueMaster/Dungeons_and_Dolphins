@@ -223,7 +223,7 @@ typedef struct {
     uint8_t spellbook_cache_start;
     uint8_t items_cache_start;
     uint8_t features_cache_start;
-    PocketD20SpellClassCounts spell_class_counts;
+    DndDolphinsSpellClassCounts spell_class_counts;
     uint8_t spell_class_counts_valid;
     uint8_t combat_spell_count;
     uint8_t* combat_spell_indices;
@@ -235,6 +235,7 @@ typedef struct {
     PocketListKind list_kind;
     uint16_t selection;
     uint16_t scroll;
+    uint16_t home_return_selection;
     uint8_t record_index;
     PocketCatalogKind catalog_kind;
     PocketEditTarget catalog_target;
@@ -1192,7 +1193,7 @@ static void dndolphins_record_list_focus(PocketD20App* app, uint8_t logical_inde
 static bool dndolphins_spell_class_counts_cached(PocketD20App* app) {
     if(!app->spell_class_counts_valid) {
         uint8_t total = 0U;
-        if(!dnd_storage_spell_class_counts(
+        if(!dndolphins_spells_class_counts(
                app->storage,
                app->profiles.active_profile,
                &app->spell_class_counts,
@@ -1447,6 +1448,8 @@ static bool dndolphins_screen_uses_features(const PocketD20App* app, PocketScree
 
 static void dndolphins_enter_screen(PocketD20App* app, PocketScreen screen) {
     PocketScreen previous = app->screen;
+    if(previous == PocketScreenHome && screen != PocketScreenHome)
+        app->home_return_selection = app->selection;
     /* Reclaim screen-local working memory before a pending save allocates file objects/buffers. */
     if(previous == PocketScreenCatalog && screen != PocketScreenCatalog) dndolphins_catalog_release(app);
     if(previous != screen && app->autosave_pending) dndolphins_flush_save(app, false);
@@ -1491,6 +1494,10 @@ static void dndolphins_enter_screen(PocketD20App* app, PocketScreen screen) {
     app->screen = screen;
     app->selection = 0U;
     app->scroll = 0U;
+    if(screen == PocketScreenHome && previous != PocketScreenHome) {
+        app->selection = app->home_return_selection;
+        app->scroll = app->selection >= 5U ? (uint16_t)(app->selection - 4U) : 0U;
+    }
     if(screen == PocketScreenSpellAttacks)
         dndolphins_prepare_combat_spell_rows(app, false);
     else if(screen == PocketScreenRituals)
@@ -2963,11 +2970,11 @@ static void dndolphins_draw_vitals(Canvas* canvas, PocketD20App* app) {
             sizeof(rows[4]),
             "Speed: %d -> %d ft",
             character->speed,
-            dnd_rules_core_effective_speed(character));
+            dndolphins_rules_character_effective_speed(character));
     else
         snprintf(rows[4], sizeof(rows[4]), "Speed: %d ft", character->speed);
     snprintf(
-        rows[5], sizeof(rows[5]), "Initiative: %+d", dnd_rules_core_initiative_modifier(character));
+        rows[5], sizeof(rows[5]), "Initiative: %+d", dndolphins_rules_character_initiative_modifier(character));
     snprintf(rows[6], sizeof(rows[6]), "Initiative misc: %+d", character->initiative_misc);
     snprintf(rows[7], sizeof(rows[7]), "Exhaustion: %u", character->exhaustion);
     snprintf(rows[8], sizeof(rows[8]), "Death saves: %u/%u", character->death_successes, 3U);
@@ -4008,7 +4015,7 @@ static void dndolphins_cast_spell(PocketD20App* app, const PocketSpellCastOption
                     secondary =
                         (int16_t)dnd_rules_core_roll_dice(damage.secondary_dice, damage.secondary_die);
                 int16_t attack_damage = primary + secondary + damage.flat_bonus;
-                uint8_t natural = dnd_rules_core_roll_d20_mode(app->roll_mode);
+                uint8_t natural = dndolphins_dice_roll_d20_mode(app->roll_mode);
                 app->spell_cast_attack_natural[index] = natural;
                 app->spell_cast_attack_damage[index] = attack_damage;
                 app->spell_cast_damage_total += attack_damage;
@@ -6968,7 +6975,7 @@ static void dndolphins_roll_generic(PocketD20App* app) {
         app->dice_result = chosen + app->dice_modifier;
     } else {
         app->dice_roll_value_count = app->dice_count;
-        app->dice_roll_sum = dnd_rules_core_roll_dice_values(
+        app->dice_roll_sum = dndolphins_dice_roll_values(
             app->dice_count, app->dice_sides, app->dice_roll_values, sizeof(app->dice_roll_values));
         if(app->dice_count == 1U) app->dice_first = app->dice_roll_values[0];
         app->dice_result = (int16_t)app->dice_roll_sum + app->dice_modifier;

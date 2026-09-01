@@ -18,6 +18,17 @@ void dndolphins_rules_character_apply_experience_floor(PocketCharacter* characte
     if(character->experience < minimum) character->experience = minimum;
 }
 
+int8_t dndolphins_rules_character_initiative_modifier(const PocketCharacter* character) {
+    return (int8_t)(dnd_rules_core_ability_modifier(
+                        character->ability_scores[PocketAbilityDexterity]) +
+                    character->initiative_misc + dnd_rules_core_exhaustion_penalty(character));
+}
+
+int16_t dndolphins_rules_character_effective_speed(const PocketCharacter* character) {
+    int16_t speed = character->speed - (5 * character->exhaustion);
+    return speed > 0 ? speed : 0;
+}
+
 int16_t dndolphins_rules_character_feature_max_uses(
     const PocketCharacter* character, const PocketFeature* feature) {
     if(feature->resource_formula == PocketResourceProficiency)

@@ -7,7 +7,7 @@
 - [ ] Launch all seven FAPs directly.
 - [ ] In Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook, press Short Back from the main screen and confirm DNDolphins is launched when `/ext/apps/Games/dndolphins.fap` exists. Temporarily remove/rename that FAP and confirm the same Short Back exits cleanly without a dead Loader handoff.
 - [ ] In each companion main screen, Hold Back and confirm the companion exits back to firmware without launching DNDolphins. Confirm Initiative and Bestiary no longer contain a normal main-menu Return/Open-DNDolphins row.
-- [ ] In companion sub-screens, Short Back must continue to move up one screen rather than immediately returning to DNDolphins; Initiative active-combat Short Back must retain previous-turn behavior.
+- [ ] In companion sub-screens, Short Back must continue to move up one screen rather than immediately returning to DNDolphins; Initiative active-combat Short Back returns to the Initiative main menu without ending the encounter, while Hold Up handles previous-turn navigation.
 - [ ] Cycle DNDolphins → DNDInventory → DNDolphins repeatedly.
 - [ ] Cycle DNDolphins → DNDSpellbook → DNDolphins repeatedly.
 - [ ] Cycle DNDolphins → Bestiary → Initiative → DNDolphins repeatedly.
@@ -78,7 +78,7 @@
 - [ ] Exercise all five Currency fields with Left/Right and direct numeric entry, restart, and confirm values persisted.
 - [ ] Add a `Currency=` line to a character profile with no Inventory currency record and confirm DNDInventory ignores it; only `inventory_{id}.txt` may supply persisted currency.
 - [ ] Exercise Inventory Resources: encumbrance toggle, capacity override, armor/shield AC application and coin normalization.
-- [ ] Select Grant Initial Inventory on an absent sidecar and confirm Short OK grants defaults once, returns directly to the populated Inventory list and writes `InitialInventory=1`. Re-enter Inventory Tools and confirm the row reports Granted; Short OK again must not duplicate equipment/currency. Then Hold OK on that same row once: confirm existing Items are preserved, starting equipment/currency are appended again, the file now contains `InitialInventory=2`, and the app reports Regranted. Hold OK a second time and confirm no additional records/currency are added. With manual Item rows but no grant marker, confirm the normal grant remains blocked rather than silently doing nothing.
+- [ ] Select Grant Initial Inventory on an absent sidecar and confirm Short OK grants defaults once, returns directly to the populated Inventory list, and the same resulting `inventory_{id}.txt` contains the granted Item rows, the expected background starting `Currency=cp,sp,ep,gp,pp` total, and `InitialInventory=1`. Reopen Inventory and confirm that exact balance reloads. Re-enter Inventory Tools and confirm the row reports Granted; Short OK again must not duplicate equipment/currency. Then Hold OK on that same row once: confirm existing Items are preserved, starting equipment/currency are appended again, the file now contains the exact combined Currency total plus `InitialInventory=2`, and the UI shows that same persisted total. Hold OK a second time and confirm no additional records/currency are added. With manual Item rows but no grant marker, confirm the normal grant remains blocked rather than silently doing nothing.
 
 ## Adventure
 
@@ -110,7 +110,7 @@
 - [ ] Initiative Start New Combat opens setup with Roll for All, per-member roll, short/repeat left-right roll adjustment, hold-OK full participant editing, hold left/right participant reordering, + Temporary Member, and Begin Combat.
 - [ ] Change the active character's Dexterity, Initiative Misc, exhaustion, name, HP and AC in DNDolphins; launch Initiative and verify the existing main-character roster/combat entry refreshes without duplicating or changing monster/temp modifiers.
 - [ ] Set Initiative Roll to Normal, Advantage and Disadvantage; verify Roll for All and individual automatic rolls use the selected mode, while a directly edited Initiative total remains unchanged until that participant is rolled again.
-- [ ] Initiative hold OK in combat opens participant editing including name, roll/modifier, AC, HP, conditions and delete; short Back moves to the previous turn.
+- [ ] Initiative Hold OK in combat opens participant editing including name, roll/modifier, AC, HP, conditions and delete. Short Back returns to the Initiative main menu without ending combat; Resume returns to the same encounter. Hold Up moves to the previous turn and correctly crosses from round N turn 1 to round N-1's final participant.
 - [ ] Bestiary full-stat-line view wraps at up to 26 characters without the old 20-character buffer truncation.
 - [ ] Adventure campaign selection shows campaign names, falling back to campaign ID only when a name is absent.
 
@@ -190,6 +190,7 @@
 ### Return focus / paging performance / ordering
 
 - [ ] From each companion main screen, Short Back and confirm DNDolphins opens with the corresponding home row already highlighted: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary and Initiative. Repeat with Hold Back and confirm it exits to firmware instead of launching DNDolphins.
+- [ ] In DNDolphins, highlight each internal home row that opens a submenu (Profiles, Character, Vitals, Abilities, Skills, Magic, Features, Combat and Dice), enter it, then Short Back; confirm Home returns to the same highlighted row/scroll position rather than row 0.
 - [ ] Open Initiative and confirm the title bar is dark on the main menu and during Combat; `[id]` is right-aligned on the main menu and `Round N` replaces it during Combat.
 - [ ] Open Item Name Catalog and compare with the established presentation: category initials are **not bracketed**, magic entries append `*`, Other entries show only their names, and the header shows `Page N <>`.
 - [ ] Page repeatedly forward/back through Item and Spell Name catalogs with restrictive and broad filters. Confirm later pages remain responsive and correct, Left/Right never skips or duplicates filtered entries, and changing a filter resets the learned page offsets safely.
