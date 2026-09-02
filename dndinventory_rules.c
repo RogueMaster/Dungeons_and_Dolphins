@@ -3,7 +3,7 @@
 static uint8_t dndinventory_rules_total_level(const DndInventoryCharacterState* character) {
     if(!character) return 1U;
     uint16_t total = 0U;
-    for(uint8_t i = 0U; i < character->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+    for(uint8_t i = 0U; i < character->class_count && i < DND_MAX_CLASSES; ++i)
         total += character->classes[i].level;
     if(total < 1U) return 1U;
     return total > 20U ? 20U : (uint8_t)total;
@@ -53,9 +53,15 @@ int8_t dndinventory_rules_weapon_attack_modifier(
         dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityDexterity]);
     int8_t ability = strength;
     switch(item->attack_ability) {
-    case PocketAttackAbilityStrength: ability = strength; break;
-    case PocketAttackAbilityDexterity: ability = dexterity; break;
-    case PocketAttackAbilityBest: ability = strength > dexterity ? strength : dexterity; break;
+    case PocketAttackAbilityStrength:
+        ability = strength;
+        break;
+    case PocketAttackAbilityDexterity:
+        ability = dexterity;
+        break;
+    case PocketAttackAbilityBest:
+        ability = strength > dexterity ? strength : dexterity;
+        break;
     default:
         if(item->weapon_properties & PocketWeaponRanged)
             ability = dexterity;

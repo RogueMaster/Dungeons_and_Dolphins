@@ -16,20 +16,31 @@
 - [ ] With `custom_active_profile.txt` containing `Active=1`, repeatedly open/close DNDInventory and DNDSpellbook both directly and from DNDolphins; every launch must show `[1]`, never transient `[0]`, and must enter the list rather than `No character`.
 - [ ] On all six companion main views, confirm `[4294967295]` never appears. Exercise absent/unreadable metadata, stale IDs, repeated character changes and no-character paths; valid ID `[0]` must remain displayable. On Inventory/Spellbook specifically, confirm the draw callback and input callback agree on the same screen: a displayed `No character / OK: Open DNDolphins` screen must actually launch DNDolphins on OK, and a displayed list/detail screen must perform only that screen's actions.
 - [ ] Repeatedly press Back from the Inventory/Spellbook top-level list and no-character screen; confirm the dispatcher exits promptly without an extra redraw or apparent input loop.
-- [ ] With 1, 2, 3 and 4 Items, move through every row and confirm `+ Add New` remains visible; add a fifth Item and confirm it scrolls away only when needed. Repeat the same 1–5 check in Spellbook.
-- [ ] Populate more than eight Items and Spells. Confirm the normal lists show no persistent `<>`; Up/Down Repeat remains responsive and performs storage I/O only when crossing an eight-record boundary. If using short Left/Right list page jumps, confirm each changes only one aligned eight-record page and holding does not churn through pages.
-- [ ] From a later Item/Spell page, wrap Up/Down back to `+ Add New` and confirm page zero is reloaded: first-page rows render normally with no `Page unavailable`, empty-page artifact or stale later-page data.
+- [ ] In Inventory with 0–3 Items, confirm **Currency** and **+ Add New** share the first viewport with available Item rows; with 4+ Items, confirm those anchors scroll away only when selection moves into later Item rows. Repeat the original 1–5 **+ Add New** visibility check in Spellbook.
+- [ ] Populate more than eight Items and Spells. Confirm Inventory shows right-aligned `PgX<>` while its transient status is clear, and Spellbook shows `Spellbook` with `PgX<>`; Up/Down Repeat remains responsive and performs storage I/O only when crossing an eight-record boundary. If using short Left/Right list page jumps, confirm each changes only one aligned eight-record page and holding does not churn through pages.
+- [ ] From a later Inventory page, wrap Up/Down back to **Currency** / **+ Add New**; from a later Spellbook page, wrap back to **+ Add New**. Confirm page zero is reloaded with no `Page unavailable`, empty-page artifact or stale later-page data.
 - [ ] Empty never-granted Inventory: delete/no sidecar on a new character and enter Inventory; confirm normal starting equipment is granted automatically. Then delete every granted Item while retaining `InitialInventory=1`, reopen Inventory, and confirm starting equipment is **not** duplicated.
-- [ ] Inventory paging acceptance: repeatedly cross 8-record boundaries, wrap to `+ Add New`, open/edit/delete records and return from tools; confirm the selected row always belongs to the resident page and no normal path renders `Page unavailable`.
+- [ ] Inventory paging acceptance: repeatedly cross 8-record boundaries, wrap to **Currency** / **+ Add New**, open/edit/delete records and return from end actions; confirm the selected row always belongs to the resident page and no normal path renders `Page unavailable`.
+- [ ] Inventory page label: with exactly 8 Items no `PgX<>` indicator is required; with 9+ Items confirm `Pg1<>`, `Pg2<>`, etc. follows the resident eight-record Item page and yields temporarily to action/status text when present.
+- [ ] Inventory quantity shortcuts: on an owned Item Hold Left subtracts 5 and Hold Right adds 5, clamped to 0..999 and persisted after relaunch. Confirm short Left/Right still page the owned list and the end-action rows do not change quantity.
 - [ ] Verify Spellbook list row marks: `A` always prepared, `P` prepared, `K` known, `-` neither, and `F` appended whenever a free cast remains (including `AF`).
 - [ ] Repeat Inventory/Spellbook launch/return cycles with empty and populated sidecars; confirm no blank/undrawn main page appears after repeated launches.
 - [ ] Force a valid `Active=1` with character 1 unreadable/missing; Inventory/Spellbook must retain `[1]` on the error/no-character screen rather than resetting the displayed ID to `[0]` or choosing another character.
-- [ ] On Inventory/Spellbook error/status/detail/tool screens, confirm `[id]` is not drawn; on the main list confirm only `[id]` occupies the top-right and no persistent `<>` is present.
+- [ ] On Inventory/Spellbook error/status/detail/tool screens, confirm `[id]` is not drawn; on the main list confirm `[id]` remains correct; for Inventory with more than eight Items, confirm `PgX<>` is shown in the status/page position without leaking onto detail/tool screens.
 - [ ] Confirm exact active-character selection, Initiative/Bestiary ID-0 fallback and teardown-before-launch behavior.
 - [ ] From a cold boot or low-free-heap state, launch DNDolphins repeatedly and confirm Loader does not show `Not enough RAM to run the app`.
 
 - [ ] DNDolphins Home focus: enter and Back out of Character, Vitals, Abilities & Saves, Skills, Features & Perks, Combat and Dice Roller; each return must restore the same named Home row rather than row 0. Repeat after returning from Inventory, Spellbook, Bestiary, Initiative, Adventure and Journal and confirm each `focus=` argument resolves to its named Home index.
-- [ ] Combat menu order: confirm Weapon Attacks, Spell Attacks, Rituals and Attack Templates are consecutive, and the state-free section header changes correctly across Attacks, Encounter, Recovery, Status and Defenses without allocating or reading storage during redraw.
+- [ ] Settings persistence/recovery: open **Settings** after Journal, toggle **Skip Dice Loading** and **Debug**, exit/relaunch DNDolphins, and confirm both values persist in `/ext/apps_data/dndolphins/settings.txt`. Delete the file and confirm defaults are used. Then corrupt one line while leaving another valid and confirm the valid setting is recovered while the malformed/unreadable setting keeps its default; app launch must not fail because Settings are reconstructable.
+- [ ] Skip Dice Loading: with the setting Off, verify the normal DNDolphins rolling animation appears for the general Dice Roller, Spend Hit Die, weapon attack/damage and spell-combat rolls. Turn it On and repeat; the exact same roll paths must show the resolved result immediately without the loading/rolling animation. Verify Adventure skill rolls and Initiative rolls remain immediate and continue reading the shared setting without creating per-FAP settings files.
+- [ ] Debug: enable Debug, exercise Settings save, an Adventure skill roll and an SHD restore, and confirm diagnostic log messages appear without changing dice totals, save data or gameplay behavior. Disable Debug and confirm those opt-in messages stop.
+- [ ] SHD history creation: on a character with Inventory, Spellbook, Features and applied-grant state, save at one level, change level/state and save again. Confirm each retained level has one core `ch_<id>_<name>_<level>.shd`, matching sidecar SHDs only for sidecars that existed at that level, and the internal `_bundle.shd` completeness marker; live `.txt` files remain authoritative.
+- [ ] Characters Hold OK → **Restore from SHD**: verify only the active character can open restore, available levels are listed highest-first, and restoring a current bundled level replaces the canonical character plus Inventory/Spellbook/Feature/applied-grant live sidecars with that level's matching snapshots. With a `_bundle.shd` marker, a sidecar absent in the selected snapshot must become absent/empty rather than retaining later data.
+- [ ] Legacy SHD compatibility: restore a pre-bundle core-only `.shd` while current Inventory/Spellbook/Feature/applied-grant sidecars exist. Confirm the character core restores but current sidecars are preserved because the older SHD did not record collection presence.
+- [ ] SHD rollback fault injection: fail the core publish and each sidecar copy in turn. Confirm the restore reports failure and attempts to leave the pre-restore canonical core and all four live sidecars intact; temporary rollback work files must be cleaned afterward.
+- [ ] Combat menu order: confirm Weapon Attacks, Spell Attacks, **Spell <ability> Atk+X DCY**, Rituals and Attack Templates appear in the attack section; Initiative Tracker is absent from Combat, and the state-free section header changes correctly across Attacks, Encounter, Recovery, Status and Defenses without allocating or reading storage during redraw. Short OK on the spellcasting-stat row opens Magic.
+- [ ] Combat cantrips: add a Known combat-mapped cantrip and a Known utility/non-combat cantrip with no structured combat effect. Confirm the combat cantrip appears in Spell Attacks at zero slot cost across scaling thresholds, while the utility cantrip remains in Spellbook but is not forced into Spell Attacks.
+- [ ] Grant status/review rendering: select **Grant Initial Traits** and **Apply Level Grants** on representative profiles. Confirm `Applying` is visibly rendered for at least one UI tick before the bounded scan, then **Review grants before apply** appears for newly eligible rows. Confirm deterministic rows remain `?` until OK/Apply All, applied rows become `A`, choice rows identify the choice type, and failures/skips remain visible instead of being silently committed.
 - [ ] Level-up review: level a character through a proficiency-bonus threshold, a deterministic-feature level, a spell-choice-growth level and an ASI/Feat level. Confirm the bounded review reports only the applicable before/after changes/notices and that reopening normal character screens does not retain a progression catalog in RAM.
 - [ ] Profile projections: compare steady-state free heap for Inventory, Spellbook and Adventure against the prior full-character builds. Use a canonical profile containing maximum-length percent-encoded text fields; apply Inventory AC/encumbrance/carry-capacity changes and byte-compare all unrelated canonical lines before/after. Spellbook and Adventure must never rewrite the canonical character file during ordinary use.
 
@@ -43,14 +54,14 @@
 
 - [ ] Build with allocator/free-heap instrumentation if available. Repeatedly enter/exit Profiles, Journal, Inventory, Spellbook, Weapon Attacks, Spell Attacks, Rituals, Adventure and Bestiary screens while forcing redraw/scroll. Confirm free heap returns to the same steady-state range after leaving each screen and does not decrease monotonically across cycles.
 - [ ] Confirm redraw alone does not cause SD activity: hold/move through screens that only redraw resident data and verify storage reads occur on screen entry, explicit input/cache boundaries or writes—not from the canvas callback.
-- [ ] Stress the source-derived project-owned working-set bounds from `MEMORY_AUDIT.md`: DNDolphins Spell/Ritual Combat 7,908 B project blocks, Inventory normal/save 3,884/5,164 B, Spellbook normal/load/save/sort-with-page 4,080/8,056/9,336/6,224 B, Adventure active-scene 1,377 B, Journal transient rewrite 2,888 B, Initiative fixed 5,276 B (6,812 B during profile sync) and Bestiary main window 4,108 B, remembering firmware/framework allocations are additional.
+- [ ] Measure actual device heap and stack high-water across the representative paths in `MEMORY_AUDIT.md`; include page-transfer overlap and firmware/framework allocations, which host layout figures do not measure.
 - [ ] Repeat Bestiary allocation-failure tests at startup/window/detail/encounter creation and confirm partially allocated project blocks are released without a later cumulative heap loss.
-- [ ] Run stack high-water checks under the manifest reservations (6/4/4/4/4/3/6 KB) and compare with the source-derived estimates rather than shrinking a stack solely to reduce Loader pressure.
+- [ ] Run stack high-water checks under the manifest reservations (6/4/4/4/4/4/6 KB) and compare with the ARM compiler measurements and working-set arithmetic rather than shrinking a stack solely to reduce Loader pressure.
 
 ## Character / Inventory / Spells
 
 - [ ] Create a character and confirm character creation alone does not create an Inventory sidecar; open DNDInventory and confirm a truly empty, never-granted Inventory receives its starting package and `InitialInventory=1`.
-- [ ] After automatic initial Inventory grant, open Inventory Tools and confirm the grant state reports Granted and **no extra trinket** was added when normal class/species/background defaults matched.
+- [ ] On an ungranted Inventory, select **Grant Initial Inventory** and confirm **Review inventory grant** appears before any package is written. After OK applies it, confirm the grant state reports Granted and **no extra trinket** was added when normal class/species/background defaults matched.
 - [ ] Force a normal starting-equipment composition with no matching Items/currency and confirm the automatic grant uses one random d100 trinket fallback and records the one-shot grant marker.
 - [ ] If normal equipment and trinket fallback both cannot be written, confirm manual Add New remains usable and can establish the canonical Inventory sidecar.
 - [ ] Reopen Inventory and confirm no duplicate starting items/currency are added automatically.
@@ -70,7 +81,7 @@
 - [ ] Delete a middle item and middle spell, close/relaunch the respective collection FAPs, and confirm the remaining records persist in order.
 - [ ] In Spell Filters, confirm Class defaults to **Character Classes**; on a multiclass character it shows the union of the character's spell lists, and Left/Right also reaches Any Class plus every supported class even when the character does not own that class.
 - [ ] In Add Spell, exercise Level, School, Ritual and Source filters separately and in combination; confirm each page is filled from matching streamed results rather than showing sparse rows from an already-selected page.
-- [ ] Cycle Source through Core, Xanathar, Forgotten Realms, Ravenloft and Other; select a spell and confirm its Source/School/Ritual metadata is copied into the owned Spell record and survives restart.
+- [ ] Cycle the bundled SRD Source filter and confirm selected spell Source/School/Ritual metadata is copied into the owned Spell record and survives restart.
 - [ ] Hold OK on a known Spellbook row and confirm Prepared toggles immediately, the `S|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back; Always Prepared remains unchanged.
 - [ ] Hold OK on an Inventory row and confirm Equipped toggles immediately, the row marker updates, the `I|` record is already updated on SD before leaving the screen, and a second Hold OK toggles it back.
 - [ ] Simulate/retry after an SD write failure and confirm an interrupted append does not leave a partial spell/item record or permanently disable later Add/Delete attempts.
@@ -78,15 +89,15 @@
 - [ ] Verify spell attack/DC, slots/Pact/points and weapon attack/damage behavior.
 
 
-## Inventory tools / initial grant
+## Inventory actions / initial grant
 
-- [ ] With no `inventory_{id}.txt` and no prior grant marker, open DNDInventory and confirm the automatic starting package creates the Inventory sidecar once.
-- [ ] Hold Up from the Inventory list and confirm the special menu contains Currency, Inventory Resources and Grant Initial Inventory.
+- [ ] With no `inventory_{id}.txt` and no prior grant marker, open DNDInventory and confirm no starting package is silently created. Select **Grant Initial Inventory**, confirm the review screen, cancel once with Back, then approve with OK and verify the package is created exactly once.
+- [ ] Confirm Inventory has no hidden Hold-Up tools menu: **Currency** is the first normal-list row, **Inventory Resources** and **Grant Initial Inventory** are the final action rows, and Hold Up on the list performs no alternate action.
 - [ ] Confirm Hold OK gestures: Inventory row = Equip/Unequip; + Add New = blank full editor; Item Catalog = category filter.
 - [ ] Exercise all five Currency fields with Left/Right and direct numeric entry, restart, and confirm values persisted.
 - [ ] Add a `Currency=` line to a character profile with no Inventory currency record and confirm DNDInventory ignores it; only `inventory_{id}.txt` may supply persisted currency.
 - [ ] Exercise Inventory Resources: encumbrance toggle, capacity override, armor/shield AC application and coin normalization.
-- [ ] After the automatic initial grant, confirm `inventory_{id}.txt` contains the granted Item rows, expected `Currency=cp,sp,ep,gp,pp` total and `InitialInventory=1`. Reopen Inventory and confirm no duplicate package is added. In Inventory Tools, Short OK on the granted state must not duplicate equipment/currency; Hold OK once appends one deliberate regrant and publishes the exact combined Currency total plus `InitialInventory=2`; a second Hold OK adds nothing.
+- [ ] After approving the initial Inventory grant, confirm `inventory_{id}.txt` contains the granted Item rows, expected `Currency=cp,sp,ep,gp,pp` total and `InitialInventory=1`. Reopen Inventory and confirm no duplicate package is added. Short OK on **Grant Initial Inventory** must review/report the already-granted state without duplication; Hold OK must show the one-time regrant review before appending the deliberate regrant and publishing `InitialInventory=2`; a second Hold OK adds nothing.
 
 - [ ] Character → Level Choices: verify it always opens. At a level with no pending ASI/Feat, confirm the explicit “No pending choices” screen; at an ASI/Feat level, confirm the choice screen and Allowed feat catalog default.
 - [ ] High Elf grants: on a fresh level-1 High Elf, run Grant Initial Traits and confirm Prestidigitation is written immediately. Raise total level to 3/5 and confirm Detect Magic/Misty Step are **not** auto-written; run Apply Level Grants and confirm they appear. Delete one deterministic granted spell while leaving its applied marker, re-run the appropriate grant action, and confirm the missing spell is repaired once without duplicating present species spells.
@@ -111,6 +122,7 @@
 - [ ] Partial custom files: launch preserves them for existing recovery/manual repair behavior.
 - [ ] View/edit/delete custom monsters, install/enable packs and generate encounters.
 - [ ] Send individual and generated monsters to Initiative.
+- [ ] Bestiary filters: set Search, Max CR, Type, Source, Environment and Role away from defaults, then press Left on each filter row and confirm it resets to empty/Any/default immediately; Right continues to advance/cycle filters normally.
 
 ## Stress
 
@@ -121,7 +133,7 @@
 - [ ] Maximum-size encounter save/rename/delete paths.
 
 - [ ] New character starts STR 15 / DEX 14 / CON 13 / INT 12 / WIS 10 / CHA 8; existing profiles retain their saved ability scores.
-- [ ] Selecting class/species/background at level 1 does not auto-grant traits; Character > **Grant Initial Traits** applies only selected deterministic level-1/starting traits once. Raise a level and confirm no new deterministic Feature/spell appears until **Apply Level Grants** is selected.
+- [ ] Selecting class/species/background at level 1 does not auto-grant traits. Character > **Grant Initial Traits** must stage starting grants for review, including Common/starting language choices and the primary-class save pair. Confirm nothing changes until reviewed; then approve/choose them once. Raise a level and confirm no new Feature/spell appears until **Apply Level Grants** is selected and reviewed.
 - [ ] Increasing a class level updates Hit Dice and applicable spell/resource progression, XP floor, and deterministic class features without rereading progression metadata outside that action.
 - [ ] Initiative Start New Combat opens setup with Roll for All, per-member roll, short/repeat left-right roll adjustment, hold-OK full participant editing, hold left/right participant reordering, + Temporary Member, and Begin Combat.
 - [ ] Change the active character's Dexterity, Initiative Misc, exhaustion, name, HP and AC in DNDolphins; launch Initiative and verify the existing main-character roster/combat entry refreshes without duplicating or changing monster/temp modifiers.
@@ -148,7 +160,7 @@
 - Give different participants Normal, Advantage and Disadvantage; verify Roll for All and single generated rolls use each participant's own mode.
 - Hold OK to open full participant editing and enter a numeric Initiative total; confirm that total is preserved until the participant is rolled again.
 - Create tied initiative totals with different modifiers and confirm the higher modifier sorts first.
-- On a fresh level-1 character, use Grant Initial Traits and confirm deterministic starting grants are applied immediately. If a grant cannot be applied, confirm only the failed entries remain available for review/retry. After later level increases, use Apply Level Grants for deterministic catch-up.
+- On a fresh level-1 character, use Grant Initial Traits and confirm starting grants are staged in Review grants before apply rather than committed immediately. Exercise Apply All plus at least one Language/Spell/Feat/Proficiency choice. After later level increases, use Apply Level Grants and confirm the next bounded review batch resumes without a long repeated scan.
 - Increase a caster level across a cantrip/prepared allowance increase and confirm deterministic progression updates while the status asks the player to choose spells rather than adding arbitrary spells.
 
 ### Initiative no-character / profile resolution
@@ -185,7 +197,8 @@
 - [ ] Level a High Elf through total character levels 1/3/5 and confirm Prestidigitation, Detect Magic and Misty Step are granted once at the appropriate gates. Repeat representative Drow/Wood Elf, Tiefling, Aasimar, Dragonborn and Goliath checks.
 - [ ] On a multiclass character, confirm species progression follows total character level rather than the level of any individual class.
 - [ ] Re-run progression checks after the grants are applied and confirm `appliedgrants_{id}.txt` prevents duplicates.
-- [ ] In Item Catalog, Hold OK cycles All → Weapons → Armor → Ammunition → Gear → Tools → Mounts/Vehicles → Potions → Rings → Rods → Scrolls → Staffs → Wands → Wondrous → Magic → All. Confirm each specific filter restricts the visible catalog to that category, Magic remains an aggregate non-Mundane filter, and Inventory-list Hold OK remains Equip/Unequip.
+- [ ] In Item Catalog, Hold OK opens **Catalog Filter**. Confirm the picker contains All, Weapons, Armor, Ammunition, Gear, Tools, Instruments, Trinkets, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic; OK applies the selected filter and returns to the catalog. Confirm Instruments includes the generic Musical Instrument plus its listed variants, Trinkets exposes all 100 bundled compact trinket labels, Tea Set appears under Gear, Magic remains an aggregate non-Mundane filter, and Inventory-list Hold OK remains Equip/Unequip.
+- [ ] Cross-check each exact Item name emitted by bundled class/background/trinket starting-equipment assets against Item Catalog search; every grant-owned name must have a catalog entry, including DNDolphins convenience aliases where the stored grant name differs from the SRD catalog label.
 ### Stack-reservation validation
 
 - [ ] Stress DNDInventory Add/Edit/Delete, Currency/Resources, Grant Initial Inventory and multi-page catalog navigation under the restored 4 KB stack reservation; confirm no stack overflow/MPU fault.
@@ -193,13 +206,13 @@
 - [ ] From DNDolphins, switch to a non-first character and launch DNDInventory; confirm the main header shows that exact active character ID and the matching `inventory_{id}.txt` contents.
 - [ ] From DNDolphins, switch to a non-first character and launch DNDSpellbook; confirm the main header shows that exact active character ID and the matching `spellbook_{id}.txt` contents/class filters.
 - [ ] Launch every companion directly from Apps; confirm each reads `custom_active_profile.txt` without directory discovery or launch-argument override. With a valid `Active=<id>`, confirm the exact ID is used. With metadata absent/unreadable, confirm Inventory/Spellbook/Journal/Adventure show no character and Initiative/Bestiary select ID 0. With metadata present but pointing to a missing character, confirm Inventory/Spellbook/Journal/Adventure/Initiative do **not** switch to ID 0 or another character, while Bestiary keeps the persisted ID and remains usable.
-- [ ] Stress DNDInitiative full participant editing, reorder, repeated Turn/Encounter recharge, save/reload and combat navigation under the 3 KB stack reservation; confirm no stack overflow/MPU fault.
+- [ ] Stress DNDInitiative full participant editing, reorder, repeated Turn/Encounter recharge, save/reload and combat navigation under the 4 KB stack reservation; confirm no stack overflow/MPU fault.
 - [ ] Leave DNDAdventure/DNDJournal/DNDolphins/DNDBestiary at their larger reservations unless device high-water measurements demonstrate additional safe margin.
 
 ### Inventory / Spellbook direct-entry checks
 
-- Launch DNDInventory from DNDolphins with a populated Inventory: the first frame is the Item list, `+ Add New` is row zero, and Hold Up opens Inventory Tools.
-- Launch DNDInventory with no Inventory sidecar: the first frame is an empty Item list with `+ Add New`; opening alone does not create the sidecar. Adding the first Item creates Inventory-owned `Currency=0,0,0,0,0`.
+- Launch DNDInventory from DNDolphins with a populated Inventory: the first frame is the Item list with **Currency** row zero and **+ Add New** row one; owned Items follow and **Inventory Resources** / **Grant Initial Inventory** are at the end. Hold Up has no hidden Inventory Tools action.
+- Launch DNDInventory with no Inventory sidecar: the first frame shows **Currency**, **+ Add New**, then the end actions; opening alone does not create the sidecar. Adding the first Item creates Inventory-owned `Currency=0,0,0,0,0`.
 - Launch DNDSpellbook from DNDolphins with a populated Spellbook: the first frame is the Spell list with `+ Add New` row zero.
 - Launch DNDSpellbook with no Spellbook sidecar: the first frame is an empty Spell list with `+ Add New`; opening alone does not create the sidecar, and the first saved Spell creates it.
 
@@ -220,8 +233,9 @@
 ### Inventory / Spellbook parity acceptance
 
 - Add a new Item and Spell. Confirm `Item added` / `Spell added` appears once in the editor header and clears on the next Short/Repeat/Long input without a timer or background worker; an UNSAVED/error notice must not be auto-cleared as a success notice.
-- Spellbook main list: Hold Up opens Spell Filters. Confirm `Class: Character Classes` is the default. Left/Right must cycle Character Classes → Any Class → Artificer through Wizard regardless of the active character's classes; Character Classes returns the union of the character's actual spell lists.
-- Spell Filters: confirm `Eligibility: Allowed` is default and `All Spells` is opt-in. Allowed must require real character list/level access; All Spells must preserve the selected class as a catalog-membership filter while bypassing character eligibility. `Any Class + All Spells` should show the complete catalog before the other explicit filters.
+- Add a blank Spell and add a Spell from the catalog; confirm both newly created records are **Known** immediately, persist as Known after relaunch, and are not automatically Prepared unless another rule/action sets Prepared.
+- Spellbook main list: Hold Up opens Spell Filters. Confirm `Class: Character Classes` is the default. Left/Right must cycle Character Classes → Any Class → the bundled SRD class filters regardless of the active character's classes; Character Classes returns the union of the character's actual spell lists.
+- Spell Filters: confirm `Eligibility: Allowed` is default and `All Spells` is opt-in. Allowed must require real character list/level access; All Spells must preserve the selected class as a catalog-membership filter while bypassing character eligibility. `Any Class + All Spells` should show all matching bundled SRD rows before the other explicit filters.
 - Spell and Item Catalogs: confirm `Page N <>` is visible; Left/Right changes catalog pages; Item rows use unbracketed category initials, append `*` for magic entries, and leave Other entries unprefixed.
 - Hold OK on a known non-always-prepared Spell and on an Item: confirm immediate persistence and a temporary `[X]` prefix on the affected row; the acknowledgement clears on the next input.
 - Reconfirm full editor parity against the recovery baseline: 17 Spell fields and 36 Item fields, Name-field catalog, Hold-OK custom name, Delete, free-cast controls, Equip/Prepare quick actions and A/P/K/F Spell list marks.
@@ -245,8 +259,8 @@
 - [ ] Bestiary home menu order: Browse Monsters, Generate Encounter, Party Level, Party Size, encounter settings, Saved Encounters, browse settings/lists, Create Custom Monster, Pack Diagnostics. Confirm Monster Pack Controls is absent and Pack Diagnostics is last.
 ## Grant/delete focused hardware checks
 
-- On a fresh Human Fighter, run **Grant Initial Traits**: expect **Updated** and verify Second Wind appears; run it again: expect **No changes**.
-- On a leveled character with unapplied deterministic grants, run **Apply Level Grants**: expect **Updated** and verify new Features/species spells; rerun: expect **No changes**.
+- On a fresh Human Fighter, run **Grant Initial Traits**: confirm the review contains starting language/save/Feature grants. Apply deterministic rows, resolve every choice, verify Second Wind and the selected languages/saves, then rerun and expect **No new grants**.
+- On a leveled character with unapplied grants, run **Apply Level Grants**, approve deterministic rows and resolve choices, then verify the resulting Features/species/subclass spells. Rerun and expect **No new grants**.
 - Delete a non-active character, an active nonzero character, and active profile 0. Confirm the row disappears, a surviving character becomes active when present, and deleting the final profile leaves only **+ New Character**.
 
 
@@ -260,7 +274,27 @@
 ## Spell-class-filter focused hardware checks
 
 - [ ] Open Spell Filters on a single-class character and confirm the initial class row reads `Class: Character Classes`.
-- [ ] Cycle right through Any Class and all 13 class labels; confirm classes absent from the character are still selectable.
+- [ ] Cycle right through Any Class and all bundled SRD class labels; confirm classes absent from the character are still selectable.
 - [ ] With a Bard that has no Wizard access, select Wizard + Allowed and confirm no Wizard-only spells leak through; switch to Wizard + All Spells and confirm Wizard catalog rows appear.
-- [ ] On an Eldritch Knight or Arcane Trickster, select Wizard + Allowed and confirm eligible Wizard-list spells appear according to third-caster level.
-- [ ] Select Any Class + All Spells and confirm complete-catalog browsing remains available.
+- [ ] Select Any Class + All Spells and confirm all matching bundled SRD rows remain browseable.
+
+## Scalable collection and training device regression
+
+- [ ] Add at least 40 Spells, 40 Items and 30 Features; test records 18–24 and later pages, then repeat with a fixture above 255 records.
+- [ ] Preserve Known/Prepared/Ritual/Always Prepared/free-cast values through add, delete, sorting, page navigation and reboot, including Disguise Self, Find Familiar, Identify and Sacred Flame.
+- [ ] Confirm manual and catalog spell additions are Known and succeed regardless of spells-known allowance.
+- [ ] Confirm Spellbook/Features page indicators are visible and page controls work; no file access occurs in Canvas callbacks.
+- [ ] Exercise Languages/Proficiencies add, replace, delete and page navigation; verify Allowed/All and long names. Load an old character and confirm no legacy training/language migration occurs.
+- [ ] Verify all primary-class save pairs, manual changes and multiclass behavior.
+- [ ] Exercise all six accessory outcomes, quantity bounds, repeated-strain wrap and exact final names. Confirm Homebrew No hides the 420 filter/results while Get Elevated Off does not hide catalog rows and owned items remain.
+- [ ] Toggle Off to 420 with existing Inventory and with no Inventory; the latter must still receive normal starting equipment later.
+- [ ] Interrupt failed writes/renames in a controlled SD test; verify whole-bundle publication and preservation of previous live collections.
+- [ ] Duplicate/export/import/archive/delete a character with all six sidecars. Restore current, version-1 and core-only SHD history; older missing companions must preserve current sidecars.
+
+Host regression verification is recorded in `tests/host/VALIDATION.md`; the seven passing ARM SDK builds and API checks are recorded in `tests/sdk/VALIDATION.md`. These device boxes remain unchecked until hardware testing is performed.
+- [ ] **Grant performance stress:** use a level-20 multiclass/profile with many species/background/class/subclass/feat grants. Confirm opening a review batch is a bounded one-time scan, applying a batch does not freeze on repeated whole-file rescans, the next batch continues promptly, and no draw/tick slowdown occurs while simply leaving the review/Magic screens visible.
+- [ ] **Magic totals draw path:** open Magic with a large Spellbook and confirm Known / knowable / free-granted totals appear. Leave the screen idle through multiple marquee/tick refreshes and confirm there is no repeated SD activity or visible periodic stall.
+- [ ] **Item Source tags:** browse bundled SRD and project Homebrew Items and confirm compact Source tags are present and survive selection into owned records.
+- [ ] **SRD catalog:** confirm Character, Spellbook and Inventory SRD rows browse normally and paging does not duplicate, skip or restart unexpectedly.
+- [ ] **Homebrew independence:** toggle **Homebrew Yes/No** and confirm Inventory `[DND]`/`[HB]` rows appear/disappear while already-owned Homebrew/DND items remain visible.
+

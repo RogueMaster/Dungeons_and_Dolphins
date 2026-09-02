@@ -1,143 +1,127 @@
 # Memory audit
 
-This audit separates values that are exact from project source from values that still require firmware/device measurement.
+This audit distinguishes current 3.6 host regression evidence, historical ARM compiler measurements and actual device measurements. Stack reservations are exact current manifest values. The ARM struct/layout tables retained below come from GDB `sizeof` expressions against seven ELF files built from the earlier 4.19.0c baseline with the official Flipper 1.4.3 SDK and GNU Arm Embedded 12.3. Evidence is in `tests/sdk/layout_arm.json`; those are real layouts for that historical SDK build, **not current 3.6 layouts and not measured free heap or cumulative stack high-water usage**. Firmware/framework objects, allocator metadata, fragmentation and allocator resize overlap are additional.
 
-- **Stack reservation** is exact from `application.fam`.
-- **Fixed project app block** and listed record/projection sizes are compiler-checked ARM32 layouts.
-- **Project working set** is arithmetic over project-owned app blocks and bounded transient project allocations. Firmware/framework objects, allocator metadata and fragmentation are additional.
-- **Source-estimated stack peak** is a conservative source review, not a measured high-water mark. Device instrumentation remains authoritative.
+## 3.6 grant/performance stack review
 
-## Per-FAP summary
+The current 3.6 reservations are DNDolphins 6 KB, DNDInventory 4 KB, DNDSpellbook 4 KB, DNDAdventure 4 KB, DNDJournal 4 KB, DNDInitiative 4 KB and DNDBestiary 6 KB. DNDInitiative was raised from 3 KB to 4 KB after reviewing its ~2.3 KB source-estimated peak: the 5.28 KB `InitiativeApp` block is heap-allocated and is not a stack requirement, but 3 KB left too little margin for nested SDK/framework calls. The changed grant paths remain bounded and use heap-backed resident records plus fixed stream buffers rather than recursion or whole-catalog stack arrays.
 
-| FAP | Stack reservation | Source-estimated stack peak | Fixed project app block | Representative bounded project working set |
-|---|---:|---:|---:|---|
-| DNDolphins | **6,144 B** | **~2,900 B** | **4,940 B** | **7,908 B** Spell/Ritual Combat; **7,668 B** Weapon Combat; **9,716 B** conservative grant/catalog overlap |
-| DNDInventory | **4,096 B** | **~2,500 B** | **1,500 B** | **3,884 B** normal 8-Item page; **5,164 B** ordinary sidecar rewrite; **~9,140 B** conservative regrant adapter/rewrite overlap |
-| DNDSpellbook | **4,096 B** | **~2,400 B** | **1,456 B** | **4,080 B** normal 8-Spell page; **~8,056 B** page load with transient canonical adapter; **~9,336 B** save/rewrite overlap; **6,224 B** sort-with-page |
-| DNDAdventure | **4,096 B** | **~2,300 B** | **512 B** | **1,377 B** with active scene; **~7.5–8.5 KB** only during transient Inventory reward bridging |
-| DNDJournal | **4,096 B** | **~2,660 B** | **1,352 B** | **2,888 B** during two-buffer index rewrite |
-| DNDInitiative | **3,072 B** | **~2,300 B** | **5,276 B** | **6,812 B** during main-character two-buffer profile sync; history save is stack-bounded and adds no resident state |
-| DNDBestiary | **6,144 B** | **~4,370 B** | **1,528 B** | **4,108 B** main monster window; **6,368 B** encounter generation |
+A current strict host `-fstack-usage` pass across every manifest source set reports the following largest individual project frames. These x86_64 frames are not ARM call-chain peaks, but they are useful regression evidence and do not indicate that the current manifest reservations need to be increased:
 
-Explicit grant processing uses a bounded 256-byte metadata line plus 512-byte read buffer and retains no grant batch in app state. ASI level-choice state uses existing app-struct alignment. Spell catalog class filters reuse the existing one-byte selector, and Inventory page residency checks add no resident buffers.
+| FAP | Reserved stack | Largest strict-host frame | Function/source |
+|---|---:|---:|---|
+| DNDolphins | 6,144 B | 1,776 B | `dndolphins_stage_character_grants` |
+| DNDInventory | 4,096 B | 1,728 B | `dnd_storage_archive_profile` |
+| DNDSpellbook | 4,096 B | 1,728 B | `dnd_storage_archive_profile` |
+| DNDAdventure | 4,096 B | 2,256 B | `dndadventure_campaign_packs_validate_index` |
+| DNDJournal | 4,096 B | 1,312 B | `dndjournal_input` |
+| DNDInitiative | 4,096 B | 1,536 B | `dndinitiative_feature_recharge_fast_recharge` |
+| DNDBestiary | 6,144 B | 2,288 B | `dndbestiary_state_load_filters` |
 
-The projection-based companions optimize **resident** state first. A few existing shared storage APIs still accept `PocketCharacter`, so Inventory grants, Spellbook page I/O and Adventure Item rewards create a bounded full-character adapter only for that operation. Those adapters are freed before returning and are not embedded in the app state. If hardware measurements show those transient peaks matter, the next optimization should be narrower collection-storage APIs rather than restoring a resident full character.
+Within the changed DNDolphins grant path, `dndolphins_apply_grant` is 1,040 B and `dndolphins_stage_grants_up_to_owned` is 1,008 B; the Magic draw function is 1,072 B and performs no storage scan. The previous official ARM SDK measurements below are retained as a historical architecture baseline; because the current environment has no uFBT/ARM toolchain, they are **not** relabeled as a fresh 3.6 ARM measurement.
 
-## Exact current ARM32 project sizes
+Grant processing retains at most 24 pending `PocketGrant` records, scans metadata with a 256-byte line and 512-byte read buffer, resumes the next review batch from a saved byte offset, consolidates dependent Feature/Feat discovery into forward passes, and stops a malformed dependency chain after eight generations. The periodic UI tick only handles deferred-event countdown/dice animation/marquee state. Grant scans and Spellbook-count scans are prohibited from Canvas draw paths by the host release audit; Magic refreshes its Known/knowable/free aggregate on screen entry and then draws the cached values.
 
-| Record/state | Size |
+Current 3.6 maintenance also removes avoidable repeated I/O without creating unbounded caches. Shared Settings are parsed best-effort from a **128-byte stack read buffer** instead of issuing a storage read for every byte; complete valid lines survive partial/corrupt reads while affected fields retain defaults. DNDolphins reuses its already-computed catalog availability during browsing, while Inventory and Spellbook cache one availability byte in their app state. Spellbook adds a fixed **128-byte status prefilter** to the app block for Prepared/Known/Always catalog filtering; it only rejects definite misses and still performs the exact storage lookup for possible matches. This adds fixed state rather than a collection-sized index.
+
+The host release audit now scans **84 static draw helpers** for direct heap/storage calls, and the sanitizer-backed tests use wrapped `malloc/calloc/realloc/free` accounting that requires zero outstanding project allocations at process exit for exercised paths. Manual failure-path review found no confirmed lost allocation in the changed catalog/status/settings paths. This is evidence for the tested code paths, not proof that every firmware/framework or hardware error path is leak-free.
+
+## Historical 4.19.0c ARM fixed layout baseline
+
+| FAP | Manifest stack | Project app block (ARM SDK layout) |
+|---|---:|---:|
+| DNDolphins | 6,144 B | 5,192 B |
+| DNDInventory | 4,096 B | 1,620 B |
+| DNDSpellbook | 4,096 B | 1,572 B |
+| DNDAdventure | 4,096 B | 512 B |
+| DNDJournal | 4,096 B | 1,348 B |
+| DNDInitiative | 3,072 B | 5,272 B |
+| DNDBestiary | 6,144 B | 1,516 B |
+
+DNDolphins contains the Language and Proficiency page buffers in its fixed block: 8 × 47 = 376 B and 8 × 63 = 504 B. These are bounded even when the sidecars grow. Removal of legacy inline language/training fields reduces the canonical character adapter to 2,920 B. The shared `DndSettings` structure is now five bytes (Skip Dice Loading, Debug, Get Elevated (persisted as legacy `ExtraItems`), Catalog scope and Homebrew). DNDInventory and DNDSpellbook both link/read it because their streamed loaders enforce Catalog/Homebrew at source; this does not materialize either catalog in RAM.
+
+## Historical 4.19.0c linked code and ARM compiler stack frames
+
+Dynamic project buffers are only part of the RAM requirement. The SDK's linked ELF section totals are below; text includes executable code and read-only data. File assets/relocations can make the on-disk FAP much larger and are not represented by these section totals.
+
+| FAP | Text/read-only data | Data + BSS | Largest compiled project frame |
+|---|---:|---:|---:|
+| DNDolphins | 117,646 B | 1 B | 1,656 B |
+| DNDInventory | 44,696 B | 0 B | 1,656 B |
+| DNDSpellbook | 33,154 B | 0 B | 1,656 B |
+| DNDAdventure | 34,703 B | 112 B | 2,168 B |
+| DNDJournal | 12,852 B | 0 B | 1,152 B |
+| DNDInitiative | 17,481 B | 0 B | 1,440 B |
+| DNDBestiary | 42,343 B | 617 B | 2,224 B |
+
+Largest frames are not call-chain peaks and can include functions later removed by the linker. For DNDolphins, linked sections + reserved stack + the named grant/catalog overlap already total **133,759 B** before framework/loader allocations. This is budget arithmetic, not a measured device minimum or proof of successful launch. Launch/free-heap and stack high-water tests remain necessary on the intended RogueMaster firmware.
+
+## Record and operation layouts
+
+| Record / allocation | Bytes |
 |---|---:|
-| `PocketSaveData` / `PocketCharacter` | **3,976 B** |
-| `PocketItem` | **298 B** |
-| `PocketSpell` | **324 B** |
-| `PocketFeature` | **234 B** |
-| `PocketGrant` | **148 B** |
-| `PocketMonsterSummary` | **172 B** |
-| `PocketMonsterDetail` | **1,544 B** |
-| `PocketMonsterEncounter` | **2,088 B** |
-| `DndAdventureScene` | **865 B** |
-| `PocketCampaignSummary` | **120 B** |
-| `PocketCampaignProgress` | **88 B** |
-| `PocketBestiaryFilterPreset` | **77 B** |
-| `PocketSavedEncounter` | **432 B** |
-| `PocketProfileState` | **308 B** |
-| `DndInventoryProfileProjection` | **374 B** |
-| `DndSpellbookProfileProjection` | **298 B** |
-| `DndAdventureProfileProjection` | **72 B** |
-| Resident Inventory character/page-owner state | **404 B** |
-| Resident Spellbook character/page-owner state | **320 B** |
+| `PocketCharacter` / `PocketSaveData` | 2,920 |
+| `PocketSpell` | 324 |
+| Eight spells plus four eight-byte flag arrays | 2,624 |
+| `PocketItem` | 300 |
+| Eight items | 2,400 |
+| `PocketFeature` | 234 |
+| Eight features | 1,872 |
+| `PocketGrant` | 148 |
+| `PocketProfileState` | 308 |
+| `DndDolphinsSpellClassCounts` | 16 |
+| Inventory projection/page-owner state | 404 |
+| Spellbook projection/page-owner state | 324 |
+| Spell sort key / 24-key batch | 36 / 864 |
+| SHD restore context (21 paths and flags) | 2,029 |
+| Three-item 420 bundle | 900 |
 
-Small rule/index records include `DndDolphinsSpellClassCounts` 8 B, `PocketAttackRoll` 10 B, `PocketDamageRoll` 92 B, `DndInventoryItemAggregate` 8 B, `DndInventoryCatalogEntry` 52 B and `DndSpellbookCatalogEntry` 56 B.
+The signed Item container reference is now 32-bit; the existing text record field remains in the same position. Logical collection indexes/counts are 16-bit; resident page counts remain eight. The representation and storage/time still impose practical limits. No gameplay ceiling is implemented by allocating a 255-record replacement array.
 
-## Working-set derivation
+## Representative project heap arithmetic
 
-### DNDolphins
+These figures describe named project allocations, not whole-device peaks. File objects and GUI/Loader/dispatcher/text-entry objects are excluded.
 
-- Fixed app block: **4,940 B**. The bounded level-up review retains only derived before/after and pending-choice flags; deterministic grant counts are no longer stored because grants are explicit actions.
-- Combat logical index: **24 B** maximum.
-- Visible Combat row cache: 5 × 64 B = **320 B**.
-- Item page: 8 × 298 B = **2,384 B**.
-- Spell page: 8 × 324 B plus four 8-byte spell-state arrays = **2,624 B**.
-- Feature page: 8 × 234 B = **1,872 B**.
-- Spell/Ritual Combat: 4,940 + 24 + 320 + 2,624 = **7,908 B**.
-- Weapon Combat: 4,940 + 24 + 320 + 2,384 = **7,668 B**.
-- Maximum 24 pending Grants: 24 × 148 B = **3,552 B**.
-- Current 24-entry character/feat catalog block: **1,224 B**.
-- Conservative grant/catalog overlap: 4,940 + 3,552 + 1,224 = **9,716 B**.
+| Path | Included project allocations | Bytes |
+|---|---|---:|
+| DNDolphins Spell/Ritual Combat | app + 8 indexes + 5 × 64-byte rows + spell page | 8,152 |
+| DNDolphins Weapon Combat | app + index/row block + item page | 7,928 |
+| DNDolphins Feature list | app + feature page | 7,064 |
+| DNDolphins Language/Proficiency catalog | app + 24-name/metadata catalog | 6,416 |
+| DNDolphins grant/catalog upper overlap | app + 24 pending grants + catalog | 9,968 |
+| DNDolphins SHD restore | app + rollback context | 7,221 |
+| Inventory normal list | app + item page | 4,020 |
+| Inventory page transfer | app + old/new item pages + canonical adapter + 1,280-byte line | 10,620 |
+| Inventory ordinary save | app + item page + adapter + line | 8,220 |
+| Inventory 420 generation | app + adapter + three-item bundle | 5,440 |
+| Spellbook normal list | app + spell page | 4,196 |
+| Spellbook page transfer | app + old/new spell pages + adapter + line | 11,020 |
+| Spellbook ordinary save | app + spell page + adapter + line | 8,396 |
+| Spellbook sort with resident page | app + spell page + 24 keys + line | 6,340 |
+| Adventure active scene | app + 865-byte scene | 1,377 |
+| Adventure reward update | app + scene + adapter + item page + line | 7,977 |
+| Journal index rewrite | app + two 768-byte buffers | 2,884 |
+| Initiative character sync | app + two 768-byte buffers | 6,808 |
+| Bestiary main monster window | app + 15 × 172-byte summaries | 4,096 |
+| Bestiary encounter generation | app + 2,088-byte encounter + 16 summaries | 6,356 |
 
-Weapon and Spell pages are not resident together. Combat section headings and level-up review presentation add no dynamic resident list.
+Page transfer deliberately retains the old companion page until the new read succeeds. That means two bounded pages can overlap temporarily; normal residency is one page. Reallocation may temporarily require old and new blocks inside the allocator. Combat uses one bounded index/row block for the active weapon/spell path and never an index sized to the entire collection. Streamed Combat filtering may perform a full file pass when its index window changes.
 
-### DNDInventory
+## Streaming, ownership and stack review
 
-- Fixed app block: **1,500 B**, reduced from the earlier full-character design by the resident Inventory projection/state.
-- Eight-Item page: **2,384 B**.
-- Normal resident project blocks: 1,500 + 2,384 = **3,884 B**.
-- Ordinary transactional sidecar rewrite line buffer: **1,280 B**, yielding **5,164 B** while the page remains resident.
-- Canonical-profile projection scan/rewrite uses one bounded **640 B** heap line, not a full resident character.
-- Starting-inventory/regrant compatibility with the existing shared composition API uses one transient **3,976 B** `PocketCharacter`. A conservative regrant overlap with the resident page and 1,280 B collection line is 1,500 + 2,384 + 3,976 + 1,280 = **9,140 B**. The adapter is freed on every success/failure exit.
+- Spell pages have exactly one allocation owner: `spell_storage`. Spells and all four flag arrays are interior pointers. Growth moves flags before clearing the enlarged record region. Transfer clears the source owner; borrowed adapters detach every page pointer before cleanup. No interior pointer is freed separately.
+- Spellbook resize uses a short-lived heap adapter instead of placing the complete character on its 4 KB stack. Other Inventory/Spellbook/Adventure compatibility adapters are likewise heap-owned.
+- Item/Spell catalog readers stream one selected catalog file per browse session. Cached seek offsets keep paging resumable without materializing the catalog; Inventory's rolling 64-page offset window remains bounded.
+- Item/Spell readers use a 256-byte stream buffer and a 1,280-byte heap line. Feature readers use a 256-byte stream buffer and 768-byte stack line. Language/proficiency sidecars use 96-byte reads and a 128-byte line. Their catalogs use 256-byte reads, a 192-byte line and at most 24 resident entries.
+- Item/Spell/Feature owned-page indexes each retain at most 32 offsets (128 B), accelerating the first 256 records. Pages outside that map stream from the file; they remain accessible. Rewrites invalidate offsets. This bounded acceleration does not impose an ownership limit.
+- Spell sorting retains 24 keys and rescans to emit each ordered batch, with original file offsets as a stable tie-breaker. Already-sorted files need only one scan and no rewrite. Runtime grows with collection size, but sorting heap does not.
+- Canvas callbacks render cached rows only. Character list hydration and Combat row preparation happen in event/update handlers. Container names outside the resident page use the logical Item number instead of loading another page during drawing.
+- Bundle creation uses a 900-byte heap block, then a single batch append. Item/Spell and new collection publication sync a temporary output before guarded renames; failed writes/renames leave the previous live collection intact in the tested failure paths. A rollback failure can leave recovery data in its backup file.
+- SHD restore keeps its 2,029-byte path/presence context on the heap. Archive paths remain bounded stack arrays. No whole `PocketCharacter` local remains in Spellbook resize.
+- Settings, SHD and grants do not add speculative campaign variables. Language/proficiency changes set a transient dirty flag so normal save also refreshes their history companions.
 
-### DNDSpellbook
+## Verification limits
 
-- Fixed app block: **1,456 B**.
-- Eight-Spell page including four state arrays: **2,624 B**.
-- Normal resident project blocks: **4,080 B**.
-- The current shared spell-window API still receives a transient **3,976 B** canonical adapter while loading/saving a page. Load overlap: 1,456 + 2,624 + 3,976 = **8,056 B**.
-- An ordinary save/rewrite can additionally own the **1,280 B** bounded collection line: **9,336 B** conservative overlap.
-- Sorting uses at most 24 compact 36-byte keys = **864 B** plus the 1,280-byte line buffer; sort-with-page: 1,456 + 2,624 + 864 + 1,280 = **6,224 B**.
-- Projection scanning itself uses one **640 B** bounded heap line and does not retain the full character.
+`tests/host/run_tests.py` strictly compiles and links all seven manifest source sets against the host shim and runs the real storage/UI helpers with AddressSanitizer and UndefinedBehaviorSanitizer. Scenarios cover 320 Items/Spells/Features, 300 Language/Proficiency records, late indexes, flags, bounded sorting/Combat, grants, failure rollback and history lifecycle. Linker allocation wrappers require zero outstanding project allocations at each test exit. This verifies exercised paths, not every possible hardware/error path.
 
-### DNDAdventure
-
-- Fixed app block: **512 B** with the 72-byte profile projection resident.
-- Active scene: **865 B**, for **1,377 B**.
-- Campaign-pack loading is bounded and storage-backed.
-- Item reward bridging creates a transient 3,976-byte canonical adapter because the shared Inventory append/window API still uses that owner shape. When an Item page/rewrite buffer overlaps, the project peak is conservatively **~7.5–8.5 KB**; that state is action-local and freed before returning to Adventure.
-
-### DNDJournal
-
-- Fixed app block: **1,352 B**.
-- Index rewrite can own two **768 B** heap buffers simultaneously.
-- Working set: 1,352 + 768 + 768 = **2,888 B**.
-
-### DNDInitiative
-
-- Fixed app block: **5,276 B**; navigation and opt-in encounter history add no new resident arrays or members.
-- Explicit main-character profile synchronization can own two **768 B** heap buffers.
-- Working set: 5,276 + 768 + 768 = **6,812 B**.
-- Completed-history publication uses bounded path/header/member buffers on stack and one storage `File*`; source review raises the conservative peak to **~2.3 KB**, still below the exact 3 KB reservation. Each record is published atomically and no history index is retained.
-- DNDInitiative reserves a **3 KB** stack. Five-row roster/setup/combat/editor windows reuse existing selection/scroll fields.
-
-### DNDBestiary
-
-- Fixed app block: **1,528 B**.
-- Main monster window: 15 × 172 B = **2,580 B**, for **4,108 B**.
-- Encounter generation can own one 2,088-byte encounter plus a 16 × 172 B = **2,752 B** candidate sample.
-- Encounter-generation project blocks: 1,528 + 2,088 + 2,752 = **6,368 B**.
-
-## Projection and shared profile/handoff behavior
-
-All seven FAPs link `dnd_profile_handoff.c`. Its active-profile reader uses a fixed 96-byte stack line and does not hydrate a character or collection.
-
-Only Inventory, Spellbook and Adventure link `dnd_profile_projection.c`. It scans the canonical character by field name and reads the canonical format by field name. The parser/rewrite line is bounded to **640 B**, matching the canonical encoded-character line bound, and is heap-owned only during the stream operation. Inventory's projection writer patches only Vitals AC plus CombatFlags encumbrance/carry-capacity fields and transactionally publishes the rewritten canonical file. Spellbook and Adventure have no canonical-profile write API.
-
-A failed projection load may invoke the existing backup-restoration path with one transient **3,976 B** `PocketSaveData`; this is recovery-only, not normal resident state.
-
-## Draw-time, allocation and ownership audit
-
-- Project canvas callbacks do **not** allocate project heap, perform storage I/O, hydrate pages, rewrite collections or poll storage.
-- Storage/catalog/page/projection work occurs on app/screen entry, explicit input, cache boundaries or writes.
-- Combat headings and Initiative visibility calculations use existing scalar state only.
-- Collection pages/indexes/scenes/Bestiary blocks, projection lines, compatibility adapters and rewrite buffers have explicit normal/failure release paths.
-- Cross-FAP launches quiesce callbacks/timers and release outgoing project-owned state before Loader starts the next FAP.
-- No firmware `qsort` dependency is used.
-
-## Hardware measurement checklist
-
-1. Measure stack high-water for all seven FAPs under the exact **6/4/4/4/4/3/6 KB** reservations, especially projection save/load paths on the three 4 KB companions.
-2. Compare steady-state free heap before/after the projection change; Inventory, Spellbook and Adventure should show the reduced resident blocks above.
-3. Stress Inventory automatic first-entry initial grant/regrant, page-boundary repair, Spellbook page load/save/sort, and Adventure Item rewards while watching transient free-heap lows and fragmentation.
-4. Repeatedly enter/exit Weapon, Spell and Ritual Combat while checking that indexes/pages are released.
-5. Stress Initiative with the maximum roster through wraparound scrolling, edit, reorder, Resume, next-turn and Hold-Up previous-turn navigation.
-6. Exercise projection/allocation/write failure paths while checking canonical-profile integrity and steady-state project heap recovery.
-
-A RogueMaster firmware build plus device free-heap, allocator-fragmentation and stack-high-water instrumentation remains the final authority for total runtime memory.
+LeakSanitizer itself cannot inspect `/proc` in this environment and is disabled; address/undefined-behavior checks and explicit project allocation accounting remain enabled. The seven official-SDK ARM builds and strict API checks stored under `tests/sdk/` passed for the earlier 4.19.0c baseline; they are historical compatibility evidence, **not a fresh 3.6 ARM build**. No physical Flipper, firmware heap measurement or target cumulative stack high-water measurement was available for 3.6. The separate RogueMaster exported-symbol comparison is not a substitute for rebuilding against the intended device firmware. Run the unchecked device gates in `DEVICE_TEST_MATRIX.md` before treating 3.6 as hardware-validated.

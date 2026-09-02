@@ -2,10 +2,10 @@
 
 #include <furi_hal_random.h>
 
-const char* const dnd_rules_core_ability_names[POCKET_D20_ABILITY_COUNT] =
+const char* const dnd_rules_core_ability_names[DND_ABILITY_COUNT] =
     {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
 
-const char* const dnd_rules_core_skill_names[POCKET_D20_SKILL_COUNT] = {
+const char* const dnd_rules_core_skill_names[DND_SKILL_COUNT] = {
     "Acrobatics",
     "Animal Handling",
     "Arcana",
@@ -26,7 +26,7 @@ const char* const dnd_rules_core_skill_names[POCKET_D20_SKILL_COUNT] = {
     "Survival",
 };
 
-const uint8_t dnd_rules_core_skill_abilities[POCKET_D20_SKILL_COUNT] = {
+const uint8_t dnd_rules_core_skill_abilities[DND_SKILL_COUNT] = {
     PocketAbilityDexterity,
     PocketAbilityWisdom,
     PocketAbilityIntelligence,
@@ -76,7 +76,7 @@ int8_t dnd_rules_core_ability_modifier(int8_t score) {
 
 uint8_t dnd_rules_core_total_level(const PocketCharacter* character) {
     uint8_t level = 0U;
-    for(uint8_t i = 0U; i < character->class_count && i < POCKET_D20_MAX_CLASSES; ++i)
+    for(uint8_t i = 0U; i < character->class_count && i < DND_MAX_CLASSES; ++i)
         level += character->classes[i].level;
     if(level < 1U) return 1U;
     if(level > 20U) return 20U;
@@ -100,7 +100,7 @@ int8_t dnd_rules_core_exhaustion_penalty(const PocketCharacter* character) {
 }
 
 int8_t dnd_rules_core_saving_throw_modifier(const PocketCharacter* character, uint8_t ability) {
-    if(ability >= POCKET_D20_ABILITY_COUNT) return 0;
+    if(ability >= DND_ABILITY_COUNT) return 0;
     int8_t base = dnd_rules_core_ability_modifier(character->ability_scores[ability]);
     return (int8_t)(dnd_rules_core_apply_proficiency(
                         base,
@@ -111,7 +111,7 @@ int8_t dnd_rules_core_saving_throw_modifier(const PocketCharacter* character, ui
 }
 
 int8_t dnd_rules_core_skill_base_modifier(const PocketCharacter* character, uint8_t skill) {
-    if(skill >= POCKET_D20_SKILL_COUNT) return 0;
+    if(skill >= DND_SKILL_COUNT) return 0;
     uint8_t ability = dnd_rules_core_skill_abilities[skill];
     int8_t base = dnd_rules_core_ability_modifier(character->ability_scores[ability]);
     return (int8_t)(dnd_rules_core_apply_proficiency(

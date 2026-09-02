@@ -5,6 +5,7 @@ Current user-facing feature coverage for the seven Dungeons & Dolphins FAPs.
 ## DNDolphins
 
 - [x] Multiple character profiles with create, switch, rename, duplicate, export, import, archive, delete, save check and backup restore actions.
+- [x] Characters Hold OK includes **Restore from SHD**, with selectable per-level history that restores the core character plus matching Inventory, Spellbook, Feature and applied-grant sidecars as one coherent snapshot.
 - [x] Character identity, species, background, alignment, multiclass levels/subclasses, XP/Milestone leveling, languages, proficiencies and Inspiration.
 - [x] Bundled class selection configures the class Hit Die and spellcasting mode; recognized older/imported classes can receive missing class-derived spellcasting setup.
 - [x] Subclass catalog defaults to the selected class and supports a class-filtered / All toggle.
@@ -14,36 +15,41 @@ Current user-facing feature coverage for the seven Dungeons & Dolphins FAPs.
 - [x] Fixed-average HP gain and Hit Dice refresh when class level increases.
 - [x] Explicit ASI/Feat level choices with dedicated ASI +2 and ASI +1/+1 application.
 - [x] Increasing class level raises XP to at least the minimum threshold for the resulting total level.
-- [x] **Grant Initial Traits** for deterministic starting traits and **Apply Level Grants** for deterministic catch-up through current levels; both report `Updated` or `No changes`.
+- [x] **Grant Initial Traits** and **Apply Level Grants** stage eligible grants into a mandatory review/choice screen before application; 24-record batches resume by byte cursor and dependency scans are bounded.
 - [x] Grant Review supports Apply All plus Pending/Skipped grant records, editing unresolved grants and adding custom grant records.
 - [x] Character-owned Feature/Perk records with uses, recharge cadence, source class and resource formulas.
 - [x] Progression Feat picker defaults to **Allowed**; Hold OK toggles **Allowed / All**.
-- [x] Casting ability, Spell Attack/DC, spell slots, multiclass casting, Pact Magic, spell points, Mystic Arcanum and Arcane Recovery.
+- [x] Casting ability, Spell Attack/DC, spell slots, multiclass casting, Pact Magic, spell points, Mystic Arcanum and Arcane Recovery; Combat also exposes a compact casting-ability / Spell Attack / Spell Save DC row.
 - [x] Weapon Attacks with ability/proficiency/magic/advantage rules, versatile damage, extra dice, criticals and Inventory ammunition consumption.
 - [x] Weapon-local ammunition counters are consumed before loose Inventory ammunition when configured.
 - [x] Common custom/legacy bows, crossbows, slings, blowguns, muskets and pistols can infer their standard ammunition family when Ammo Group is blank.
 - [x] Loose ammunition lookup accepts the required ammo token anywhere in the Item name, case-insensitively.
-- [x] Spell Attacks with class casting modifiers, cantrip scaling, upcasting, structured damage/healing effects and supported slot/Pact/point/free-cast resource use.
+- [x] Spell Attacks with class casting modifiers, cantrip scaling, upcasting, structured damage/healing effects and supported slot/Pact/point/free-cast resource use; tracked combat-capable cantrips require no slot, while utility/non-combat cantrips without a structured combat effect are not listed there.
 - [x] Ritual casting path for eligible known Wizard ritual spells.
 - [x] Editable attack templates.
 - [x] Short Rest, Spend Hit Die and Long Rest recovery actions.
 - [x] Conditions, Concentration, Reaction, temporary effects, defenses, senses, movement, death-save and exhaustion controls.
 - [x] General Dice Roller with d4/d6/d8/d10/d12/d20/d100, quantity, modifier, Advantage, Disadvantage and Guidance.
 - [x] Dice Roller Guidance automatically adds 1d4 to supported d20 rolls; Advantage/Disadvantage return to Normal when the dice setup no longer supports those modes.
+- [x] Home **Settings** after Journal with shared **Skip Dice Loading**, **Debug**, **Get Elevated**, **Catalog** and **Homebrew: Yes/No** settings persisted under the DNDolphins data root; Catalog defaults to the bundled SRD rules set and Homebrew defaults Yes.
+- [x] **Skip Dice Loading** bypasses DNDolphins roll animations for Dice Roller, Hit Dice, weapon and spell-combat rolls; Adventure/Initiative read the same setting and already present their roll results without a loading animation.
 - [x] Launch/return integration with Inventory, Spellbook, Bestiary, Initiative, Adventure and Journal.
 
 ## DNDInventory
 
-- [x] Opens directly to the active character's Inventory with **+ Add New**.
-- [x] Automatic one-time starting-equipment grant for a truly empty, never-granted Inventory.
-- [x] Explicit **Grant Initial Inventory** action plus one-time Hold OK regrant override.
-- [x] Eight-record bounded Inventory paging.
+- [x] Opens directly to the active character's Inventory with **Currency** first and **+ Add New** second; owned Items follow, then Inventory Resources and Grant Initial Inventory.
+- [x] Explicit **Review inventory grant** confirmation before the normal **Grant Initial Inventory** transaction, plus a reviewed one-time Hold OK regrant override; empty Inventory launch never auto-grants.
+- [x] Eight-record bounded Inventory paging with `PgX<>` in the upper-right when owned Items exceed one page.
 - [x] Full Item editor with quantity, weight, equipment/attunement, weapon, damage, ammunition, charges, armor, container and source fields.
-- [x] Item Name catalog with All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic filters.
+- [x] Item Name catalog with All, Weapons, Armor, Ammunition, Gear, Tools, Instruments, Trinkets, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic filters; Hold OK opens the selectable filter-category list.
+- [x] Item catalog keeps the 579 SRD rows plus 36 project Homebrew/DNDolphins rows in the normal streamed file; Homebrew filtering is applied while browsing and owned Inventory remains unaffected.
 - [x] Recognized bundled weapon/armor selections populate useful mechanical presets including weight, damage, properties, Versatile die, ammunition family, armor AC/DEX cap and shield bonus.
 - [x] Generic Spell Scroll entries for Cantrip and Levels 1–9 with level-appropriate rarity.
+- [x] Musical-instrument variants and the d100 trinket set are cataloged in their own categories; Tea Set is available as mundane Gear.
+- [x] Fallback d100 trinkets use the SRD 5.2.1 table and remain catalog-backed.
+- [x] Every exact Item name used by bundled starting-equipment grants is searchable in the Item catalog; project naming aliases are labeled DNDolphins rather than SRD.
 - [x] Hold OK quick Equip/Unequip.
-- [x] Hold Left/Right quick Stack Qty adjustment.
+- [x] Hold Left/Right on an owned Item changes Stack Qty by -5/+5; the Item editor retains normal single-step Left/Right and full numeric Hold OK entry.
 - [x] CP/SP/EP/GP/PP currency editing and coin normalization.
 - [x] Carried/equipped weight, capacity, Standard/Variant encumbrance, attunement count and calculated armor/shield AC.
 - [x] Normal carrying capacity uses Strength × 15 lb with an explicit carrying-capacity override.
@@ -55,13 +61,14 @@ Current user-facing feature coverage for the seven Dungeons & Dolphins FAPs.
 - [x] Opens directly to the active character's Spellbook with **+ Add New**.
 - [x] Eight-record bounded Spellbook paging.
 - [x] Full Spell editor with source class, level, Known/Prepared/Always Prepared/Ritual, free casts and catalog/source/school/grant metadata.
+- [x] Blank **+ Add New** spells and catalog-selected spells are automatically marked Known.
 - [x] Hold OK quick Prepare/Unprepare for Known spells.
 - [x] Owned Spells kept in level-ascending, case-insensitive alphabetical order.
-- [x] Bundled 448-spell catalog sorted by level then name.
+- [x] One canonical 355-spell SRD catalog owned by DNDolphins and streamed by both Character and Spellbook, sorted by level then name, with every fixed SRD spell grant required to resolve in it.
 - [x] Filters for Level, Class, Ritual, School, Source, Status and Eligibility.
-- [x] **Character Classes** default class filter, plus **Any Class** and all 13 supported class filters.
+- [x] **Character Classes** default class filter, plus **Any Class** and all bundled SRD class filters.
 - [x] **Allowed** character eligibility and **All Spells** catalog browsing modes.
-- [x] Eldritch Knight and Arcane Trickster Wizard-list eligibility.
+
 - [x] Catalog selection resolves a compatible owned Source Class and marks the selected spell Known.
 - [x] Catalog selection copies level, Ritual, School, Source and Stable ID metadata into the owned Spell record.
 
@@ -108,7 +115,7 @@ Current user-facing feature coverage for the seven Dungeons & Dolphins FAPs.
 
 ## DNDBestiary
 
-- [x] Streamed bundled monster catalog with Search, Max CR, Type, Source, Environment and Role filters.
+- [x] Streamed bundled monster catalog with Search, Max CR, Type, Source, Environment and Role filters; Left on those filter rows resets the value to its default/Any state.
 - [x] Monster Search uses case-insensitive substring matching.
 - [x] Full stat blocks with abilities, defenses, senses, traits, actions and additional text.
 - [x] Favorite and Recent monster lists.
@@ -132,3 +139,24 @@ Current user-facing feature coverage for the seven Dungeons & Dolphins FAPs.
 - [x] Companion main screens display the resolved character ID in brackets where applicable.
 - [x] Collections and catalogs use bounded streaming/paging rather than whole-file resident loading.
 - [x] Editable campaign/monster text packs do not require checksums.
+
+## Scalable collections and training
+
+- [x] Owned Items/Spells/Features extend beyond the former 24/24/20 limits with eight-record resident windows and logical indexes above 255.
+- [x] Spellbook single-owner page allocation preserves Known/Prepared/Ritual/Always Prepared/free-cast associations through add/delete/sort/reload; manual additions are not limited by spells-known allowances.
+- [x] Bounded Combat weapon/spell/ritual index windows, indexed Feature pages, and `Spellbook` / `Features` headers with `PgX<>`.
+- [x] Scalable Languages and typed Proficiencies lists with add/replace/delete and paged streamed catalogs; Proficiencies defaults to Allowed with Hold OK for All.
+- [x] Primary-class saving-throw proficiencies are staged as reviewed starting grants; no additional starting pair is silently granted from multiclassing.
+- [x] Get Elevated Off/420, default 420; full random bundles, deferred until normal equipment exists, immediate active-character grants on Off-to-420. The 18 420 catalog rows are gated only by Homebrew, not Get Elevated.
+- [x] Six sidecars included in duplicate/delete/export/import/archive and SHD snapshots/restore, with older history compatibility and no legacy language/training migration.
+- [x] SRD grant-coverage gate: 28 species, 4 backgrounds, 12 classes, 12 subclasses and 19 feats all have progression metadata; stable persisted grant IDs are collision-checked.
+- [x] Grant choices support Language, Spell, Feat/Perk, Skill, Skill/Tool, weapon/armor/tool Proficiency and Size, including constrained catalogs and dependent feature grants.
+- [x] Magic shows Known / knowable / free-granted spell totals; the aggregate is loaded outside Canvas draw callbacks.
+- [x] Item catalog displays compact Source tags and validates non-empty source attribution.
+- [x] Release compliance cross-checks **475 fixed SRD grant payloads** against SRD spell/feat/language/skill/save/proficiency/size/resistance/sense/speed vocabulary instead of trusting source labels alone.
+- [x] Every one of the **42 packed assets** is explicitly classified by the release audit; adding a new bundled file fails the gate until its SRD/Homebrew provenance is reviewed.
+- [x] Compiled Class/Background/Species/Alignment/Feat fallback lists exactly mirror the SRD picker files.
+- [x] Spellbook SRD filter UI exposes only SRD-valid class and source selectors.
+- [x] Settings reads are buffered and best-effort per line, catalog availability is cached outside draw paths, and Spellbook status filtering uses a fixed 128-byte negative prefilter with exact-match fallback.
+- [x] Host release audit checks all direct draw helpers for heap/storage work; the current 3.6 tree checks **84** draw helpers.
+

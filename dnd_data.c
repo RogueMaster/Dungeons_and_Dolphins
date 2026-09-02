@@ -68,7 +68,7 @@ static bool dnd_data_reserve_records(
 }
 
 static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t next) {
-    if(next > POCKET_D20_MAX_SPELLS) return false;
+    if(next > DND_RESIDENT_RECORD_LIMIT) return false;
     if(next == character->spell_capacity) return true;
     if(next == 0U) {
         free(character->spell_storage);
@@ -162,9 +162,9 @@ static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t ne
 
 bool dnd_data_reserve_spells(PocketCharacter* character, uint8_t required) {
     if(required <= character->spell_capacity) return true;
-    if(required > POCKET_D20_MAX_SPELLS) return false;
-    uint8_t next =
-        dnd_data_next_capacity(character->spell_capacity, required, POCKET_D20_MAX_SPELLS);
+    if(required > DND_RESIDENT_RECORD_LIMIT) return false;
+    uint8_t next = dnd_data_next_capacity(
+        character->spell_capacity, required, DND_RESIDENT_RECORD_LIMIT);
     return dnd_data_resize_spell_storage(character, next);
 }
 
@@ -178,7 +178,7 @@ bool dnd_data_reserve_features(PocketCharacter* character, uint8_t required) {
         (void**)&character->features,
         &character->feature_capacity,
         required,
-        POCKET_D20_MAX_FEATURES,
+        DND_RESIDENT_RECORD_LIMIT,
         sizeof(PocketFeature));
 }
 
@@ -187,7 +187,7 @@ bool dnd_data_reserve_features_exact(PocketCharacter* character, uint8_t require
         (void**)&character->features,
         &character->feature_capacity,
         required,
-        POCKET_D20_MAX_FEATURES,
+        DND_RESIDENT_RECORD_LIMIT,
         sizeof(PocketFeature));
 }
 
@@ -196,7 +196,7 @@ bool dnd_data_reserve_items(PocketCharacter* character, uint8_t required) {
         (void**)&character->items,
         &character->item_capacity,
         required,
-        POCKET_D20_MAX_ITEMS,
+        DND_RESIDENT_RECORD_LIMIT,
         sizeof(PocketItem));
 }
 
@@ -206,7 +206,7 @@ void dnd_data_clear_items(PocketCharacter* character) {
         (void**)&character->items,
         &character->item_capacity,
         0U,
-        POCKET_D20_MAX_ITEMS,
+        DND_RESIDENT_RECORD_LIMIT,
         sizeof(PocketItem));
     character->item_count = 0U;
 }
@@ -216,7 +216,7 @@ bool dnd_data_reserve_grants(PocketCharacter* character, uint8_t required) {
         (void**)&character->grants,
         &character->grant_capacity,
         required,
-        POCKET_D20_MAX_GRANTS,
+        DND_MAX_GRANTS,
         sizeof(PocketGrant));
 }
 
@@ -225,7 +225,7 @@ bool dnd_data_reserve_grants_exact(PocketCharacter* character, uint8_t required)
         (void**)&character->grants,
         &character->grant_capacity,
         required,
-        POCKET_D20_MAX_GRANTS,
+        DND_MAX_GRANTS,
         sizeof(PocketGrant));
 }
 
@@ -255,8 +255,7 @@ void dnd_data_set_defaults(PocketSaveData* data) {
 
     character->class_count = 1U;
     dnd_data_copy(character->classes[0].name, sizeof(character->classes[0].name), "Fighter");
-    dnd_data_copy(
-        character->classes[0].subclass, sizeof(character->classes[0].subclass), "None");
+    dnd_data_copy(character->classes[0].subclass, sizeof(character->classes[0].subclass), "None");
     character->classes[0].level = 1U;
     character->classes[0].hit_die = 10U;
     character->classes[0].hit_dice_current = 1U;
@@ -281,9 +280,8 @@ void dnd_data_set_defaults(PocketSaveData* data) {
     character->hit_dice_current = 1U;
     character->hit_dice_max = 1U;
     character->spellcasting_ability = PocketAbilityIntelligence;
-
-    character->language_count = 1U;
-    dnd_data_copy(character->languages[0], sizeof(character->languages[0]), "Common");
+    /* Saving-throw proficiencies are class grants. Fresh characters leave them
+       unset until Grant Initial Traits presents each proficiency for approval. */
 
     character->attack_template_count = 3U;
     PocketAttackTemplate* unarmed = &character->attack_templates[0];
@@ -305,7 +303,6 @@ void dnd_data_set_defaults(PocketSaveData* data) {
     saving_throw->save_ability = PocketAbilityDexterity;
     saving_throw->damage_dice = 1U;
     saving_throw->damage_die = 6U;
-
 }
 
 void dnd_data_sanitize(PocketSaveData* data) {
@@ -317,17 +314,13 @@ void dnd_data_sanitize(PocketSaveData* data) {
     character->alignment[sizeof(character->alignment) - 1U] = '\0';
     if(!character->alignment[0])
         dnd_data_copy(character->alignment, sizeof(character->alignment), "True Neutral");
-    character->other_proficiencies[sizeof(character->other_proficiencies) - 1U] = '\0';
     character->origin_feat[sizeof(character->origin_feat) - 1U] = '\0';
-    character->tool_proficiencies[sizeof(character->tool_proficiencies) - 1U] = '\0';
-    character->armor_training[sizeof(character->armor_training) - 1U] = '\0';
-    character->weapon_training[sizeof(character->weapon_training) - 1U] = '\0';
     character->senses[sizeof(character->senses) - 1U] = '\0';
     character->size = dnd_data_clamp_u8(character->size, PocketSizeCount - 1U);
 
-    character->class_count = dnd_data_clamp_u8(character->class_count, POCKET_D20_MAX_CLASSES);
+    character->class_count = dnd_data_clamp_u8(character->class_count, DND_MAX_CLASSES);
     if(character->class_count == 0U) character->class_count = 1U;
-    for(uint8_t i = 0U; i < POCKET_D20_MAX_CLASSES; ++i) {
+    for(uint8_t i = 0U; i < DND_MAX_CLASSES; ++i) {
         PocketClassLevel* class_level = &character->classes[i];
         class_level->name[sizeof(class_level->name) - 1U] = '\0';
         class_level->subclass[sizeof(class_level->subclass) - 1U] = '\0';
@@ -348,15 +341,15 @@ void dnd_data_sanitize(PocketSaveData* data) {
     }
     if(character->classes[0].level == 0U) character->classes[0].level = 1U;
 
-    for(uint8_t i = 0U; i < POCKET_D20_ABILITY_COUNT; ++i) {
+    for(uint8_t i = 0U; i < DND_ABILITY_COUNT; ++i) {
         character->ability_scores[i] =
             (int8_t)dnd_data_clamp_i16(character->ability_scores[i], 1, 30);
-        character->saving_throw_proficiency[i] = dnd_data_clamp_u8(
-            character->saving_throw_proficiency[i], PocketProficiencyProficient);
+        character->saving_throw_proficiency[i] =
+            dnd_data_clamp_u8(character->saving_throw_proficiency[i], PocketProficiencyProficient);
         character->saving_throw_misc[i] =
             (int8_t)dnd_data_clamp_i16(character->saving_throw_misc[i], -20, 20);
     }
-    for(uint8_t i = 0U; i < POCKET_D20_SKILL_COUNT; ++i) {
+    for(uint8_t i = 0U; i < DND_SKILL_COUNT; ++i) {
         character->skill_proficiency[i] =
             dnd_data_clamp_u8(character->skill_proficiency[i], PocketProficiencyExpertise);
         character->skill_misc[i] = (int8_t)dnd_data_clamp_i16(character->skill_misc[i], -20, 20);
@@ -386,44 +379,45 @@ void dnd_data_sanitize(PocketSaveData* data) {
     if(character->spell_storage && character->spells && character->spell_known &&
        character->spell_always_prepared && character->spell_free_casts_current &&
        character->spell_free_casts_max) {
-        uint8_t spell_limit = dnd_data_clamp_u8(character->spell_capacity, POCKET_D20_MAX_SPELLS);
+        uint8_t spell_limit =
+            dnd_data_clamp_u8(character->spell_capacity, DND_RESIDENT_RECORD_LIMIT);
         character->spell_count = dnd_data_clamp_u8(character->spell_count, spell_limit);
     } else {
         character->spell_count = 0U;
     }
     if(character->features) {
-        uint8_t feature_limit = dnd_data_clamp_u8(character->feature_capacity, POCKET_D20_MAX_FEATURES);
+        uint8_t feature_limit =
+            dnd_data_clamp_u8(character->feature_capacity, DND_RESIDENT_RECORD_LIMIT);
         character->feature_count = dnd_data_clamp_u8(character->feature_count, feature_limit);
     } else {
         character->feature_count = 0U;
     }
     if(character->items) {
-        uint8_t item_limit = dnd_data_clamp_u8(character->item_capacity, POCKET_D20_MAX_ITEMS);
+        uint8_t item_limit =
+            dnd_data_clamp_u8(character->item_capacity, DND_RESIDENT_RECORD_LIMIT);
         character->item_count = dnd_data_clamp_u8(character->item_count, item_limit);
     } else {
         character->item_count = 0U;
     }
     if(character->grants) {
-        uint8_t grant_limit = dnd_data_clamp_u8(character->grant_capacity, POCKET_D20_MAX_GRANTS);
+        uint8_t grant_limit = dnd_data_clamp_u8(character->grant_capacity, DND_MAX_GRANTS);
         character->grant_count = dnd_data_clamp_u8(character->grant_count, grant_limit);
     } else {
         character->grant_count = 0U;
     }
-    character->language_count =
-        dnd_data_clamp_u8(character->language_count, POCKET_D20_MAX_LANGUAGES);
 
     for(uint8_t i = 0U; i < character->spell_count; ++i) {
-        character->spells[i].name[POCKET_D20_SPELL_NAME_LEN - 1U] = '\0';
-        character->spells[i].detail[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+        character->spells[i].name[DND_SPELL_NAME_LEN - 1U] = '\0';
+        character->spells[i].detail[DND_DETAIL_LEN - 1U] = '\0';
         character->spells[i].level = dnd_data_clamp_u8(character->spells[i].level, 9U);
         character->spells[i].class_index =
-            dnd_data_clamp_u8(character->spells[i].class_index, POCKET_D20_MAX_CLASSES - 1U);
+            dnd_data_clamp_u8(character->spells[i].class_index, DND_MAX_CLASSES - 1U);
         character->spells[i].prepared = character->spells[i].prepared ? 1U : 0U;
         character->spells[i].ritual = character->spells[i].ritual ? 1U : 0U;
-        character->spells[i].stable_id[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        character->spells[i].source[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        character->spells[i].school[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        character->spells[i].grant_name[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        character->spells[i].stable_id[DND_SHORT_LEN - 1U] = '\0';
+        character->spells[i].source[DND_SHORT_LEN - 1U] = '\0';
+        character->spells[i].school[DND_SHORT_LEN - 1U] = '\0';
+        character->spells[i].grant_name[DND_SHORT_LEN - 1U] = '\0';
         character->spells[i].grant_source =
             dnd_data_clamp_u8(character->spells[i].grant_source, PocketGrantSourceCount - 1U);
         character->spell_known[i] = character->spell_known[i] ? 1U : 0U;
@@ -434,10 +428,10 @@ void dnd_data_sanitize(PocketSaveData* data) {
             character->spell_free_casts_current[i], character->spell_free_casts_max[i]);
     }
     for(uint8_t i = 0U; i < character->feature_count; ++i) {
-        character->features[i].name[POCKET_D20_FEATURE_NAME_LEN - 1U] = '\0';
-        character->features[i].detail[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+        character->features[i].name[DND_FEATURE_NAME_LEN - 1U] = '\0';
+        character->features[i].detail[DND_DETAIL_LEN - 1U] = '\0';
         character->features[i].class_index =
-            dnd_data_clamp_u8(character->features[i].class_index, POCKET_D20_MAX_CLASSES - 1U);
+            dnd_data_clamp_u8(character->features[i].class_index, DND_MAX_CLASSES - 1U);
         character->features[i].class_level_gained =
             dnd_data_clamp_u8(character->features[i].class_level_gained, 20U);
         character->features[i].recharge =
@@ -449,50 +443,47 @@ void dnd_data_sanitize(PocketSaveData* data) {
     }
     for(uint8_t i = 0U; i < character->item_count; ++i) {
         PocketItem* item = &character->items[i];
-        item->name[POCKET_D20_ITEM_NAME_LEN - 1U] = '\0';
-        item->detail[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+        item->name[DND_ITEM_NAME_LEN - 1U] = '\0';
+        item->detail[DND_DETAIL_LEN - 1U] = '\0';
         item->attack_ability = dnd_data_clamp_u8(item->attack_ability, PocketAttackAbilityBest);
         item->damage_type = dnd_data_clamp_u8(item->damage_type, PocketDamageTypeCount - 1U);
         item->damage_dice = dnd_data_clamp_u8(item->damage_dice, 20U);
         item->extra_dice = dnd_data_clamp_u8(item->extra_dice, 20U);
-        item->container_index =
-            (int8_t)dnd_data_clamp_i16(item->container_index, -1, POCKET_D20_MAX_ITEMS - 1U);
+        if(item->container_index < -1 || item->container_index >= UINT16_MAX)
+            item->container_index = -1;
         item->charges_current = dnd_data_clamp_i16(item->charges_current, 0, 999);
         item->charges_max = dnd_data_clamp_i16(item->charges_max, 0, 999);
         item->armor_dex_cap = (int8_t)dnd_data_clamp_i16(item->armor_dex_cap, -1, 9);
-        item->ammunition_group[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        item->ammunition_group[DND_SHORT_LEN - 1U] = '\0';
     }
-    for(uint8_t i = 0U; i < POCKET_D20_MAX_LANGUAGES; ++i) {
-        character->languages[i][POCKET_D20_SHORT_LEN - 1U] = '\0';
-    }
-    character->conditions[POCKET_D20_DETAIL_LEN - 1U] = '\0';
-    character->concentration[POCKET_D20_NAME_LEN - 1U] = '\0';
-    character->temporary_effects[POCKET_D20_DETAIL_LEN - 1U] = '\0';
-    character->resistances[POCKET_D20_DETAIL_LEN - 1U] = '\0';
-    character->immunities[POCKET_D20_DETAIL_LEN - 1U] = '\0';
-    character->vulnerabilities[POCKET_D20_DETAIL_LEN - 1U] = '\0';
-    character->movement_modes[POCKET_D20_DETAIL_LEN - 1U] = '\0';
+    character->conditions[DND_DETAIL_LEN - 1U] = '\0';
+    character->concentration[DND_NAME_LEN - 1U] = '\0';
+    character->temporary_effects[DND_DETAIL_LEN - 1U] = '\0';
+    character->resistances[DND_DETAIL_LEN - 1U] = '\0';
+    character->immunities[DND_DETAIL_LEN - 1U] = '\0';
+    character->vulnerabilities[DND_DETAIL_LEN - 1U] = '\0';
+    character->movement_modes[DND_DETAIL_LEN - 1U] = '\0';
     character->reaction_available = character->reaction_available ? 1U : 0U;
     for(uint8_t i = 0U; i < character->grant_count; ++i) {
         PocketGrant* grant = &character->grants[i];
-        grant->stable_id[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        grant->source[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        grant->option_name[POCKET_D20_NAME_LEN - 1U] = '\0';
-        grant->prerequisites[POCKET_D20_NAME_LEN - 1U] = '\0';
-        grant->grant_value[POCKET_D20_NAME_LEN - 1U] = '\0';
+        grant->stable_id[DND_SHORT_LEN - 1U] = '\0';
+        grant->source[DND_SHORT_LEN - 1U] = '\0';
+        grant->option_name[DND_NAME_LEN - 1U] = '\0';
+        grant->prerequisites[DND_NAME_LEN - 1U] = '\0';
+        grant->grant_value[DND_NAME_LEN - 1U] = '\0';
         grant->source_type = dnd_data_clamp_u8(grant->source_type, PocketGrantSourceCount - 1U);
-        grant->class_index = dnd_data_clamp_u8(grant->class_index, POCKET_D20_MAX_CLASSES - 1U);
+        grant->class_index = dnd_data_clamp_u8(grant->class_index, DND_MAX_CLASSES - 1U);
         grant->level_gained = dnd_data_clamp_u8(grant->level_gained, 20U);
         grant->status = dnd_data_clamp_u8(grant->status, PocketGrantSkipped);
     }
     character->attack_template_count =
-        dnd_data_clamp_u8(character->attack_template_count, POCKET_D20_MAX_ATTACK_TEMPLATES);
+        dnd_data_clamp_u8(character->attack_template_count, DND_MAX_ATTACK_TEMPLATES);
     for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
         PocketAttackTemplate* attack = &character->attack_templates[i];
-        attack->name[POCKET_D20_NAME_LEN - 1U] = '\0';
-        attack->mastery[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        attack->damage_type[POCKET_D20_SHORT_LEN - 1U] = '\0';
-        attack->rider_type[POCKET_D20_SHORT_LEN - 1U] = '\0';
+        attack->name[DND_NAME_LEN - 1U] = '\0';
+        attack->mastery[DND_SHORT_LEN - 1U] = '\0';
+        attack->damage_type[DND_SHORT_LEN - 1U] = '\0';
+        attack->rider_type[DND_SHORT_LEN - 1U] = '\0';
         attack->type = dnd_data_clamp_u8(attack->type, PocketAttackTemplateTypeCount - 1U);
         attack->ability = dnd_data_clamp_u8(attack->ability, PocketAbilityCharisma);
         attack->save_ability = dnd_data_clamp_u8(attack->save_ability, PocketAbilityCharisma);
@@ -500,5 +491,4 @@ void dnd_data_sanitize(PocketSaveData* data) {
         attack->rider_dice = dnd_data_clamp_u8(attack->rider_dice, 20U);
         attack->recharge = dnd_data_clamp_u8(attack->recharge, PocketRechargeCount - 1U);
     }
-
 }

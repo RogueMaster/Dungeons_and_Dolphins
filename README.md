@@ -8,6 +8,8 @@
 
 DNDolphins is an offline 5E-compatible character, combat, campaign and encounter suite for Flipper Zero. It is split into seven FAPs so character management, Inventory, Spellbook, Adventure, Journal, Initiative and Bestiary can each keep their own working set small while sharing the same active character where appropriate.
 
+Use it as a pocket companion to your table, not as a replacement for the game itself. DNDolphins is not meant to replace the source material, the Player's Handbook, or a good Dungeon Master. Keep the books handy, respect the rulings at your table, and support your local Dungeon Masters.
+
 ## Common controls
 
 - **Up / Down:** move through menu rows, records or choices. Held navigation repeats where the screen supports repeat input.
@@ -39,6 +41,7 @@ The Home menu is presented in this order:
 12. **Dice Roller** — Opens the general-purpose dice roller.
 13. **Adventure** — Saves the active character and launches DNDAdventure.
 14. **Journal** — Saves the active character and launches DNDJournal.
+15. **Settings** — Opens shared Dungeons & Dolphins preferences for dice loading, diagnostics, Get Elevated, catalog scope and Homebrew visibility.
 
 ### Characters and Profile Actions
 
@@ -53,10 +56,22 @@ Hold OK on an existing character to open these actions in order:
 7. **Delete** — Deletes the selected character plus its DNDolphins-owned Inventory, Spellbook, Feature and grant-state sidecars. If another character exists, a survivor becomes active; deleting the final profile leaves **+ New Character**.
 8. **Verify Save** — Reads the selected profile and reports whether the character can be loaded.
 9. **Restore Backup** — Restores the active character from its available recovery copy when one exists.
+10. **Restore from SHD** — For the active character, opens the available level snapshots and restores the selected level as one coherent character-owned set. The core character returns to its canonical character file while matching Inventory, Spellbook, Feature, applied-grant, Language and Proficiency snapshot data return to their respective live sidecars.
+
+### Settings
+
+Settings are shared across the suite and persist in `/ext/apps_data/dndolphins/settings.txt`.
+The preferences are small and reconstructable, so saving writes only `settings.txt`; settings-specific `.tmp` and `.bak` files are not created. Loading is best-effort: defaults are established first, each complete valid setting line is applied independently, and missing, unreadable, malformed or truncated data leaves the affected preference at its default without preventing the app from opening.
+
+1. **Skip Dice Loading** — Off by default. When enabled, DNDolphins skips its rolling animation and immediately shows the already-resolved dice result for the general Dice Roller, weapon attacks/damage, spell-combat rolls and Hit Dice. Companion FAPs read the same preference. Adventure skill rolls and Initiative rolls already resolve directly without an animation, so enabling this setting keeps their existing immediate-result behavior.
+2. **Debug** — Off by default. Enables additional diagnostic logging at selected shared/settings/restore and roll paths. It does not change dice math, character rules or persisted character data.
+3. **Get Elevated** — **420** by default. This controls only the randomized starting 420 bundle. Changing Off to 420 adds one random bundle to the active character if an Inventory already exists; otherwise the bundle waits for normal starting-equipment generation. Turning it Off does not remove already-owned items and does not control catalog visibility.
+4. **Catalog** — **SRD** by default. Selects the installed rules catalog used by Character, grant, Inventory and Spellbook loaders. Catalog assets are streamed on demand rather than loaded wholesale into memory.
+5. **Homebrew** — **Yes** by default. Controls visibility of rows sourced as `Homebrew` or `DNDolphins` without changing already-owned character data. The normal Item catalog retains these project rows so the toggle works independently of the rules catalog.
 
 ### Fresh-character defaults and automatic setup
 
-A new character starts as **New Hero**, Human, Adventurer, True Neutral, Fighter 1 with Milestone leveling, Common, 10 HP, AC 10 and the standard ability array assigned as STR 15, DEX 14, CON 13, INT 12, WIS 10 and CHA 8. Three editable attack templates are also created: Unarmed Strike, Spell Attack and Saving Throw Action.
+A new character starts as **New Hero**, Human, Adventurer, True Neutral, Fighter 1 with Milestone leveling, 10 HP, AC 10 and the standard ability array assigned as STR 15, DEX 14, CON 13, INT 12, WIS 10 and CHA 8. Languages and class saving-throw proficiencies are deliberately not written as hidden defaults: **Grant Initial Traits** stages Common, the starting language choices and the primary-class save pair alongside the other level-1 grants for review before they are applied. Adding another class does not silently grant another save pair. Manual save adjustments remain available in Abilities & Saves. Three editable attack templates are also created: Unarmed Strike, Spell Attack and Saving Throw Action.
 
 Choosing a bundled class automatically applies that class's normal Hit Die and spellcasting classification, and choosing a subclass defaults to choices compatible with the selected class. In the subclass catalog, **Hold OK** toggles the normal class-filtered list and **All** subclasses; Hold OK on the Class or Subclass field itself opens custom text entry. When an older/imported character contains a recognized class but its spellcasting setup or normal slot pool is unset, opening DNDolphins can fill the missing class-derived spellcasting data instead of requiring the user to rebuild it manually.
 
@@ -66,6 +81,8 @@ The Character screen is presented in this order:
 
 1. **Name** — OK edits the character name.
 2. **Player** — OK edits the player name.
+Catalog-backed Class, Subclass, Species, Background, Feat and Spell choices stream their installed assets at load time. Grant metadata is also streamed rather than materialized in RAM. Existing character-owned values and already-applied grants remain valid if catalog settings change. If a picker asset is missing, DNDolphins uses a small SRD fallback list for the core Class/Subclass/Species/Background/Feat choices.
+
 3. **Species** — OK opens the bundled Species catalog; Hold OK enters a custom Species name.
 4. **Background** — OK opens the bundled Background catalog; Hold OK enters a custom Background name.
 5. **Alignment** — OK opens the bundled Alignment catalog; Hold OK enters a custom Alignment value.
@@ -74,13 +91,21 @@ The Character screen is presented in this order:
 8. **XP** — OK adds 100 XP, Left/Right changes XP by 100, and Hold OK opens full numeric entry.
 9. **Leveling** — Toggles XP or Milestone leveling.
 10. **Languages** — Opens the character language list.
-11. **Other proficiencies** — Edits the free-form proficiency field.
+11. **Proficiencies** — Opens owned weapon, armor and tool training, with a catalog for adding or replacing entries.
 12. **Inspiration** — Toggles Inspiration.
 13. **Level Choices** — Opens the next pending ASI/Feat choice. ASI +2 and ASI +1/+1 apply the ability change directly; progression feat choices open the Feat catalog in **Allowed** mode.
-14. **Grant Initial Traits** — Applies missing deterministic level-1 species/background/class/subclass traits and spells. The action reports **Updated** when character state changes or **No changes** when all applicable starting grants are already present.
-15. **Apply Level Grants** — Applies missing deterministic grants through the character's current levels. Increasing a class level does not run this action automatically.
+14. **Grant Initial Traits** — Stages missing starting/level-1 species, background, primary-class, subclass, language, save, feat/proficiency and spell grants into **Review grants before apply**. The brief **Applying** status covers the bounded metadata scan; nothing is committed merely because the action was opened.
+15. **Apply Level Grants** — Stages missing grants through the character's current levels. Increasing a class level does not run this action automatically. Each review batch must be approved or have its required choices resolved before progression continues to the next bounded batch.
 
 When a class level increases, HP grows by the class's fixed-average Hit Die value plus Constitution modifier, with a minimum gain of 1 HP per level. Class and global Hit Dice current values are set to their new maximums, while ASI/Feat and other player choices remain explicit. The XP value is raised to at least the minimum threshold for the resulting total level.
+
+### Languages and Proficiencies
+
+Languages begins with **+ New Language**. Short OK opens the streamed language catalog; Left/Right moves through catalog pages and OK adds the selected language. Open an owned language to replace it from the catalog or choose **Delete language**. Starting and feature-granted language choices appear as reviewable `Freepick` Language grants; restrictions such as **Standard language** are enforced by the choice catalog instead of silently selecting a language.
+
+Proficiencies begins with **+ New Proficiency**. The streamed catalog covers weapons, armor and tools and defaults to **Allowed**, using class training/choice eligibility and already-owned grants. **Hold OK** switches between Allowed and All for table rulings and homebrew. Open an owned proficiency to replace its type/name from the catalog or choose **Delete proficiency**. Granted training is staged through the same approval flow; a choice grant opens only the applicable options rather than granting every eligible tool/weapon/armor. An Item's own Proficient switch continues to control that Item's attack modifier.
+
+Both owned lists grow beyond one page. Up/Down traverses entries and Short Left/Right moves by eight-record pages, with `PgX<>` in the header when needed. Duplicate additions are ignored. Existing legacy language/training text is not imported; select entries in the new lists.
 
 ### Classes and class editor
 
@@ -109,13 +134,16 @@ Class options are presented in this order:
 
 ### Grant review behavior
 
-**Grant Initial Traits** and **Apply Level Grants** apply every deterministic grant the app can resolve and report **Updated** or **No changes**. If a grant cannot be safely resolved, the app opens **Review grants before apply** instead of silently choosing for the player.
+**Grant Initial Traits** and **Apply Level Grants** always stage newly eligible grants into **Review grants before apply** before changing the character. Rows begin with `?`, successfully applied rows show `A`, and skipped rows show `S`. Choice-bearing rows identify their choice type before opening the applicable catalog. Review batches are capped at 24 resident grants and resume the metadata file from a saved byte cursor, so a high-level character does not repeatedly rescan the catalog from byte zero.
 
-- **Apply all pending** applies every currently pending review record.
-- **Grant row / Short OK** applies a pending grant, or changes a skipped grant back to Pending.
+- **Apply all pending** applies only deterministic pending rows. Choice rows remain pending and the status reports how many choices still need player input.
+- **Grant row / Short OK** applies a deterministic grant; for Language, Spell, Feat/Perk, Skill, Skill/Tool, Proficiency or Size choices it opens the appropriate choice catalog instead. Selecting a Feat/Perk can stage grants owned by that newly acquired feature as a later review batch.
+- **Spell choices** are restricted by the class/feature that granted them. Level-based `Freepick Spell` rows use the highest spell level available at the class level that earned the grant; school/list/explicit-option restrictions are applied when metadata supplies them.
 - **Grant row / Hold Left** marks a pending grant Skipped.
 - **Grant row / Hold OK** opens the full grant record editor.
 - **+ Add Custom Grant** creates an editable custom grant record for advanced/manual progression handling.
+
+Grant scanning is an explicit input/deferred-event operation. It is never run from the periodic UI tick or Canvas draw callbacks. Feature/Feat dependency discovery is consolidated into bounded forward passes and has an eight-generation safety ceiling to prevent malformed dependency chains from looping indefinitely.
 
 ### Vitals options
 
@@ -148,7 +176,7 @@ Each row represents one of the 18 skills and displays its calculated total. Left
 
 ### Features & Perks options
 
-The Features list begins with **+ Add New**, followed by character-owned class features, feats, perks and limited-use resources. Short OK opens a Feature; Left/Right adjusts the highlighted field; Hold OK opens full numeric entry or custom text where supported.
+The Features list begins with **+ Add New**, followed by character-owned class features, feats, perks and limited-use resources. It grows beyond 20 Features; `Features` and `PgX<>` identify the current page. On the list, Short Left/Right moves by eight-record pages. Short OK opens a Feature; Left/Right adjusts the highlighted field; Hold OK opens full numeric entry or custom text where supported.
 
 Feature options are presented in this order:
 
@@ -186,7 +214,7 @@ The Magic screen is presented in this order:
 15. **Level 8 slots**
 16. **Level 9 slots** — On each slot row, Short Left/Right changes current slots, Short OK opens current-slot numeric entry, Hold Left/Right changes the maximum, and Hold OK opens maximum-slot numeric entry. During Arcane Recovery, applicable level 1–5 slot rows instead spend or undo recovery budget.
 
-Multiclass full/half/third-caster slot rules, Pact Magic, spell points, Mystic Arcanum and supported recovery resources are calculated from the character's class data. Eldritch Knight and Arcane Trickster use Wizard-list spell eligibility with third-caster progression.
+Multiclass full/half/third-caster slot rules, Pact Magic, spell points, Mystic Arcanum and supported recovery resources are calculated from the character's class data.
 
 ### Combat options
 
@@ -194,10 +222,10 @@ Combat is presented in this order:
 
 1. **Attack mode** — Cycles Normal, Advantage and Disadvantage for attack rolls.
 2. **Weapon Attacks** — Lists usable Inventory weapons and performs attack/damage resolution. Ammunition can come from a weapon's own counter or matching Inventory stacks; loose ammunition matches the required token anywhere in the Item name, so names such as `Fire Arrow` can satisfy an `arrow` requirement.
-3. **Spell Attacks** — Lists eligible Spellbook spells and resolves attack/save, damage/healing and resource use from structured spell metadata.
-4. **Rituals** — Lists eligible known ritual spells that can be cast through the ritual path without consuming a slot when the character has the applicable ritual capability.
-5. **Attack Templates** — Opens saved Unarmed, Spell Attack, Saving Throw or Custom attack templates. Hold OK on an existing template opens its full editor.
-6. **Initiative Tracker** — Launches DNDInitiative.
+3. **Spell Attacks** — Lists tracked Spellbook spells that currently have a cast resource and structured combat effect. Known/tracked combat cantrips are always castable without slots, but utility/non-combat cantrips that do not resolve through the structured combat path are not listed here.
+4. **Spellcasting stats** — Shows the current Spellcasting Ability abbreviation, Spell Attack Bonus and Spell Save DC on one row. Short OK opens **Magic & Spells** for the full casting controls.
+5. **Rituals** — Lists eligible known ritual spells that can be cast through the ritual path without consuming a slot when the character has the applicable ritual capability.
+6. **Attack Templates** — Opens saved Unarmed, Spell Attack, Saving Throw or Custom attack templates. The default **Unarmed Strike** now rolls `d20 + ability modifier + Proficiency Bonus` (plus Attack misc and exhaustion effects), shows hit damage as `1 + ability modifier`, and shows the Grapple/Shove save DC as `8 + ability modifier + Proficiency Bonus`. Its Ability field defaults to Strength and remains editable for features such as Dexterous Attacks. Hold OK on an existing template opens its full editor.
 7. **HP** — Adjusts current HP; Hold OK opens full numeric entry.
 8. **Temporary HP** — Adjusts temporary HP; Hold OK opens full numeric entry.
 9. **Short Rest** — Applies supported Short Rest recovery and enables applicable recovery choices such as Arcane Recovery.
@@ -218,34 +246,49 @@ Combat is presented in this order:
 
 Weapon combat uses STR/DEX/finesse rules, proficiency, magic bonuses, versatile damage, extra dice, riders and critical dice doubling. For weapons with the Ammunition property, a weapon-local Ammo Current/Maximum counter is used first when configured; otherwise Combat consumes one quantity from the first non-weapon Inventory stack whose name or Ammo Group contains the required ammunition token, case-insensitively. Standard families normalize to `arrow`, `bolt`, `bullet` or `needle`, so **Fire Arrow**, **Silvered Arrows**, **Crossbow Bolt Bundle** and similar descriptive names can work without being named exactly `Arrows` or `Bolts`. Older/custom bows, crossbows, slings, blowguns, muskets and pistols can infer the standard ammunition family from the weapon name when Ammo Group is empty.
 
+The Magic screen displays **Known / knowable / free-granted** totals. Known is the number of owned Known spells. Knowable combines each class's current cantrip/prepared-or-spellbook capacity with genuinely additional granted spells. The free-granted value excludes ordinary class-capacity learning (for example normal Wizard spellbook picks) so bonus species/feat/feature/subclass spells do not silently distort the class allowance. The aggregate is refreshed when Magic is entered; drawing the screen does not read the Spellbook file.
+
 Spell combat supports source-class casting modifiers, cantrip scaling, higher-level casting, multiple attack/roll instances and supported secondary effects. Short Rest restores Short/Long Features and enables Arcane Recovery; Long Rest restores HP, spell slots, Pact slots, spell points, free casts and applicable Features, clears temporary HP/death-save marks and reduces Exhaustion by one. Reaction Ready/Used state is edited separately.
 
 ### Dice Roller controls
 
-The Dice Roller contains Dice Count, Die, Modifier, Mode and the Roll action/result row. Left/Right adjusts the selected setup value, OK rolls when the Roll row is selected, and Hold OK on Dice Count, Die or Modifier opens full numeric entry. Modes include Normal, Advantage, Disadvantage and Guidance. Advantage, Disadvantage and Guidance are d20 conveniences: Guidance automatically adds a rolled d4 to a 1d20 roll, while Advantage/Disadvantage rolls two d20s and keeps the appropriate result. Changing the dice setup away from the supported d20 form returns the roller to Normal mode.
+The Dice Roller contains Dice Count, Die, Modifier, Mode and the Roll action/result row. Left/Right adjusts the selected setup value, OK rolls when the Roll row is selected, and Hold OK on Dice Count, Die or Modifier opens full numeric entry. Modes include Normal, Advantage, Disadvantage and Guidance. Advantage, Disadvantage and Guidance are d20 conveniences: Guidance automatically adds a rolled d4 to a 1d20 roll, while Advantage/Disadvantage rolls two d20s and keeps the appropriate result. Changing the dice setup away from the supported d20 form returns the roller to Normal mode. With **Settings → Skip Dice Loading** enabled, the roll is still resolved normally but its rolling animation is omitted and the result is shown immediately.
 
 ## DNDInventory — inventory, equipment and currency
 
-DNDInventory opens the persisted active character directly to the Inventory list. A truly empty Inventory that has never received starting equipment automatically applies the character's initial class/species/background equipment package once.
+DNDInventory opens the persisted active character directly to the Inventory list. Opening Inventory never writes starting equipment automatically. When an initial package is still available, **Grant Initial Inventory** opens the explicit review screen before anything is written.
 
 ### Inventory list
 
-The list begins with **+ Add New**, followed by owned Items in stored order.
+The list begins with **Currency**, then **+ Add New**, followed by owned Items in stored order. **Inventory Resources** and **Grant Initial Inventory** are placed after the final owned Item so the former Hold-Up actions are visible in the normal list.
 
+- **Currency** — Short OK opens CP, SP, EP, GP and PP. Left/Right changes the selected denomination by one; OK opens full numeric entry.
 - **+ Add New** — Short OK or Hold OK creates a blank Item and opens the Item Editor.
 - **Item row / Short OK** — Opens that Item in the Item Editor.
 - **Item row / Hold OK** — Toggles Equipped and saves immediately.
 - **Short Left / Right** — Moves to the previous/next eight-record Inventory page.
-- **Hold Left / Right** — Decreases/increases the selected Item's Stack Qty by one, clamped to 0–999.
-- **Hold Up** — Opens **Inventory Tools**.
+- **Hold Left / Right on an Item** — Decreases/increases Stack Qty by five, clamped to 0–999.
+- **Inventory Resources** — Short OK opens derived carrying/equipment information and actions.
+- **Grant Initial Inventory** — Short OK opens **Review inventory grant** for the normal class/background starting package; OK on that review screen performs the transaction and Back cancels. Hold OK opens the same review screen for the one-time explicit regrant override when available. Opening an empty Inventory never silently applies the package.
 
-### Inventory Tools
+When owned Inventory exceeds one eight-record page, the header shows **PgX<>** at the upper right. The indicator follows the currently resident Inventory page; temporary save/status messages take its place while they are active.
 
-Inventory Tools are presented in this order:
+### Get Elevated bundle and Homebrew catalog
 
-1. **Currency** — Opens CP, SP, EP, GP and PP. Left/Right changes the selected denomination by one; OK opens full numeric entry.
-2. **Inventory Resources** — Opens derived carrying/equipment information and actions.
-3. **Grant Initial Inventory** — Short OK applies the normal starting-equipment grant when it has not been used. Hold OK invokes the one-time explicit regrant override when that override is available.
+Inventory grows beyond 24 items while grants, rewards, editing and Combat lookups remain available on later pages. With **Get Elevated: 420**, normal starting-equipment generation also adds one random bundle:
+
+| d6 | Accessory | Additional items |
+|---|---|---|
+| 1 | Old Pipe & Lighter | Two different Premium Flower strains |
+| 2 | Small Bong & Lighter | Two different Premium Flower strains |
+| 3 | One Hitter & Lighter | Two different Premium Flower strains |
+| 4 | Gandalf Pipe & Lighter | Two different Premium Flower strains |
+| 5 | Puffco Peak | One Live Rosin strain |
+| 6 | Blue Dream Vape Pen | None |
+
+Each flower stack contains **5–37** one-gram units; the rosin stack contains **2–9**. Strains are **Blue Dream, Girl Scout Cookies, Wedding Cake, Sour Diesel, Pineapple Express, Lemon Cherry Gelato**. If the second flower roll repeats the first, it advances to the next strain and wraps at the end of this list. Stack quantities roll independently.
+
+The **420** catalog filter appears after Magic and contains the six accessories, six **Premium Flower (1 gram)** entries and six **Live Rosin (1 gram)** entries. These rows are present in both physical Item catalog modes and are visible only when **Homebrew: Yes**. **Get Elevated** does not hide or reveal catalog rows; it only controls automatic/randomized bundle granting. Owned items remain visible regardless of either setting. The bundle is committed as a unit, so a failed storage operation cannot leave only part of the bundle in Inventory.
 
 ### Inventory Resources
 
@@ -267,7 +310,7 @@ Item options are presented in this order. Left/Right or Short OK performs the no
 
 1. **Name** — Short OK opens the Item catalog; Hold OK edits a custom Item name.
 2. **Notes** — Edits free-form Item notes.
-3. **Stack Qty** — Sets the owned quantity; the Inventory list also supports Hold Left/Right for quick ±1 changes.
+3. **Stack Qty** — Sets the owned quantity; the Inventory list also supports Hold Left/Right for quick ±5 changes.
 4. **Weight** — Sets per-item weight in tenths of a pound for carrying calculations.
 5. **Equipped** — Toggles whether the Item is equipped.
 6. **Attuned** — Toggles attunement; Inventory Resources counts attuned Items against the normal three-item limit.
@@ -302,7 +345,7 @@ Item options are presented in this order. Left/Right or Short OK performs the no
 35. **Ammo group** — Edits the weapon/ammunition family used by Combat matching. Exact Item names are not required: the relevant token may appear anywhere in a loose-ammunition Item name.
 36. **Delete item** — Removes the Item.
 
-The Item catalog supports All, Weapons, Armor, Ammunition, Gear, Tools, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic filters. **Hold OK** in the catalog advances to the next category filter; Short Left/Right changes catalog pages; Short OK applies the selected catalog entry. Generic Spell Scroll entries cover Cantrip and Levels 1–9 with level-appropriate rarity.
+The Item catalog supports All, Weapons, Armor, Ammunition, Gear, Tools, Instruments, Trinkets, Mounts/Vehicles, Potions, Rings, Rods, Scrolls, Staffs, Wands, Wondrous and Magic filters. The normal catalog contains **615 rows**: 579 SRD rows plus the same 18 `Homebrew` and 18 `DNDolphins` project rows used by the independent Homebrew toggle. **Homebrew: No** yields the 579-row SRD view without affecting already-owned Inventory records. Catalog rows display compact Source tags such as `[Core]`, `[DND]` or `[HB]`. **Hold OK** opens the filter-category picker; Up/Down chooses a filter and OK applies it. Short Left/Right changes catalog pages and Short OK applies the selected catalog entry. Musical Instrument has its own category with the SRD instrument variants, and the catalog includes the d100 SRD Trinkets under their own category. **Tea Set** is included as generic Mundane Gear as a DNDolphins convenience and is not represented as an SRD equipment-table title. Generic Spell Scroll entries cover Cantrip and Levels 1–9 with level-appropriate rarity.
 
 Choosing a recognized bundled weapon or armor also fills its useful mechanical preset—weight, damage, weapon properties, Versatile die, ammunition family, armor base/DEX cap or shield bonus—so it can be used by Combat and Formula AC without manually rebuilding standard equipment statistics. **Normalize coin values** converts the current CP/SP/EP/GP/PP mix into larger denominations while preserving the same total copper-piece value.
 
@@ -312,9 +355,9 @@ DNDSpellbook opens the persisted active character directly to the Spellbook list
 
 ### Spellbook list
 
-The list begins with **+ Add New**, followed by owned Spells.
+The list begins with **+ Add New**, followed by owned Spells. There is no 24-spell limit or manual spells-known allowance restriction. The header shows `Spellbook` and `PgX<>` when more than one page exists, alongside the active character ID.
 
-- **+ Add New** — Short OK or Hold OK creates a blank Spell and opens the Spell Editor.
+- **+ Add New** — Short OK or Hold OK creates a blank Spell, marks it Known, and opens the Spell Editor.
 - **Spell row / Short OK** — Opens that Spell in the Spell Editor.
 - **Spell row / Hold OK** — Toggles Prepared for a Known spell and saves immediately. Always Prepared spells stay prepared; unknown spells are not quick-prepared.
 - **Short Left / Right** — Moves to the previous/next eight-record Spellbook page.
@@ -327,10 +370,10 @@ List status marks are `A` for Always Prepared, `P` for Prepared, `K` for Known a
 Filters are presented in this order:
 
 1. **Level** — Any, Cantrip or Levels 1–9.
-2. **Class** — **Character Classes** is the default and represents the union of the character's actual spell lists. The selector also provides **Any Class** plus Artificer, Barbarian, Bard, Cleric, Druid, Fighter, Monk, Paladin, Ranger, Rogue, Sorcerer, Warlock and Wizard even when the character does not own that class.
+2. **Class** — **Character Classes** is the default and represents the union of the character's actual spell lists. **Any Class** plus the bundled SRD class filters are available for catalog browsing even when the character does not own the selected class.
 3. **Ritual** — Any or Ritual Only.
 4. **School** — Any or a specific spell school.
-5. **Source** — Filters by catalog source.
+5. **Source** — Filters by catalog source. The bundled SRD selector provides **Any / Core**.
 6. **Status** — Any, Prepared, Known or Always Prepared.
 7. **Eligibility** — **Allowed** enforces the character's actual spell-list access and permitted spell level; **All Spells** treats the selected class as a catalog-membership filter without requiring character eligibility. **Any Class + All Spells** exposes the complete bundled catalog.
 
@@ -338,7 +381,7 @@ Left/Right changes the selected filter. OK returns to the list/catalog and reapp
 
 ### Spell Catalog
 
-The bundled 448-spell catalog is sorted by spell level and then name. Short Left/Right changes catalog pages, Short OK selects the highlighted Spell, and Hold OK opens Spell Filters without leaving the catalog workflow.
+The bundled Spell catalog contains **355 SRD spells**, sorted by spell level and then name. Homebrew is an independent source gate for project-owned spell rows. Short Left/Right changes catalog pages, Short OK selects the highlighted Spell, and Hold OK opens Spell Filters without leaving the catalog workflow.
 
 ### Spell Editor
 
@@ -351,7 +394,7 @@ Spell options are presented in this order. Left/Right or Short OK performs the n
 5. **Known** — Marks whether the character knows the Spell. Choosing a Spell from the catalog marks it Known automatically.
 6. **Prepared** — Marks the Spell Prepared.
 7. **Always prepared** — Keeps the Spell prepared regardless of quick-prepare toggles.
-8. **Ritual** — Marks ritual capability for the Rituals combat path.
+8. **Ritual** — Marks ritual capability for the Rituals combat path. This tag does not change Known.
 9. **Free casts** — Sets remaining no-slot casts.
 10. **Free casts max** — Sets the maximum free-cast pool restored by the supported recovery logic.
 11. **Use one free cast** — Consumes one remaining free cast without spending a spell slot.
@@ -362,7 +405,7 @@ Spell options are presented in this order. Left/Right or Short OK performs the n
 16. **Grant type** — Stores the grant-source type used by progression bookkeeping.
 17. **Delete spell** — Removes the Spell.
 
-Choosing a catalog Spell copies its level, ritual, school, source and a stable ID in addition to the name. Owned Spellbook records are automatically kept in level-ascending, case-insensitive name order after additions or edits. Eldritch Knight and Arcane Trickster resolve Wizard-list eligibility through their third-caster progression.
+Choosing a catalog Spell copies its level, ritual, school, source and a stable ID in addition to the name. Owned Spellbook records are automatically kept in level-ascending, case-insensitive name order after additions or edits.
 
 ## DNDAdventure — campaigns and choices
 
@@ -495,6 +538,8 @@ The Bestiary Home menu is presented in this order:
 
 Party Level and Party Size are persisted between Bestiary sessions. Opening a monster automatically adds it to **Recent Monsters**, while Favorites, Saved Filters and Saved Encounters persist until the user changes them. Search is case-insensitive substring matching, so a partial piece of a monster name is enough.
 
+On the six browse-filter rows (**Search**, **Max CR**, **Type**, **Source**, **Browse Env** and **Browse Role**), **Left** resets that filter to its default/Any state immediately; **Right** advances through the available values where applicable.
+
 ### Monster detail controls
 
 A monster detail screen exposes CR/XP, AC/HP, type/source/role, size/alignment, speed, abilities, skills, defenses, senses, languages, traits, actions and additional text. OK opens long detail lines where applicable; those viewers use Up/Down for single-line scroll, Left/Right for five-line movement and OK to return.
@@ -543,12 +588,14 @@ The bundled Bestiary contains 346 indexed/statblock-matched monsters, including 
 - Spellbook: `spellbook_<id>.txt`
 - Features: `feats_<id>.txt`
 - Applied deterministic grants: `appliedgrants_<id>.txt`
+- Shared settings: `settings.txt`
+- Level history: `ch_<id>_<safeName>_<level>.shd` core snapshots plus matching `_items.shd`, `_spellbook.shd`, `_features.shd` and `_appliedgrants.shd` sidecar snapshots. Current complete bundles also carry an internal `_bundle.shd` marker so Restore can distinguish a truly empty historical collection from an older core-only SHD that never captured sidecars.
 - Journal: `/ext/apps_data/dndjournal/`
 - Initiative: `/ext/apps_data/dndinitiative/`
 - Adventure: `/ext/apps_data/dndadventure/`
 - Bestiary/custom monsters/packs/encounters: `/ext/apps_data/dndbestiary/`
 
-`/ext/apps_data/dndolphins/custom_active_profile.txt` stores the active character as `Active=<id>`. Inventory and Spellbook sidecars remain under the DNDolphins character root so Combat, progression, Adventure and Journal share the same character-owned records.
+`/ext/apps_data/dndolphins/custom_active_profile.txt` stores the active character as `Active=<id>`. Inventory and Spellbook sidecars remain under the DNDolphins character root so Combat, progression, Adventure and Journal share the same character-owned records. Live `.txt` character/sidecar files remain authoritative during normal play; SHD files are level-history snapshots used only by the explicit **Restore from SHD** workflow.
 
 ## Data and memory behavior
 
@@ -579,3 +626,5 @@ From a RogueMaster/Flipper firmware tree containing this directory:
 ```text
 fbt fap_dndolphins fap_dndadventure fap_dndjournal fap_dndinitiative fap_dndbestiary fap_dndinventory fap_dndspellbook
 ```
+
+The suite release label is kept separately from the SDK’s numeric FAP version metadata. Build with the firmware tree or SDK matching your device. SDK build results are in `tests/sdk/VALIDATION.md`; device checks are in `DEVICE_TEST_MATRIX.md`.

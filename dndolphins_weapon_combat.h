@@ -7,7 +7,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#define POCKET_D20_MAX_DAMAGE_ROLLS 80U
+#define DNDOLPHINS_MAX_DAMAGE_ROLLS 80U
 
 typedef struct {
     uint8_t first_die;
@@ -27,7 +27,7 @@ typedef struct {
     uint8_t critical;
     uint8_t weapon_roll_count;
     uint8_t extra_roll_count;
-    uint8_t rolls[POCKET_D20_MAX_DAMAGE_ROLLS];
+    uint8_t rolls[DNDOLPHINS_MAX_DAMAGE_ROLLS];
 } PocketDamageRoll;
 
 PocketAttackRoll dndolphins_weapon_combat_roll_attack(
@@ -41,7 +41,8 @@ PocketDamageRoll dndolphins_weapon_combat_roll_damage(
 bool dndolphins_weapon_combat_items_collect_weapon_indices(
     Storage* storage,
     uint32_t profile,
-    uint8_t* indices,
-    uint8_t capacity,
-    uint8_t* count,
-    uint8_t* total_count);
+    uint16_t start,
+    uint16_t* indices,
+    uint16_t capacity,
+    uint16_t* count,
+    uint16_t* total_count);

@@ -1,3 +1,8 @@
+# Suite release label. FAP's binary manifest stores numeric major/minor only.
+DND_RELEASE_VERSION = "3.6"
+DND_FAP_VERSION = (3, 6)
+DND_RELEASE_DEFINES = [("DND_RELEASE_VERSION", '\\"' + DND_RELEASE_VERSION + '\\"')]
+
 App(
     appid="dndolphins",
     name="DNDolphins",
@@ -6,9 +11,12 @@ App(
     stack_size=6 * 1024,
     flags=["UnloadAssetPacks"],
     sources=[
+        "dnd_character_collections.c",
         "dnd_data.c",
+        "dnd_extra_items.c",
         "dnd_profile_handoff.c",
         "dnd_rules_core.c",
+        "dnd_settings.c",
         "dnd_spell_eligibility.c",
         "dnd_storage.c",
         "dnd_weapon_rules.c",
@@ -25,7 +33,8 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Offline 5E-compatible character, progression, dice, and combat hub.",
 )
 
@@ -39,9 +48,11 @@ App(
     flags=["UnloadAssetPacks"],
     sources=[
         "dnd_data.c",
+        "dnd_extra_items.c",
         "dnd_profile_handoff.c",
         "dnd_profile_projection.c",
         "dnd_rules_core.c",
+        "dnd_settings.c",
         "dnd_storage.c",
         "dnd_weapon_rules.c",
         "dndinventory.c",
@@ -54,7 +65,8 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Standalone per-character inventory and item catalog for DNDolphins.",
 )
 
@@ -71,15 +83,16 @@ App(
         "dnd_profile_projection.c",
         "dnd_spell_eligibility.c",
         "dnd_storage.c",
+        "dnd_settings.c",
         "dndspellbook.c",
         "dndspellbook_collection.c",
     ],
     fap_icon="icon.png",
-    fap_file_assets="spellbook_assets",
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Standalone per-character spellbook and spell catalog for DNDolphins.",
 )
 
@@ -96,6 +109,7 @@ App(
         "dnd_profile_handoff.c",
         "dnd_profile_projection.c",
         "dnd_rules_core.c",
+        "dnd_settings.c",
         "dnd_storage.c",
         "dndadventure.c",
         "dndadventure_campaign_packs.c",
@@ -107,7 +121,8 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Standalone campaign packs and Adventure progression for DNDolphins.",
 )
 
@@ -126,7 +141,8 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Standalone per-character journal for DNDolphins.",
 )
 
@@ -135,10 +151,11 @@ App(
     name="DNDInitiative",
     apptype=FlipperAppType.EXTERNAL,
     entry_point="dndinitiative_app",
-    stack_size=3 * 1024,
+    stack_size=4 * 1024,
     flags=["UnloadAssetPacks"],
     sources=[
         "dnd_profile_handoff.c",
+        "dnd_settings.c",
         "dndinitiative.c",
         "dndinitiative_feature_recharge.c",
     ],
@@ -146,7 +163,8 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Standalone party roster and initiative tracker for DNDolphins.",
 )
 
@@ -169,6 +187,7 @@ App(
     fap_category="Games",
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
-    fap_version="4.19",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
     fap_description="Offline monster reference and party-level encounter generator.",
 )

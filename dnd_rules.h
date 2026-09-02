@@ -2,9 +2,9 @@
 
 #include "dnd_data.h"
 
-extern const char* const dnd_rules_core_ability_names[POCKET_D20_ABILITY_COUNT];
-extern const char* const dnd_rules_core_skill_names[POCKET_D20_SKILL_COUNT];
-extern const uint8_t dnd_rules_core_skill_abilities[POCKET_D20_SKILL_COUNT];
+extern const char* const dnd_rules_core_ability_names[DND_ABILITY_COUNT];
+extern const char* const dnd_rules_core_skill_names[DND_SKILL_COUNT];
+extern const uint8_t dnd_rules_core_skill_abilities[DND_SKILL_COUNT];
 extern const char* const dnd_rules_core_damage_names[PocketDamageTypeCount];
 
 int8_t dnd_rules_core_ability_modifier(int8_t score);
