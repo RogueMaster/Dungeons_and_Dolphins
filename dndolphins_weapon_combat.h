@@ -17,7 +17,7 @@ typedef struct {
     uint8_t natural_roll;
     uint8_t critical;
     uint8_t automatic_miss;
-} PocketAttackRoll;
+} DndAttackRoll;
 
 typedef struct {
     int16_t weapon_total;
@@ -28,15 +28,15 @@ typedef struct {
     uint8_t weapon_roll_count;
     uint8_t extra_roll_count;
     uint8_t rolls[DNDOLPHINS_MAX_DAMAGE_ROLLS];
-} PocketDamageRoll;
+} DndDamageRoll;
 
-PocketAttackRoll dndolphins_weapon_combat_roll_attack(
-    const PocketCharacter* character,
-    const PocketItem* item,
-    PocketRollMode mode);
-PocketDamageRoll dndolphins_weapon_combat_roll_damage(
-    const PocketCharacter* character,
-    const PocketItem* item,
+DndAttackRoll dndolphins_weapon_combat_roll_attack(
+    const DndCharacter* character,
+    const DndItem* item,
+    DndRollMode mode);
+DndDamageRoll dndolphins_weapon_combat_roll_damage(
+    const DndCharacter* character,
+    const DndItem* item,
     bool critical);
 bool dndolphins_weapon_combat_items_collect_weapon_indices(
     Storage* storage,

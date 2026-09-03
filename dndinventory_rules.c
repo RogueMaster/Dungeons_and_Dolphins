@@ -11,7 +11,7 @@ static uint8_t dndinventory_rules_total_level(const DndInventoryCharacterState* 
 
 int16_t dndinventory_rules_carrying_capacity(const DndInventoryCharacterState* character) {
     if(character->carrying_capacity_override > 0) return character->carrying_capacity_override;
-    return (int16_t)character->ability_scores[PocketAbilityStrength] * 15;
+    return (int16_t)character->ability_scores[DndAbilityStrength] * 15;
 }
 
 void dndinventory_rules_normalize_currency(DndInventoryCharacterState* character) {
@@ -34,7 +34,7 @@ int16_t dndinventory_rules_calculated_armor_class(
     const DndInventoryItemAggregate* aggregate) {
     int16_t armor = 10;
     int16_t dexterity =
-        dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityDexterity]);
+        dnd_rules_core_ability_modifier(character->ability_scores[DndAbilityDexterity]);
     if(aggregate->armor_base) {
         int16_t dexterity_part = dexterity;
         if(aggregate->armor_dex_cap >= 0 && dexterity_part > aggregate->armor_dex_cap)
@@ -46,26 +46,26 @@ int16_t dndinventory_rules_calculated_armor_class(
 
 int8_t dndinventory_rules_weapon_attack_modifier(
     const DndInventoryCharacterState* character,
-    const PocketItem* item) {
+    const DndItem* item) {
     int8_t strength =
-        dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityStrength]);
+        dnd_rules_core_ability_modifier(character->ability_scores[DndAbilityStrength]);
     int8_t dexterity =
-        dnd_rules_core_ability_modifier(character->ability_scores[PocketAbilityDexterity]);
+        dnd_rules_core_ability_modifier(character->ability_scores[DndAbilityDexterity]);
     int8_t ability = strength;
     switch(item->attack_ability) {
-    case PocketAttackAbilityStrength:
+    case DndAttackAbilityStrength:
         ability = strength;
         break;
-    case PocketAttackAbilityDexterity:
+    case DndAttackAbilityDexterity:
         ability = dexterity;
         break;
-    case PocketAttackAbilityBest:
+    case DndAttackAbilityBest:
         ability = strength > dexterity ? strength : dexterity;
         break;
     default:
-        if(item->weapon_properties & PocketWeaponRanged)
+        if(item->weapon_properties & DndWeaponRanged)
             ability = dexterity;
-        else if(item->weapon_properties & PocketWeaponFinesse)
+        else if(item->weapon_properties & DndWeaponFinesse)
             ability = strength > dexterity ? strength : dexterity;
         break;
     }

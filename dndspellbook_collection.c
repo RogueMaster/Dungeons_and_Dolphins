@@ -129,11 +129,11 @@ static const char* const dndspellbook_collection_class_names[] = {
 typedef struct {
     char name[DND_CHARACTER_NAME_LEN];
     uint8_t class_count;
-    PocketClassLevel classes[DND_MAX_CLASSES];
+    DndClassLevel classes[DND_MAX_CLASSES];
     uint8_t spell_count;
     uint8_t spell_capacity;
     void* spell_storage;
-    PocketSpell* spells;
+    DndSpell* spells;
     uint8_t* spell_known;
     uint8_t* spell_always_prepared;
     uint8_t* spell_free_casts_current;
@@ -202,7 +202,7 @@ static bool dndspellbook_collection_load_page(DndSpellbookCollectionApp* app, ui
 static bool dndspellbook_collection_save_page(DndSpellbookCollectionApp* app);
 static bool
     dndspellbook_collection_prepare_record(DndSpellbookCollectionApp* app, uint16_t logical);
-static PocketSpell* dndspellbook_collection_spell(
+static DndSpell* dndspellbook_collection_spell(
     DndSpellbookCollectionApp* app,
     uint16_t logical,
     uint8_t* local_out);
@@ -321,7 +321,7 @@ static void dndspellbook_collection_redraw(DndSpellbookCollectionApp* app) {
 }
 
 static bool
-    dndspellbook_collection_class_uses_wizard_spell_list(const PocketClassLevel* class_level) {
+    dndspellbook_collection_class_uses_wizard_spell_list(const DndClassLevel* class_level) {
     if(!class_level) return false;
     return (!strcmp(class_level->name, "Fighter") &&
             !strcmp(class_level->subclass, "Eldritch Knight")) ||
@@ -402,7 +402,7 @@ static uint16_t dndspellbook_collection_class_mask(char* classes) {
     return mask;
 }
 
-static uint16_t dndspellbook_collection_character_class_mask(const PocketClassLevel* class_level) {
+static uint16_t dndspellbook_collection_character_class_mask(const DndClassLevel* class_level) {
     if(!class_level) return 0U;
     return dndspellbook_collection_class_uses_wizard_spell_list(class_level) ?
                DndSpellbookClassMaskWizard :
@@ -415,7 +415,7 @@ static bool dndspellbook_collection_class_allows(
     uint8_t level,
     uint16_t mask) {
     if(!character || class_index >= character->class_count) return false;
-    const PocketClassLevel* class_level = &character->classes[class_index];
+    const DndClassLevel* class_level = &character->classes[class_index];
     uint16_t selected = dndspellbook_collection_character_class_mask(class_level);
     return selected && (mask & selected) &&
            level <= dnd_spell_eligibility_class_max_spell_level(class_level);
@@ -544,7 +544,7 @@ static void dndspellbook_collection_clear_page(DndSpellbookCharacterState* chara
 static bool
     dndspellbook_collection_resize_page(DndSpellbookCharacterState* state, uint8_t required) {
     if(!state || required > DND_STORAGE_COLLECTION_CACHE_SIZE) return false;
-    PocketCharacter* io = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* io = calloc(1U, sizeof(DndCharacter));
     if(!io) return false;
     io->spell_storage = state->spell_storage;
     io->spells = state->spells;
@@ -569,11 +569,11 @@ static bool
     return true;
 }
 
-static PocketCharacter* dndspellbook_collection_io_character(
+static DndCharacter* dndspellbook_collection_io_character(
     const DndSpellbookCharacterState* state,
     bool attach_page) {
     if(!state) return NULL;
-    PocketCharacter* io = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* io = calloc(1U, sizeof(DndCharacter));
     if(!io) return NULL;
     dndspellbook_collection_copy(io->name, sizeof(io->name), state->name);
     io->class_count = state->class_count;
@@ -592,7 +592,7 @@ static PocketCharacter* dndspellbook_collection_io_character(
     return io;
 }
 
-static void dndspellbook_collection_free_io_character(PocketCharacter* io, bool owns_page) {
+static void dndspellbook_collection_free_io_character(DndCharacter* io, bool owns_page) {
     if(!io) return;
     if(owns_page)
         dnd_data_clear_spells(io);
@@ -608,7 +608,7 @@ static void dndspellbook_collection_free_io_character(PocketCharacter* io, bool 
 }
 
 static bool dndspellbook_collection_load_page(DndSpellbookCollectionApp* app, uint16_t start) {
-    PocketCharacter* io = dndspellbook_collection_io_character(&app->data.character, false);
+    DndCharacter* io = dndspellbook_collection_io_character(&app->data.character, false);
     if(!io) return false;
     uint16_t total = app->total;
     bool ok = dnd_storage_load_spellbook_window_indexed(
@@ -644,7 +644,7 @@ static bool dndspellbook_collection_load_page(DndSpellbookCollectionApp* app, ui
 }
 
 static bool dndspellbook_collection_save_page(DndSpellbookCollectionApp* app) {
-    PocketCharacter* io = dndspellbook_collection_io_character(&app->data.character, true);
+    DndCharacter* io = dndspellbook_collection_io_character(&app->data.character, true);
     bool ok = io &&
               dnd_storage_save_spellbook_window(app->storage, app->profile, app->cache_start, io);
     dndspellbook_collection_free_io_character(io, false);
@@ -677,7 +677,7 @@ static uint8_t
     return (uint8_t)(logical - app->cache_start);
 }
 
-static PocketSpell* dndspellbook_collection_spell(
+static DndSpell* dndspellbook_collection_spell(
     DndSpellbookCollectionApp* app,
     uint16_t logical,
     uint8_t* local_out) {
@@ -688,7 +688,7 @@ static PocketSpell* dndspellbook_collection_spell(
     return &app->data.character.spells[local];
 }
 
-static PocketSpell* dndspellbook_collection_spell_cached(
+static DndSpell* dndspellbook_collection_spell_cached(
     DndSpellbookCollectionApp* app,
     uint16_t logical,
     uint8_t* local_out) {
@@ -755,7 +755,7 @@ static bool dndspellbook_collection_add_blank(DndSpellbookCollectionApp* app) {
     character->spell_free_casts_current[character->spell_count] = 0U;
     character->spell_free_casts_max[character->spell_count] = 0U;
     uint8_t local = character->spell_count;
-    PocketSpell* spell = &character->spells[local];
+    DndSpell* spell = &character->spells[local];
     memset(spell, 0, sizeof(*spell));
     dndspellbook_collection_copy(spell->name, sizeof(spell->name), "New Spell");
     character->spell_known[local] = 1U;
@@ -776,7 +776,7 @@ static bool dndspellbook_collection_add_blank(DndSpellbookCollectionApp* app) {
 
 static bool dndspellbook_collection_delete_current(DndSpellbookCollectionApp* app) {
     if(app->record_index >= app->total) return false;
-    PocketCharacter* owner = dndspellbook_collection_io_character(&app->data.character, false);
+    DndCharacter* owner = dndspellbook_collection_io_character(&app->data.character, false);
     bool deleted = owner &&
                    dnd_storage_delete_spell(app->storage, app->profile, owner, app->record_index);
     dndspellbook_collection_free_io_character(owner, false);
@@ -1222,7 +1222,7 @@ static bool dndspellbook_collection_status_prefilter_maybe_has(
 
 static bool dndspellbook_collection_status_prefilter_visitor(
     uint16_t logical_index,
-    const PocketSpell* spell,
+    const DndSpell* spell,
     uint8_t known,
     uint8_t always_prepared,
     uint8_t free_casts_current,
@@ -1262,7 +1262,7 @@ static bool dndspellbook_collection_status_prefilter_build(DndSpellbookCollectio
 
 static bool dndspellbook_collection_status_visitor(
     uint16_t logical_index,
-    const PocketSpell* spell,
+    const DndSpell* spell,
     uint8_t known,
     uint8_t always_prepared,
     uint8_t free_casts_current,
@@ -1494,7 +1494,7 @@ static bool dndspellbook_collection_apply_catalog(DndSpellbookCollectionApp* app
     if(app->selection >= app->catalog_count) return false;
     DndSpellbookCatalogEntry* selected = &app->catalog[app->selection];
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(!spell) return false;
     dndspellbook_collection_copy(spell->name, sizeof(spell->name), selected->name);
     spell->level = selected->level;
@@ -1632,7 +1632,7 @@ static void dndspellbook_collection_format_detail(
     size_t size) {
     DndSpellbookCharacterState* character = &app->data.character;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell_cached(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell_cached(app, app->record_index, &local);
     if(!spell) {
         dndspellbook_collection_copy(out, size, "Read error");
         return;
@@ -1737,7 +1737,7 @@ static void dndspellbook_collection_draw_list(Canvas* canvas, DndSpellbookCollec
             } else {
                 uint8_t local = dndspellbook_collection_local(app, logical);
                 if(local < app->data.character.spell_count) {
-                    PocketSpell* spell = &app->data.character.spells[local];
+                    DndSpell* spell = &app->data.character.spells[local];
                     char status_mark = app->data.character.spell_always_prepared[local] ? 'A' :
                                        spell->prepared                                  ? 'P' :
                                        app->data.character.spell_known[local]           ? 'K' :
@@ -1942,7 +1942,7 @@ static bool dndspellbook_collection_number_spec(
     *minimum = 0;
     *maximum = 999;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(!spell) return false;
     if(field == 3U) {
         *header = "Spell level";
@@ -1994,7 +1994,7 @@ static void
     dndspellbook_collection_adjust(DndSpellbookCollectionApp* app, uint8_t field, int8_t delta) {
     DndSpellbookCharacterState* character = &app->data.character;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(!spell) return;
     if(field == 2U) {
         if(!character->class_count) return;
@@ -2030,8 +2030,8 @@ static void
             character->spell_free_casts_current[local] = character->spell_free_casts_max[local];
     } else if(field == 15U) {
         int16_t source = (int16_t)spell->grant_source + delta;
-        if(source < 0) source = PocketGrantSourceCount - 1U;
-        if(source >= PocketGrantSourceCount) source = 0;
+        if(source < 0) source = DndGrantSourceCount - 1U;
+        if(source >= DndGrantSourceCount) source = 0;
         spell->grant_source = (uint8_t)source;
     } else {
         return;
@@ -2042,7 +2042,7 @@ static void
 static void dndspellbook_collection_text_done(void* context) {
     DndSpellbookCollectionApp* app = context;
     if(!app) return;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, NULL);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, NULL);
     if(spell) {
         if(app->edit == DndSpellbookCollectionEditName)
             dndspellbook_collection_copy(spell->name, sizeof(spell->name), app->edit_buffer);
@@ -2071,7 +2071,7 @@ static void dndspellbook_collection_number_done(void* context, int32_t number) {
     DndSpellbookCollectionApp* app = context;
     if(!app) return;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(spell) {
         if(app->number_field == 3U) {
             spell->level = (uint8_t)number;
@@ -2093,7 +2093,7 @@ static void dndspellbook_collection_number_done(void* context, int32_t number) {
 static void dndspellbook_collection_detail_ok(DndSpellbookCollectionApp* app) {
     uint8_t field = app->detail_selection;
     uint8_t local = 0U;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, &local);
     if(!spell) return;
     if(field == 0U)
         dndspellbook_collection_open_catalog(app);
@@ -2131,7 +2131,7 @@ static void dndspellbook_collection_detail_ok(DndSpellbookCollectionApp* app) {
 static void dndspellbook_collection_detail_hold_ok(DndSpellbookCollectionApp* app) {
     if(dndspellbook_collection_begin_number(app, app->detail_selection)) return;
     if(app->detail_selection != 0U) return;
-    PocketSpell* spell = dndspellbook_collection_spell(app, app->record_index, NULL);
+    DndSpell* spell = dndspellbook_collection_spell(app, app->record_index, NULL);
     if(spell)
         dndspellbook_collection_begin_text(
             app, DndSpellbookCollectionEditName, "Custom spell", spell->name);
@@ -2278,7 +2278,7 @@ static bool dndspellbook_collection_input(InputEvent* event, void* context) {
         else if(event->key == InputKeyOk && event->type == InputTypeLong && app->selection) {
             uint16_t logical = app->selection - 1U;
             uint8_t local = 0U;
-            PocketSpell* spell = dndspellbook_collection_spell(app, logical, &local);
+            DndSpell* spell = dndspellbook_collection_spell(app, logical, &local);
             if(spell) {
                 if(app->data.character.spell_always_prepared[local])
                     dndspellbook_collection_set_transient_status(app, "Always prepared");

@@ -11,10 +11,10 @@ bool dndadventure_item_reward_grant_reward(
     const char* detail) {
     if(!storage || !projection || !name || !name[0] || !strcmp(name, "-")) return false;
 
-    /* Collection storage still accepts the canonical PocketCharacter owner shape.
+    /* Collection storage still accepts the canonical DndCharacter owner shape.
        Adventure creates it only for this bounded I/O operation; it is never part
        of resident app state. */
-    PocketCharacter* character = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* character = calloc(1U, sizeof(DndCharacter));
     if(!character) return false;
     strncpy(character->name, projection->name, sizeof(character->name) - 1U);
     character->class_count = projection->class_count;
@@ -41,7 +41,7 @@ bool dndadventure_item_reward_grant_reward(
         dnd_data_clear_items(character);
     }
 
-    PocketItem item;
+    DndItem item;
     memset(&item, 0, sizeof(item));
     strncpy(item.name, name, sizeof(item.name) - 1U);
     item.name[sizeof(item.name) - 1U] = '\0';

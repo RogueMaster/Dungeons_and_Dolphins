@@ -8,7 +8,7 @@ static uint8_t dnd_extra_items_roll(uint8_t sides) {
     return (uint8_t)(furi_hal_random_get() % sides);
 }
 
-bool dnd_extra_items_grant(Storage* storage, uint32_t profile, const PocketCharacter* owner) {
+bool dnd_extra_items_grant(Storage* storage, uint32_t profile, const DndCharacter* owner) {
     if(!storage || !owner) return false;
     if(!dnd_storage_items_exist(storage, profile)) return true;
     static const char* const accessories[] = {
@@ -25,7 +25,7 @@ bool dnd_extra_items_grant(Storage* storage, uint32_t profile, const PocketChara
         "Sour Diesel",
         "Pineapple Express",
         "Lemon Cherry Gelato"};
-    PocketItem* items = calloc(3U, sizeof(PocketItem));
+    DndItem* items = calloc(3U, sizeof(DndItem));
     if(!items) return false;
     for(uint8_t i = 0U; i < 3U; ++i) {
         items[i].container_index = -1;

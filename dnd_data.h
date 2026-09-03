@@ -28,111 +28,111 @@
 #define DND_SLOT_COUNT    10U
 
 typedef enum {
-    PocketAbilityStrength,
-    PocketAbilityDexterity,
-    PocketAbilityConstitution,
-    PocketAbilityIntelligence,
-    PocketAbilityWisdom,
-    PocketAbilityCharisma,
-} PocketAbility;
+    DndAbilityStrength,
+    DndAbilityDexterity,
+    DndAbilityConstitution,
+    DndAbilityIntelligence,
+    DndAbilityWisdom,
+    DndAbilityCharisma,
+} DndAbility;
 
 typedef enum {
-    PocketProficiencyNone,
-    PocketProficiencyProficient,
-    PocketProficiencyExpertise,
-} PocketProficiency;
+    DndProficiencyNone,
+    DndProficiencyProficient,
+    DndProficiencyExpertise,
+} DndProficiency;
 
 typedef enum {
-    PocketRechargeManual,
-    PocketRechargeTurn,
-    PocketRechargeEncounter,
-    PocketRechargeDawn,
-    PocketRechargeShortOrLong,
-    PocketRechargeLong,
-    PocketRechargeCount,
-} PocketRecharge;
+    DndRechargeManual,
+    DndRechargeTurn,
+    DndRechargeEncounter,
+    DndRechargeDawn,
+    DndRechargeShortOrLong,
+    DndRechargeLong,
+    DndRechargeCount,
+} DndRecharge;
 
 typedef enum {
-    PocketSizeTiny,
-    PocketSizeSmall,
-    PocketSizeMedium,
-    PocketSizeLarge,
-    PocketSizeCount,
-} PocketSize;
+    DndSizeTiny,
+    DndSizeSmall,
+    DndSizeMedium,
+    DndSizeLarge,
+    DndSizeCount,
+} DndSize;
 
 typedef enum {
-    PocketSpellcastingNone,
-    PocketSpellcastingFull,
-    PocketSpellcastingHalf,
-    PocketSpellcastingThird,
-    PocketSpellcastingPact,
-    PocketSpellcastingSpellPoints,
-    PocketSpellcastingCustom,
-    PocketSpellcastingModeCount,
-} PocketSpellcastingMode;
+    DndSpellcastingNone,
+    DndSpellcastingFull,
+    DndSpellcastingHalf,
+    DndSpellcastingThird,
+    DndSpellcastingPact,
+    DndSpellcastingSpellPoints,
+    DndSpellcastingCustom,
+    DndSpellcastingModeCount,
+} DndSpellcastingMode;
 
 typedef enum {
-    PocketGrantSpecies,
-    PocketGrantBackground,
-    PocketGrantFeat,
-    PocketGrantClassFeature,
-    PocketGrantSubclassFeature,
-    PocketGrantItem,
-    PocketGrantSourceCount,
-} PocketGrantSource;
+    DndGrantSpecies,
+    DndGrantBackground,
+    DndGrantFeat,
+    DndGrantClassFeature,
+    DndGrantSubclassFeature,
+    DndGrantItem,
+    DndGrantSourceCount,
+} DndGrantSource;
 
 typedef enum {
-    PocketGrantPending,
-    PocketGrantApplied,
-    PocketGrantSkipped,
-} PocketGrantStatus;
+    DndGrantPending,
+    DndGrantApplied,
+    DndGrantSkipped,
+} DndGrantStatus;
 
 typedef enum {
-    PocketResourceManual,
-    PocketResourceProficiency,
-    PocketResourceAbility,
-    PocketResourceFormulaCount,
-} PocketResourceFormula;
+    DndResourceManual,
+    DndResourceProficiency,
+    DndResourceAbility,
+    DndResourceFormulaCount,
+} DndResourceFormula;
 
 typedef enum {
-    PocketAttackTemplateUnarmed,
-    PocketAttackTemplateSpellAttack,
-    PocketAttackTemplateSavingThrow,
-    PocketAttackTemplateCustom,
-    PocketAttackTemplateTypeCount,
-} PocketAttackTemplateType;
+    DndAttackTemplateUnarmed,
+    DndAttackTemplateSpellAttack,
+    DndAttackTemplateSavingThrow,
+    DndAttackTemplateCustom,
+    DndAttackTemplateTypeCount,
+} DndAttackTemplateType;
 
 typedef enum {
-    PocketAttackAbilityAuto,
-    PocketAttackAbilityStrength,
-    PocketAttackAbilityDexterity,
-    PocketAttackAbilityBest,
-} PocketAttackAbility;
+    DndAttackAbilityAuto,
+    DndAttackAbilityStrength,
+    DndAttackAbilityDexterity,
+    DndAttackAbilityBest,
+} DndAttackAbility;
 
 typedef enum {
-    PocketDamageBludgeoning,
-    PocketDamagePiercing,
-    PocketDamageSlashing,
-    PocketDamageAcid,
-    PocketDamageCold,
-    PocketDamageFire,
-    PocketDamageForce,
-    PocketDamageLightning,
-    PocketDamageNecrotic,
-    PocketDamagePoison,
-    PocketDamagePsychic,
-    PocketDamageRadiant,
-    PocketDamageThunder,
-    PocketDamageTypeCount,
-} PocketDamageType;
+    DndDamageBludgeoning,
+    DndDamagePiercing,
+    DndDamageSlashing,
+    DndDamageAcid,
+    DndDamageCold,
+    DndDamageFire,
+    DndDamageForce,
+    DndDamageLightning,
+    DndDamageNecrotic,
+    DndDamagePoison,
+    DndDamagePsychic,
+    DndDamageRadiant,
+    DndDamageThunder,
+    DndDamageTypeCount,
+} DndDamageType;
 
 enum {
-    PocketWeaponFinesse = 1U << 0,
-    PocketWeaponRanged = 1U << 1,
-    PocketWeaponLight = 1U << 2,
-    PocketWeaponHeavy = 1U << 3,
-    PocketWeaponThrown = 1U << 4,
-    PocketWeaponAmmunition = 1U << 5,
+    DndWeaponFinesse = 1U << 0,
+    DndWeaponRanged = 1U << 1,
+    DndWeaponLight = 1U << 2,
+    DndWeaponHeavy = 1U << 3,
+    DndWeaponThrown = 1U << 4,
+    DndWeaponAmmunition = 1U << 5,
 };
 
 typedef struct {
@@ -153,7 +153,7 @@ typedef struct {
     uint16_t mystic_arcanum_mask;
     uint16_t spell_points_current;
     uint16_t spell_points_max;
-} PocketClassLevel;
+} DndClassLevel;
 
 typedef struct {
     char name[DND_SPELL_NAME_LEN];
@@ -167,7 +167,7 @@ typedef struct {
     char school[DND_SHORT_LEN];
     uint8_t grant_source;
     char grant_name[DND_SHORT_LEN];
-} PocketSpell;
+} DndSpell;
 
 typedef struct {
     char name[DND_FEATURE_NAME_LEN];
@@ -179,7 +179,7 @@ typedef struct {
     uint8_t recharge;
     uint8_t resource_formula;
     uint8_t resource_ability;
-} PocketFeature;
+} DndFeature;
 
 typedef struct {
     char name[DND_ITEM_NAME_LEN];
@@ -210,7 +210,7 @@ typedef struct {
     int8_t armor_dex_cap;
     uint8_t shield_bonus;
     char ammunition_group[DND_SHORT_LEN];
-} PocketItem;
+} DndItem;
 
 typedef struct {
     char stable_id[DND_SHORT_LEN];
@@ -222,7 +222,7 @@ typedef struct {
     uint8_t class_index;
     uint8_t level_gained;
     uint8_t status;
-} PocketGrant;
+} DndGrant;
 
 typedef struct {
     char name[DND_NAME_LEN];
@@ -239,7 +239,7 @@ typedef struct {
     uint8_t rider_dice;
     uint8_t rider_die;
     uint8_t recharge;
-} PocketAttackTemplate;
+} DndAttackTemplate;
 
 typedef struct {
     char name[DND_CHARACTER_NAME_LEN];
@@ -252,7 +252,7 @@ typedef struct {
     char senses[DND_DETAIL_LEN];
 
     uint8_t class_count;
-    PocketClassLevel classes[DND_MAX_CLASSES];
+    DndClassLevel classes[DND_MAX_CLASSES];
     uint32_t experience;
     uint8_t milestone_leveling;
     uint8_t inspiration;
@@ -290,17 +290,17 @@ typedef struct {
     uint8_t spell_count;
     uint8_t spell_capacity;
     void* spell_storage;
-    PocketSpell* spells;
+    DndSpell* spells;
     uint8_t* spell_known;
     uint8_t* spell_always_prepared;
     uint8_t* spell_free_casts_current;
     uint8_t* spell_free_casts_max;
     uint8_t feature_count;
     uint8_t feature_capacity;
-    PocketFeature* features;
+    DndFeature* features;
     uint8_t item_count;
     uint8_t item_capacity;
-    PocketItem* items;
+    DndItem* items;
     int8_t saving_throw_misc[DND_ABILITY_COUNT];
     int8_t skill_misc[DND_SKILL_COUNT];
 
@@ -315,26 +315,26 @@ typedef struct {
 
     uint8_t grant_count;
     uint8_t grant_capacity;
-    PocketGrant* grants;
+    DndGrant* grants;
     uint8_t attack_template_count;
-    PocketAttackTemplate attack_templates[DND_MAX_ATTACK_TEMPLATES];
+    DndAttackTemplate attack_templates[DND_MAX_ATTACK_TEMPLATES];
     uint8_t encumbrance_mode;
     int16_t carrying_capacity_override;
 
-} PocketCharacter;
+} DndCharacter;
 
 typedef struct {
-    PocketCharacter character;
-} PocketSaveData;
+    DndCharacter character;
+} DndSaveData;
 
-void dnd_data_set_defaults(PocketSaveData* data);
-void dnd_data_clear(PocketSaveData* data);
-void dnd_data_sanitize(PocketSaveData* data);
-bool dnd_data_reserve_spells(PocketCharacter* character, uint8_t required);
-void dnd_data_clear_spells(PocketCharacter* character);
-bool dnd_data_reserve_features(PocketCharacter* character, uint8_t required);
-bool dnd_data_reserve_features_exact(PocketCharacter* character, uint8_t required);
-bool dnd_data_reserve_items(PocketCharacter* character, uint8_t required);
-void dnd_data_clear_items(PocketCharacter* character);
-bool dnd_data_reserve_grants(PocketCharacter* character, uint8_t required);
-bool dnd_data_reserve_grants_exact(PocketCharacter* character, uint8_t required);
+void dnd_data_set_defaults(DndSaveData* data);
+void dnd_data_clear(DndSaveData* data);
+void dnd_data_sanitize(DndSaveData* data);
+bool dnd_data_reserve_spells(DndCharacter* character, uint8_t required);
+void dnd_data_clear_spells(DndCharacter* character);
+bool dnd_data_reserve_features(DndCharacter* character, uint8_t required);
+bool dnd_data_reserve_features_exact(DndCharacter* character, uint8_t required);
+bool dnd_data_reserve_items(DndCharacter* character, uint8_t required);
+void dnd_data_clear_items(DndCharacter* character);
+bool dnd_data_reserve_grants(DndCharacter* character, uint8_t required);
+bool dnd_data_reserve_grants_exact(DndCharacter* character, uint8_t required);

@@ -235,12 +235,12 @@ static bool dnd_projection_load_common(
         if(dnd_projection_indexed_key(key, "Class", "Data", DND_MAX_CLASSES, &index)) {
             size_t count = dnd_projection_parse_numbers(value, n, 16U);
             if(count) {
-                PocketClassLevel* targets[2] = {
+                DndClassLevel* targets[2] = {
                     inventory ? &inventory->classes[index] : NULL,
                     spellbook ? &spellbook->classes[index] : NULL,
                 };
                 for(uint8_t t = 0U; t < 2U; ++t) {
-                    PocketClassLevel* cl = targets[t];
+                    DndClassLevel* cl = targets[t];
                     if(!cl) continue;
                     if(count >= 1U) cl->level = (uint8_t)n[0];
                     if(count >= 2U) cl->hit_die = (uint8_t)n[1];
@@ -309,7 +309,7 @@ static bool dnd_projection_load_common(
 }
 
 static bool dnd_projection_restore_backup(Storage* storage, uint32_t profile) {
-    PocketSaveData* recovery = calloc(1U, sizeof(PocketSaveData));
+    DndSaveData* recovery = calloc(1U, sizeof(DndSaveData));
     if(!recovery) return false;
     bool restored = dnd_storage_restore_backup(storage, profile, recovery);
     dnd_data_clear(recovery);

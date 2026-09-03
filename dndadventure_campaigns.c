@@ -127,7 +127,7 @@ static uint8_t dndadventure_campaigns_split(char* line, char** fields, uint8_t c
     return count;
 }
 
-static bool dndadventure_campaigns_parse(char* line, bool bundled, PocketCampaignSummary* output) {
+static bool dndadventure_campaigns_parse(char* line, bool bundled, DndAdventureCampaignSummary* output) {
     if(!line[0] || line[0] == '#') return false;
     char* fields[7];
     if(dndadventure_campaigns_split(line, fields, 7U) != 7U) return false;
@@ -179,7 +179,7 @@ static bool dndadventure_campaigns_path_cache_build(
         CampaignReader reader;
         dndadventure_campaigns_reader_init(&reader, file, 0U);
         char line[CAMPAIGN_LINE_LEN];
-        PocketCampaignSummary campaign;
+        DndAdventureCampaignSummary campaign;
         uint32_t line_offset = 0U;
         while(dndadventure_campaigns_read_line(&reader, line, sizeof(line), &line_offset)) {
             if(dndadventure_campaigns_parse(line, bundled, &campaign))
@@ -220,7 +220,7 @@ static bool dndadventure_campaigns_at_index(
     bool bundled,
     const CampaignPathCache* cache,
     uint16_t index,
-    PocketCampaignSummary* output) {
+    DndAdventureCampaignSummary* output) {
     if(!cache || index >= cache->count || !cache->hint_count) return false;
     uint16_t hint_slot = (uint16_t)(index / CAMPAIGN_HINT_STRIDE);
     if(hint_slot >= cache->hint_count) hint_slot = (uint16_t)(cache->hint_count - 1U);
@@ -236,7 +236,7 @@ static bool dndadventure_campaigns_at_index(
         dndadventure_campaigns_reader_init(&reader, file, offset);
         char line[CAMPAIGN_LINE_LEN];
         while(dndadventure_campaigns_read_line(&reader, line, sizeof(line), NULL)) {
-            PocketCampaignSummary campaign;
+            DndAdventureCampaignSummary campaign;
             if(!dndadventure_campaigns_parse(line, bundled, &campaign)) continue;
             if(logical == index) {
                 *output = campaign;
@@ -259,7 +259,7 @@ uint16_t dndadventure_campaigns_count(Storage* storage) {
     return count > UINT16_MAX ? UINT16_MAX : (uint16_t)count;
 }
 
-bool dndadventure_campaigns_at(Storage* storage, uint16_t index, PocketCampaignSummary* output) {
+bool dndadventure_campaigns_at(Storage* storage, uint16_t index, DndAdventureCampaignSummary* output) {
     if(!output || !dndadventure_campaigns_cache_ensure(storage)) return false;
     if(index < campaign_cache.bundled.count)
         return dndadventure_campaigns_at_index(
@@ -279,7 +279,7 @@ static bool dndadventure_campaigns_find_path(
     const char* path,
     bool bundled,
     const char* id,
-    PocketCampaignSummary* output) {
+    DndAdventureCampaignSummary* output) {
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     bool found = false;
@@ -288,7 +288,7 @@ static bool dndadventure_campaigns_find_path(
         dndadventure_campaigns_reader_init(&reader, file, 0U);
         char line[CAMPAIGN_LINE_LEN];
         while(dndadventure_campaigns_read_line(&reader, line, sizeof(line), NULL)) {
-            PocketCampaignSummary campaign;
+            DndAdventureCampaignSummary campaign;
             if(!dndadventure_campaigns_parse(line, bundled, &campaign) || strcmp(campaign.id, id))
                 continue;
             *output = campaign;
@@ -302,7 +302,7 @@ static bool dndadventure_campaigns_find_path(
     return found;
 }
 
-bool dndadventure_campaigns_find(Storage* storage, const char* id, PocketCampaignSummary* output) {
+bool dndadventure_campaigns_find(Storage* storage, const char* id, DndAdventureCampaignSummary* output) {
     if(!id || !output || !dndadventure_campaigns_cache_ensure(storage)) return false;
     return dndadventure_campaigns_find_path(storage, CAMPAIGN_BUNDLED_INDEX, true, id, output) ||
            dndadventure_campaigns_find_path(storage, CAMPAIGN_USER_INDEX, false, id, output) ||
@@ -311,7 +311,7 @@ bool dndadventure_campaigns_find(Storage* storage, const char* id, PocketCampaig
 
 bool dndadventure_campaigns_scene_path(
     Storage* storage,
-    const PocketCampaignSummary* campaign,
+    const DndAdventureCampaignSummary* campaign,
     char* output,
     size_t size) {
     if(!storage || !campaign || !output || size == 0U ||
@@ -431,8 +431,8 @@ bool dndadventure_campaigns_active_save(
 bool dndadventure_campaigns_progress_save(
     Storage* storage,
     uint32_t profile_id,
-    const PocketCampaignSummary* campaign,
-    const PocketCampaignProgress* progress) {
+    const DndAdventureCampaignSummary* campaign,
+    const DndAdventureCampaignProgress* progress) {
     if(!storage || !campaign || !progress) return false;
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
@@ -466,8 +466,8 @@ bool dndadventure_campaigns_progress_save(
 bool dndadventure_campaigns_progress_load(
     Storage* storage,
     uint32_t profile_id,
-    const PocketCampaignSummary* campaign,
-    PocketCampaignProgress* progress) {
+    const DndAdventureCampaignSummary* campaign,
+    DndAdventureCampaignProgress* progress) {
     memset(progress, 0, sizeof(*progress));
     dndadventure_campaigns_copy(progress->campaign, sizeof(progress->campaign), campaign->id);
     dndadventure_campaigns_copy(progress->scene, sizeof(progress->scene), campaign->entry_scene);
@@ -531,7 +531,7 @@ static bool dndadventure_campaigns_scene_present(
 }
 
 static void dndadventure_campaigns_note_problem(
-    PocketCampaignDiagnostics* output,
+    DndAdventureCampaignDiagnostics* output,
     const char* id,
     const char* problem) {
     if(output->problem_id[0]) return;
@@ -541,8 +541,8 @@ static void dndadventure_campaigns_note_problem(
 
 static void dndadventure_campaigns_validate_scenes(
     Storage* storage,
-    const PocketCampaignSummary* campaign,
-    PocketCampaignDiagnostics* output) {
+    const DndAdventureCampaignSummary* campaign,
+    DndAdventureCampaignDiagnostics* output) {
     char path[DND_FS_PATH_LEN];
     if(!dndadventure_campaigns_scene_path(storage, campaign, path, sizeof(path))) {
         ++output->missing_scene_files;
@@ -630,7 +630,7 @@ static bool dndadventure_campaigns_path_has_id_before(
         uint16_t records = 0U;
         while(records < record_limit &&
               dndadventure_campaigns_read_line(&reader, line, CAMPAIGN_LINE_LEN, NULL)) {
-            PocketCampaignSummary campaign;
+            DndAdventureCampaignSummary campaign;
             if(!dndadventure_campaigns_parse(line, bundled, &campaign)) continue;
             if(!strcmp(campaign.id, id)) {
                 found = true;
@@ -670,7 +670,7 @@ static void dndadventure_campaigns_diagnose_path(
     const char* path,
     bool bundled,
     uint8_t path_rank,
-    PocketCampaignDiagnostics* output) {
+    DndAdventureCampaignDiagnostics* output) {
     File* file = storage_file_alloc(storage);
     if(!file) return;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
@@ -688,7 +688,7 @@ static void dndadventure_campaigns_diagnose_path(
     dndadventure_campaigns_reader_init(&reader, file, 0U);
     uint16_t prior_records = 0U;
     while(dndadventure_campaigns_read_line(&reader, line, CAMPAIGN_LINE_LEN, NULL)) {
-        PocketCampaignSummary campaign;
+        DndAdventureCampaignSummary campaign;
         if(!dndadventure_campaigns_parse(line, bundled, &campaign)) continue;
         if(output->records < UINT16_MAX) ++output->records;
         if(campaign.pack_version != DNDADVENTURE_PACK_VERSION ||
@@ -710,7 +710,7 @@ static void dndadventure_campaigns_diagnose_path(
     free(line);
 }
 
-void dndadventure_campaigns_diagnose(Storage* storage, PocketCampaignDiagnostics* output) {
+void dndadventure_campaigns_diagnose(Storage* storage, DndAdventureCampaignDiagnostics* output) {
     if(!output) return;
     memset(output, 0, sizeof(*output));
     if(!storage) {

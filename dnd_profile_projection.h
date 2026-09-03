@@ -9,7 +9,7 @@ typedef struct {
     char species[DND_NAME_LEN];
     char background[DND_NAME_LEN];
     uint8_t class_count;
-    PocketClassLevel classes[DND_MAX_CLASSES];
+    DndClassLevel classes[DND_MAX_CLASSES];
     int8_t ability_scores[DND_ABILITY_COUNT];
     int16_t armor_class;
     uint8_t exhaustion;
@@ -20,7 +20,7 @@ typedef struct {
 typedef struct {
     char name[DND_CHARACTER_NAME_LEN];
     uint8_t class_count;
-    PocketClassLevel classes[DND_MAX_CLASSES];
+    DndClassLevel classes[DND_MAX_CLASSES];
 } DndSpellbookProfileProjection;
 
 typedef struct {

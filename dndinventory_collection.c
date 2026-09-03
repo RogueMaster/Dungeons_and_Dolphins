@@ -145,51 +145,51 @@ typedef struct {
 #define COLLECTION_WEAPON(name, weight, dice, die, versatile, type, properties, ammo) \
     {name, weight, properties, dice, die, versatile, type, 0U, -1, 0U, ammo}
 #define COLLECTION_ARMOR(name, weight, base, dex_cap, shield) \
-    {name, weight, 0U, 0U, 0U, 0U, PocketDamageBludgeoning, base, dex_cap, shield, ""}
+    {name, weight, 0U, 0U, 0U, 0U, DndDamageBludgeoning, base, dex_cap, shield, ""}
 
 static const DndInventoryEquipmentPreset dndinventory_collection_equipment_presets[] = {
-    COLLECTION_WEAPON("Club", 20, 1, 4, 0, PocketDamageBludgeoning, PocketWeaponLight, ""),
+    COLLECTION_WEAPON("Club", 20, 1, 4, 0, DndDamageBludgeoning, DndWeaponLight, ""),
     COLLECTION_WEAPON(
         "Dagger",
         10,
         1,
         4,
         0,
-        PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponLight | PocketWeaponThrown,
+        DndDamagePiercing,
+        DndWeaponFinesse | DndWeaponLight | DndWeaponThrown,
         ""),
-    COLLECTION_WEAPON("Greatclub", 100, 1, 8, 0, PocketDamageBludgeoning, 0U, ""),
+    COLLECTION_WEAPON("Greatclub", 100, 1, 8, 0, DndDamageBludgeoning, 0U, ""),
     COLLECTION_WEAPON(
         "Handaxe",
         20,
         1,
         6,
         0,
-        PocketDamageSlashing,
-        PocketWeaponLight | PocketWeaponThrown,
+        DndDamageSlashing,
+        DndWeaponLight | DndWeaponThrown,
         ""),
-    COLLECTION_WEAPON("Javelin", 20, 1, 6, 0, PocketDamagePiercing, PocketWeaponThrown, ""),
+    COLLECTION_WEAPON("Javelin", 20, 1, 6, 0, DndDamagePiercing, DndWeaponThrown, ""),
     COLLECTION_WEAPON(
         "Light Hammer",
         20,
         1,
         4,
         0,
-        PocketDamageBludgeoning,
-        PocketWeaponLight | PocketWeaponThrown,
+        DndDamageBludgeoning,
+        DndWeaponLight | DndWeaponThrown,
         ""),
-    COLLECTION_WEAPON("Mace", 40, 1, 6, 0, PocketDamageBludgeoning, 0U, ""),
-    COLLECTION_WEAPON("Quarterstaff", 40, 1, 6, 8, PocketDamageBludgeoning, 0U, ""),
-    COLLECTION_WEAPON("Sickle", 20, 1, 4, 0, PocketDamageSlashing, PocketWeaponLight, ""),
-    COLLECTION_WEAPON("Spear", 30, 1, 6, 8, PocketDamagePiercing, PocketWeaponThrown, ""),
+    COLLECTION_WEAPON("Mace", 40, 1, 6, 0, DndDamageBludgeoning, 0U, ""),
+    COLLECTION_WEAPON("Quarterstaff", 40, 1, 6, 8, DndDamageBludgeoning, 0U, ""),
+    COLLECTION_WEAPON("Sickle", 20, 1, 4, 0, DndDamageSlashing, DndWeaponLight, ""),
+    COLLECTION_WEAPON("Spear", 30, 1, 6, 8, DndDamagePiercing, DndWeaponThrown, ""),
     COLLECTION_WEAPON(
         "Dart",
         3,
         1,
         4,
         0,
-        PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponRanged | PocketWeaponThrown,
+        DndDamagePiercing,
+        DndWeaponFinesse | DndWeaponRanged | DndWeaponThrown,
         ""),
     COLLECTION_WEAPON(
         "Light Crossbow",
@@ -197,8 +197,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         8,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Bolts"),
     COLLECTION_WEAPON(
         "Shortbow",
@@ -206,8 +206,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         6,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Arrows"),
     COLLECTION_WEAPON(
         "Sling",
@@ -215,29 +215,29 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         4,
         0,
-        PocketDamageBludgeoning,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamageBludgeoning,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Sling bullets"),
-    COLLECTION_WEAPON("Battleaxe", 40, 1, 8, 10, PocketDamageSlashing, 0U, ""),
-    COLLECTION_WEAPON("Flail", 20, 1, 8, 0, PocketDamageBludgeoning, 0U, ""),
-    COLLECTION_WEAPON("Glaive", 60, 1, 10, 0, PocketDamageSlashing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Greataxe", 70, 1, 12, 0, PocketDamageSlashing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Greatsword", 60, 2, 6, 0, PocketDamageSlashing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Halberd", 60, 1, 10, 0, PocketDamageSlashing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Lance", 60, 1, 10, 0, PocketDamagePiercing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Longsword", 30, 1, 8, 10, PocketDamageSlashing, 0U, ""),
-    COLLECTION_WEAPON("Maul", 100, 2, 6, 0, PocketDamageBludgeoning, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Morningstar", 40, 1, 8, 0, PocketDamagePiercing, 0U, ""),
-    COLLECTION_WEAPON("Pike", 180, 1, 10, 0, PocketDamagePiercing, PocketWeaponHeavy, ""),
-    COLLECTION_WEAPON("Rapier", 20, 1, 8, 0, PocketDamagePiercing, PocketWeaponFinesse, ""),
+    COLLECTION_WEAPON("Battleaxe", 40, 1, 8, 10, DndDamageSlashing, 0U, ""),
+    COLLECTION_WEAPON("Flail", 20, 1, 8, 0, DndDamageBludgeoning, 0U, ""),
+    COLLECTION_WEAPON("Glaive", 60, 1, 10, 0, DndDamageSlashing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Greataxe", 70, 1, 12, 0, DndDamageSlashing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Greatsword", 60, 2, 6, 0, DndDamageSlashing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Halberd", 60, 1, 10, 0, DndDamageSlashing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Lance", 60, 1, 10, 0, DndDamagePiercing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Longsword", 30, 1, 8, 10, DndDamageSlashing, 0U, ""),
+    COLLECTION_WEAPON("Maul", 100, 2, 6, 0, DndDamageBludgeoning, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Morningstar", 40, 1, 8, 0, DndDamagePiercing, 0U, ""),
+    COLLECTION_WEAPON("Pike", 180, 1, 10, 0, DndDamagePiercing, DndWeaponHeavy, ""),
+    COLLECTION_WEAPON("Rapier", 20, 1, 8, 0, DndDamagePiercing, DndWeaponFinesse, ""),
     COLLECTION_WEAPON(
         "Scimitar",
         30,
         1,
         6,
         0,
-        PocketDamageSlashing,
-        PocketWeaponFinesse | PocketWeaponLight,
+        DndDamageSlashing,
+        DndWeaponFinesse | DndWeaponLight,
         ""),
     COLLECTION_WEAPON(
         "Shortsword",
@@ -245,21 +245,21 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         6,
         0,
-        PocketDamagePiercing,
-        PocketWeaponFinesse | PocketWeaponLight,
+        DndDamagePiercing,
+        DndWeaponFinesse | DndWeaponLight,
         ""),
-    COLLECTION_WEAPON("Trident", 40, 1, 8, 10, PocketDamagePiercing, PocketWeaponThrown, ""),
-    COLLECTION_WEAPON("Warhammer", 50, 1, 8, 10, PocketDamageBludgeoning, 0U, ""),
-    COLLECTION_WEAPON("War Pick", 20, 1, 8, 10, PocketDamagePiercing, 0U, ""),
-    COLLECTION_WEAPON("Whip", 30, 1, 4, 0, PocketDamageSlashing, PocketWeaponFinesse, ""),
+    COLLECTION_WEAPON("Trident", 40, 1, 8, 10, DndDamagePiercing, DndWeaponThrown, ""),
+    COLLECTION_WEAPON("Warhammer", 50, 1, 8, 10, DndDamageBludgeoning, 0U, ""),
+    COLLECTION_WEAPON("War Pick", 20, 1, 8, 10, DndDamagePiercing, 0U, ""),
+    COLLECTION_WEAPON("Whip", 30, 1, 4, 0, DndDamageSlashing, DndWeaponFinesse, ""),
     COLLECTION_WEAPON(
         "Blowgun",
         10,
         1,
         1,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Needles"),
     COLLECTION_WEAPON(
         "Hand Crossbow",
@@ -267,8 +267,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         6,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponLight | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponLight | DndWeaponAmmunition,
         "Bolts"),
     COLLECTION_WEAPON(
         "Heavy Crossbow",
@@ -276,8 +276,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         10,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponHeavy | DndWeaponAmmunition,
         "Bolts"),
     COLLECTION_WEAPON(
         "Longbow",
@@ -285,8 +285,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         8,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponHeavy | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponHeavy | DndWeaponAmmunition,
         "Arrows"),
     COLLECTION_WEAPON(
         "Musket",
@@ -294,8 +294,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         12,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Bullets"),
     COLLECTION_WEAPON(
         "Pistol",
@@ -303,8 +303,8 @@ static const DndInventoryEquipmentPreset dndinventory_collection_equipment_prese
         1,
         10,
         0,
-        PocketDamagePiercing,
-        PocketWeaponRanged | PocketWeaponAmmunition,
+        DndDamagePiercing,
+        DndWeaponRanged | DndWeaponAmmunition,
         "Bullets"),
     COLLECTION_ARMOR("Padded Armor", 80, 11, -1, 0),
     COLLECTION_ARMOR("Leather Armor", 100, 11, -1, 0),
@@ -403,7 +403,7 @@ static bool
 static bool
     dndinventory_collection_ensure_list_page(DndInventoryCollectionApp* app, uint16_t selection);
 static void dndinventory_collection_list_adjust_scroll(DndInventoryCollectionApp* app);
-static PocketItem* dndinventory_collection_item(DndInventoryCollectionApp* app, uint16_t logical);
+static DndItem* dndinventory_collection_item(DndInventoryCollectionApp* app, uint16_t logical);
 static void dndinventory_collection_begin_text(
     DndInventoryCollectionApp* app,
     DndInventoryCollectionEdit edit,
@@ -436,7 +436,7 @@ typedef struct {
 
 static bool dndinventory_collection_aggregate_item_record(
     uint16_t logical_index,
-    const PocketItem* item,
+    const DndItem* item,
     void* context) {
     (void)logical_index;
     DndInventoryItemAggregateContext* aggregate_context = context;
@@ -807,16 +807,16 @@ static bool dndinventory_collection_item_filter_allows(
 }
 
 static void dndinventory_collection_apply_item_preset(
-    PocketItem* item,
+    DndItem* item,
     const char* name,
     uint8_t category) {
     item->weight_tenths = 0;
     item->is_weapon = category == DndInventoryItemCategoryWeapon;
-    item->attack_ability = PocketAttackAbilityAuto;
+    item->attack_ability = DndAttackAbilityAuto;
     item->damage_dice = item->is_weapon ? 1U : 0U;
     item->damage_die = item->is_weapon ? 6U : 0U;
     item->versatile_die = 0U;
-    item->damage_type = PocketDamageBludgeoning;
+    item->damage_type = DndDamageBludgeoning;
     item->add_ability_damage = item->is_weapon;
     item->weapon_properties = 0U;
     item->armor_base = 0U;
@@ -867,7 +867,7 @@ static void dndinventory_collection_projection_from_state(
 static void dndinventory_collection_state_from_projection(
     DndInventoryCharacterState* state,
     const DndInventoryProfileProjection* projection) {
-    PocketItem* items = state->items;
+    DndItem* items = state->items;
     uint8_t item_count = state->item_count;
     memset(state, 0, sizeof(*state));
     state->items = items;
@@ -887,10 +887,10 @@ static void dndinventory_collection_state_from_projection(
     state->carrying_capacity_override = projection->carrying_capacity_override;
 }
 
-static PocketCharacter* dndinventory_collection_io_character(
+static DndCharacter* dndinventory_collection_io_character(
     const DndInventoryCharacterState* state,
     bool attach_items) {
-    PocketCharacter* io = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* io = calloc(1U, sizeof(DndCharacter));
     if(!io || !state) return io;
     dndinventory_collection_copy(io->name, sizeof(io->name), state->name);
     io->class_count = state->class_count;
@@ -909,7 +909,7 @@ static PocketCharacter* dndinventory_collection_io_character(
     return io;
 }
 
-static void dndinventory_collection_free_io_character(PocketCharacter* io, bool owns_items) {
+static void dndinventory_collection_free_io_character(DndCharacter* io, bool owns_items) {
     if(!io) return;
     if(owns_items)
         dnd_data_clear_items(io);
@@ -940,7 +940,7 @@ static bool dndinventory_collection_save_currency(DndInventoryCollectionApp* app
         c->currency_gp,
         c->currency_pp,
     };
-    PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+    DndCharacter* owner = dndinventory_collection_io_character(c, false);
     bool ok = owner &&
               dnd_storage_save_inventory_currency(app->storage, app->profile, owner, currency);
     dndinventory_collection_free_io_character(owner, false);
@@ -978,7 +978,7 @@ static bool dndinventory_collection_load_currency(DndInventoryCollectionApp* app
     c->currency_gp = 0;
     c->currency_pp = 0;
     int32_t zero_currency[5] = {0, 0, 0, 0, 0};
-    PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+    DndCharacter* owner = dndinventory_collection_io_character(c, false);
     bool saved = owner && dnd_storage_save_inventory_currency(
                               app->storage, app->profile, owner, zero_currency);
     dndinventory_collection_free_io_character(owner, false);
@@ -1450,7 +1450,7 @@ static bool
 }
 
 static bool dndinventory_collection_load_page(DndInventoryCollectionApp* app, uint16_t start) {
-    PocketCharacter* io = dndinventory_collection_io_character(&app->data.character, false);
+    DndCharacter* io = dndinventory_collection_io_character(&app->data.character, false);
     if(!io) return false;
     uint16_t total = app->total;
     bool ok = dnd_storage_load_items_window_indexed(
@@ -1482,7 +1482,7 @@ static bool dndinventory_collection_save_page(DndInventoryCollectionApp* app) {
         const DndInventoryCharacterState* c = &app->data.character;
         int32_t currency[5] = {
             c->currency_cp, c->currency_sp, c->currency_ep, c->currency_gp, c->currency_pp};
-        PocketCharacter* owner = dndinventory_collection_io_character(c, false);
+        DndCharacter* owner = dndinventory_collection_io_character(c, false);
         bool currency_saved = owner && dnd_storage_save_inventory_currency(
                                            app->storage, app->profile, owner, currency);
         dndinventory_collection_free_io_character(owner, false);
@@ -1491,7 +1491,7 @@ static bool dndinventory_collection_save_page(DndInventoryCollectionApp* app) {
             return false;
         }
     }
-    PocketCharacter* io = dndinventory_collection_io_character(&app->data.character, true);
+    DndCharacter* io = dndinventory_collection_io_character(&app->data.character, true);
     bool ok = io &&
               dnd_storage_save_items_window(app->storage, app->profile, app->cache_start, io);
     dndinventory_collection_free_io_character(io, false);
@@ -1519,13 +1519,13 @@ static bool
            logical < app->cache_start + app->data.character.item_count;
 }
 
-static PocketItem* dndinventory_collection_item(DndInventoryCollectionApp* app, uint16_t logical) {
+static DndItem* dndinventory_collection_item(DndInventoryCollectionApp* app, uint16_t logical) {
     if(!dndinventory_collection_prepare_record(app, logical)) return NULL;
     uint8_t local = dndinventory_collection_local(app, logical);
     return local < app->data.character.item_count ? &app->data.character.items[local] : NULL;
 }
 
-static PocketItem*
+static DndItem*
     dndinventory_collection_item_cached(DndInventoryCollectionApp* app, uint16_t logical) {
     if(!app || logical < app->cache_start) return NULL;
     uint16_t local = logical - app->cache_start;
@@ -1545,13 +1545,13 @@ static bool dndinventory_collection_add_blank(DndInventoryCollectionApp* app) {
         dndinventory_collection_set_status(app, "Item add failed");
         return false;
     }
-    PocketItem* resized = realloc(c->items, (size_t)(c->item_count + 1U) * sizeof(PocketItem));
+    DndItem* resized = realloc(c->items, (size_t)(c->item_count + 1U) * sizeof(DndItem));
     if(!resized) {
         dndinventory_collection_set_status(app, "Item add failed");
         return false;
     }
     c->items = resized;
-    PocketItem* item = &c->items[c->item_count];
+    DndItem* item = &c->items[c->item_count];
     memset(item, 0, sizeof(*item));
     dndinventory_collection_copy(item->name, sizeof(item->name), "New Item");
     item->quantity = 1;
@@ -1577,7 +1577,7 @@ static bool dndinventory_collection_add_blank(DndInventoryCollectionApp* app) {
 
 static bool dndinventory_collection_delete_current(DndInventoryCollectionApp* app) {
     if(app->record_index >= app->total) return false;
-    PocketCharacter* owner = dndinventory_collection_io_character(&app->data.character, false);
+    DndCharacter* owner = dndinventory_collection_io_character(&app->data.character, false);
     bool deleted = owner &&
                    dnd_storage_delete_item(app->storage, app->profile, owner, app->record_index);
     dndinventory_collection_free_io_character(owner, false);
@@ -1722,7 +1722,7 @@ static void dndinventory_collection_open_catalog(DndInventoryCollectionApp* app)
 static bool dndinventory_collection_apply_catalog(DndInventoryCollectionApp* app) {
     if(app->selection >= app->catalog_count) return false;
     DndInventoryCatalogEntry* selected = &app->catalog[app->selection];
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(!item) return false;
     dndinventory_collection_copy(item->name, sizeof(item->name), selected->name);
     dndinventory_collection_apply_item_preset(item, selected->name, selected->category);
@@ -1747,7 +1747,7 @@ static void dndinventory_collection_format_detail(
     char* out,
     size_t size) {
     DndInventoryCharacterState* c = &app->data.character;
-    PocketItem* item = dndinventory_collection_item_cached(app, app->record_index);
+    DndItem* item = dndinventory_collection_item_cached(app, app->record_index);
     if(!item) {
         dndinventory_collection_copy(out, size, "Read error");
         return;
@@ -1808,30 +1808,30 @@ static void dndinventory_collection_format_detail(
         break;
     case 16:
         snprintf(
-            out, size, "Finesse: %s", item->weapon_properties & PocketWeaponFinesse ? "Yes" : "No");
+            out, size, "Finesse: %s", item->weapon_properties & DndWeaponFinesse ? "Yes" : "No");
         break;
     case 17:
         snprintf(
-            out, size, "Ranged: %s", item->weapon_properties & PocketWeaponRanged ? "Yes" : "No");
+            out, size, "Ranged: %s", item->weapon_properties & DndWeaponRanged ? "Yes" : "No");
         break;
     case 18:
         snprintf(
-            out, size, "Light: %s", item->weapon_properties & PocketWeaponLight ? "Yes" : "No");
+            out, size, "Light: %s", item->weapon_properties & DndWeaponLight ? "Yes" : "No");
         break;
     case 19:
         snprintf(
-            out, size, "Heavy: %s", item->weapon_properties & PocketWeaponHeavy ? "Yes" : "No");
+            out, size, "Heavy: %s", item->weapon_properties & DndWeaponHeavy ? "Yes" : "No");
         break;
     case 20:
         snprintf(
-            out, size, "Thrown: %s", item->weapon_properties & PocketWeaponThrown ? "Yes" : "No");
+            out, size, "Thrown: %s", item->weapon_properties & DndWeaponThrown ? "Yes" : "No");
         break;
     case 21:
         snprintf(
             out,
             size,
             "Ammunition: %s",
-            item->weapon_properties & PocketWeaponAmmunition ? "Yes" : "No");
+            item->weapon_properties & DndWeaponAmmunition ? "Yes" : "No");
         break;
     case 22:
         snprintf(out, size, "Add ability dmg: %s", item->add_ability_damage ? "Yes" : "No");
@@ -1861,7 +1861,7 @@ static void dndinventory_collection_format_detail(
         if(item->container_index < 0) {
             dndinventory_collection_copy(out, size, "Container: Carried");
         } else {
-            PocketItem* container =
+            DndItem* container =
                 dndinventory_collection_item_cached(app, (uint16_t)item->container_index);
             if(container && container->name[0])
                 snprintf(out, size, "Container: %.21s", container->name);
@@ -1942,7 +1942,7 @@ static void dndinventory_collection_draw_list(Canvas* canvas, DndInventoryCollec
             } else {
                 uint8_t local = dndinventory_collection_local(app, logical);
                 if(local < app->data.character.item_count) {
-                    PocketItem* item = &app->data.character.items[local];
+                    DndItem* item = &app->data.character.items[local];
                     snprintf(
                         text,
                         sizeof(text),
@@ -2135,7 +2135,7 @@ static bool dndinventory_collection_number_spec(
     *value = 0;
     *minimum = 0;
     *maximum = 999;
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(!item) return false;
     switch(field) {
     case 2U:
@@ -2290,7 +2290,7 @@ static bool dndinventory_collection_begin_currency_number(
 
 static void
     dndinventory_collection_adjust(DndInventoryCollectionApp* app, uint8_t field, int8_t delta) {
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(!item) return;
     switch(field) {
     case 2:
@@ -2312,8 +2312,8 @@ static void
         break;
     case 7: {
         int16_t next = (int16_t)item->attack_ability + delta;
-        if(next < 0) next = (int16_t)PocketAttackAbilityBest;
-        if(next > (int16_t)PocketAttackAbilityBest) next = 0;
+        if(next < 0) next = (int16_t)DndAttackAbilityBest;
+        if(next > (int16_t)DndAttackAbilityBest) next = 0;
         item->attack_ability = (uint8_t)next;
         break;
     }
@@ -2343,28 +2343,28 @@ static void
         break;
     case 15: {
         int16_t next = (int16_t)item->damage_type + delta;
-        if(next < 0) next = PocketDamageTypeCount - 1U;
-        if(next >= PocketDamageTypeCount) next = 0;
+        if(next < 0) next = DndDamageTypeCount - 1U;
+        if(next >= DndDamageTypeCount) next = 0;
         item->damage_type = (uint8_t)next;
         break;
     }
     case 16:
-        item->weapon_properties ^= PocketWeaponFinesse;
+        item->weapon_properties ^= DndWeaponFinesse;
         break;
     case 17:
-        item->weapon_properties ^= PocketWeaponRanged;
+        item->weapon_properties ^= DndWeaponRanged;
         break;
     case 18:
-        item->weapon_properties ^= PocketWeaponLight;
+        item->weapon_properties ^= DndWeaponLight;
         break;
     case 19:
-        item->weapon_properties ^= PocketWeaponHeavy;
+        item->weapon_properties ^= DndWeaponHeavy;
         break;
     case 20:
-        item->weapon_properties ^= PocketWeaponThrown;
+        item->weapon_properties ^= DndWeaponThrown;
         break;
     case 21:
-        item->weapon_properties ^= PocketWeaponAmmunition;
+        item->weapon_properties ^= DndWeaponAmmunition;
         break;
     case 22:
         item->add_ability_damage = !item->add_ability_damage;
@@ -2427,7 +2427,7 @@ static void
 static void dndinventory_collection_text_done(void* context) {
     DndInventoryCollectionApp* app = context;
     if(!app) return;
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(item) {
         if(app->edit == DndInventoryCollectionEditName)
             dndinventory_collection_copy(item->name, sizeof(item->name), app->edit_buffer);
@@ -2464,7 +2464,7 @@ static void dndinventory_collection_number_done(void* context, int32_t number) {
         dndinventory_collection_redraw(app);
         return;
     }
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(item) {
         switch(field) {
         case 2U:
@@ -2527,7 +2527,7 @@ static void dndinventory_collection_number_done(void* context, int32_t number) {
 
 static void dndinventory_collection_detail_ok(DndInventoryCollectionApp* app) {
     uint8_t field = app->detail_selection;
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(!item) return;
     if(field == 0U)
         dndinventory_collection_open_catalog(app);
@@ -2548,7 +2548,7 @@ static void dndinventory_collection_detail_ok(DndInventoryCollectionApp* app) {
 static void dndinventory_collection_detail_hold_ok(DndInventoryCollectionApp* app) {
     if(dndinventory_collection_begin_number(app, app->detail_selection)) return;
     if(app->detail_selection != 0U) return;
-    PocketItem* item = dndinventory_collection_item(app, app->record_index);
+    DndItem* item = dndinventory_collection_item(app, app->record_index);
     if(item)
         dndinventory_collection_begin_text(
             app, DndInventoryCollectionEditName, "Custom item", item->name);
@@ -2622,7 +2622,7 @@ static bool dndinventory_collection_input(InputEvent* event, void* context) {
             dndinventory_collection_selection_is_item(app, app->selection) &&
             (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             uint16_t logical = dndinventory_collection_selection_item(app->selection);
-            PocketItem* item = dndinventory_collection_item(app, logical);
+            DndItem* item = dndinventory_collection_item(app, logical);
             if(item) {
                 item->quantity = dndinventory_collection_clamp_i16(
                     (int32_t)item->quantity + (event->key == InputKeyRight ? 5 : -5), 0, 999);
@@ -2664,7 +2664,7 @@ static bool dndinventory_collection_input(InputEvent* event, void* context) {
             event->key == InputKeyOk && event->type == InputTypeLong &&
             dndinventory_collection_selection_is_item(app, app->selection)) {
             uint16_t logical = dndinventory_collection_selection_item(app->selection);
-            PocketItem* item = dndinventory_collection_item(app, logical);
+            DndItem* item = dndinventory_collection_item(app, logical);
             if(item) {
                 item->equipped = !item->equipped;
                 bool saved = dndinventory_collection_save_page(app);

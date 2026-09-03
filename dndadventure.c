@@ -85,8 +85,8 @@ typedef struct {
 
     uint16_t campaign_count;
     char campaign_rows[5][27];
-    PocketCampaignSummary active_campaign;
-    PocketCampaignProgress progress;
+    DndAdventureCampaignSummary active_campaign;
+    DndAdventureCampaignProgress progress;
     uint8_t active_campaign_valid;
     DndAdventureScene* scene;
     uint8_t adventure_started;
@@ -127,9 +127,9 @@ static int8_t
     int16_t total = dnd_rules_core_ability_modifier(character->ability_scores[ability]) +
                     character->skill_misc[skill];
     uint8_t pb = (uint8_t)(2U + (dndadventure_character_level(character) - 1U) / 4U);
-    if(character->skill_proficiency[skill] == PocketProficiencyProficient)
+    if(character->skill_proficiency[skill] == DndProficiencyProficient)
         total += pb;
-    else if(character->skill_proficiency[skill] == PocketProficiencyExpertise)
+    else if(character->skill_proficiency[skill] == DndProficiencyExpertise)
         total += pb * 2U;
     if(total < -128) total = -128;
     if(total > 127) total = 127;
@@ -295,7 +295,7 @@ static bool dndadventure_save_progress(DndAdventureApp* app) {
 static bool dndadventure_resolve_active(DndAdventureApp* app) {
     if(app->active_campaign_valid) return true;
     char active_id[DNDADVENTURE_CAMPAIGN_ID_LEN];
-    PocketCampaignSummary campaign;
+    DndAdventureCampaignSummary campaign;
     bool loaded = app->character_loaded &&
                   dndadventure_campaigns_active_load(
                       app->storage, app->profile, active_id, sizeof(active_id));
@@ -316,7 +316,7 @@ static bool dndadventure_resolve_active(DndAdventureApp* app) {
 }
 
 static bool dndadventure_select_campaign(DndAdventureApp* app, uint16_t index) {
-    PocketCampaignSummary next;
+    DndAdventureCampaignSummary next;
     if(!dndadventure_campaigns_at(app->storage, index, &next)) {
         dndadventure_set_status(app, "Campaign record invalid");
         return false;
@@ -435,7 +435,7 @@ static bool dndadventure_write_milestone_journal(DndAdventureApp* app, const cha
             "Milestone reached in %s. Use Continue active Adventure from this entry to resume.",
             app->active_campaign.name[0] ? app->active_campaign.name : "Adventure");
         bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
-                  dndadventure_writef(file, "PocketD20Journal=1\n") &&
+                  dndadventure_writef(file, "DNDJournal=1\n") &&
                   dndadventure_writef(file, "CharacterId=%lu\n", (unsigned long)app->profile) &&
                   dndadventure_journal_write_string(file, "Title", milestone) &&
                   dndadventure_journal_write_string(file, "Body", body) &&
@@ -606,7 +606,7 @@ static void dndadventure_prepare_campaign_rows(DndAdventureApp* app) {
         uint16_t index = app->scroll + visible;
         if(index >= rows) continue;
         if(index < app->campaign_count) {
-            PocketCampaignSummary campaign;
+            DndAdventureCampaignSummary campaign;
             if(dndadventure_campaigns_at(app->storage, index, &campaign)) {
                 const char* label = campaign.name[0] ? campaign.name : campaign.id;
                 snprintf(
@@ -820,13 +820,13 @@ static void
 
 static bool dndadventure_restart_current(DndAdventureApp* app) {
     if(!app || !app->active_campaign_valid || !app->character_loaded) return false;
-    PocketCampaignProgress restarted;
+    DndAdventureCampaignProgress restarted;
     memset(&restarted, 0, sizeof(restarted));
     dndadventure_copy(restarted.campaign, sizeof(restarted.campaign), app->active_campaign.id);
     dndadventure_copy(restarted.scene, sizeof(restarted.scene), app->active_campaign.entry_scene);
     dndadventure_copy(
         restarted.checkpoint, sizeof(restarted.checkpoint), app->active_campaign.entry_scene);
-    PocketCampaignProgress previous = app->progress;
+    DndAdventureCampaignProgress previous = app->progress;
     app->progress = restarted;
     if(!dndadventure_load_scene(app) || !dndadventure_save_progress(app)) {
         app->progress = previous;

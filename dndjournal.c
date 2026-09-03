@@ -1068,7 +1068,7 @@ static bool dndjournal_save_entry(JournalApp* app, JournalEntry* entry) {
     File* file = storage_file_alloc(app->storage);
     if(!file) return false;
     bool ok = storage_file_open(file, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
-              dndjournal_writef(file, "PocketD20Journal=1\n") &&
+              dndjournal_writef(file, "DNDJournal=1\n") &&
               dndjournal_writef(file, "CharacterId=%lu\n", (unsigned long)app->profile) &&
               dndjournal_write_string(file, "Title", entry->title) &&
               dndjournal_write_string(file, "Body", entry->body) &&

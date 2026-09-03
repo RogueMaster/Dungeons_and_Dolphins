@@ -34,12 +34,12 @@ typedef struct {
 } PackReader;
 
 typedef struct {
-    PocketPackSummary summary;
+    DndBestiaryPackSummary summary;
 } PackRecord;
 
 typedef struct {
-    char id[POCKET_PACK_ID_LEN];
-    char name[POCKET_PACK_NAME_LEN];
+    char id[DND_PACK_ID_LEN];
+    char name[DND_PACK_NAME_LEN];
 } PackManifest;
 
 static PackRecord* dndbestiary_packs_records_alloc(void) {
@@ -198,7 +198,7 @@ static bool
     if(!file) return false;
     bool ok = storage_file_open(file, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     char line[PACK_LINE_LEN];
-    int length = snprintf(line, sizeof(line), "# PocketPackRegistry=%u\n", PACK_VERSION);
+    int length = snprintf(line, sizeof(line), "# DNDBestiaryPackRegistry=%u\n", PACK_VERSION);
     if(ok && length > 0 && (size_t)length < sizeof(line)) {
         ok = storage_file_write(file, line, (size_t)length) == (size_t)length;
     } else {
@@ -495,7 +495,7 @@ uint16_t dndbestiary_packs_count(Storage* storage) {
     return valid ? count : 0U;
 }
 
-bool dndbestiary_packs_at(Storage* storage, uint16_t index, PocketPackSummary* output) {
+bool dndbestiary_packs_at(Storage* storage, uint16_t index, DndBestiaryPackSummary* output) {
     if(!output) return false;
     PackRecord* records = dndbestiary_packs_records_alloc();
     if(!records) return false;
@@ -520,7 +520,7 @@ static bool dndbestiary_packs_read_manifest(Storage* storage, PackManifest* outp
         char* value = strchr(line, '=');
         if(!value) continue;
         *value++ = '\0';
-        if(!strcmp(line, "PocketPack")) {
+        if(!strcmp(line, "DNDPack") || !strcmp(line, "PocketPack")) {
             /* Version is informational; recognized manifest fields remain usable. */
         } else if(!strcmp(line, "Id"))
             dndbestiary_packs_copy(output->id, sizeof(output->id), value);
@@ -583,7 +583,7 @@ static bool dndbestiary_packs_unique_record_ids(Storage* storage, const char* ne
     enum {
         PackMaximumIds = 96U
     };
-    char(*ids)[POCKET_PACK_ID_LEN] = calloc(PackMaximumIds, POCKET_PACK_ID_LEN);
+    char(*ids)[DND_PACK_ID_LEN] = calloc(PackMaximumIds, DND_PACK_ID_LEN);
     if(!ids) return false;
     const char* packaged = MONSTER_PACKAGED_INDEX;
     const char* custom = MONSTER_CUSTOM_INDEX;
@@ -614,7 +614,7 @@ static bool dndbestiary_packs_unique_record_ids(Storage* storage, const char* ne
                 ok = false;
                 break;
             }
-        if(ok) dndbestiary_packs_copy(ids[count++], POCKET_PACK_ID_LEN, line);
+        if(ok) dndbestiary_packs_copy(ids[count++], DND_PACK_ID_LEN, line);
     }
     storage_file_close(file);
     storage_file_free(file);

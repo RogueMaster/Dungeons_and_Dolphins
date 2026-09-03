@@ -1,15 +1,15 @@
 #include "dndolphins_weapon_combat.h"
 
-PocketAttackRoll dndolphins_weapon_combat_roll_attack(
-    const PocketCharacter* character,
-    const PocketItem* item,
-    PocketRollMode mode) {
-    PocketAttackRoll result = {0};
+DndAttackRoll dndolphins_weapon_combat_roll_attack(
+    const DndCharacter* character,
+    const DndItem* item,
+    DndRollMode mode) {
+    DndAttackRoll result = {0};
     result.first_die = dnd_rules_core_roll_die(20U);
     result.natural_roll = result.first_die;
-    if(mode == PocketRollAdvantage || mode == PocketRollDisadvantage) {
+    if(mode == DndRollAdvantage || mode == DndRollDisadvantage) {
         result.second_die = dnd_rules_core_roll_die(20U);
-        if(mode == PocketRollAdvantage) {
+        if(mode == DndRollAdvantage) {
             if(result.second_die > result.natural_roll) result.natural_roll = result.second_die;
         } else if(result.second_die < result.natural_roll) {
             result.natural_roll = result.second_die;
@@ -22,11 +22,11 @@ PocketAttackRoll dndolphins_weapon_combat_roll_attack(
     return result;
 }
 
-PocketDamageRoll dndolphins_weapon_combat_roll_damage(
-    const PocketCharacter* character,
-    const PocketItem* item,
+DndDamageRoll dndolphins_weapon_combat_roll_damage(
+    const DndCharacter* character,
+    const DndItem* item,
     bool critical) {
-    PocketDamageRoll result = {0};
+    DndDamageRoll result = {0};
     uint8_t multiplier = critical ? 2U : 1U;
     uint8_t die = item->damage_die;
     if(item->use_versatile && item->versatile_die >= 2U) die = item->versatile_die;
@@ -56,13 +56,13 @@ typedef struct {
     uint16_t start;
     uint16_t capacity;
     uint16_t count;
-} PocketD20WeaponIndexContext;
+} DndDolphinsWeaponIndexContext;
 
 static bool dndolphins_weapon_combat_index_visitor(
     uint16_t logical_index,
-    const PocketItem* item,
+    const DndItem* item,
     void* context) {
-    PocketD20WeaponIndexContext* scan = context;
+    DndDolphinsWeaponIndexContext* scan = context;
     if(item->is_weapon) {
         if(scan->count >= scan->start && scan->count - scan->start < scan->capacity)
             scan->indices[scan->count - scan->start] = logical_index;
@@ -80,7 +80,7 @@ bool dndolphins_weapon_combat_items_collect_weapon_indices(
     uint16_t* count,
     uint16_t* total_count) {
     if(!storage || !count || (capacity && !indices)) return false;
-    PocketD20WeaponIndexContext context = {
+    DndDolphinsWeaponIndexContext context = {
         .indices = indices,
         .start = start,
         .capacity = capacity,

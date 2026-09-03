@@ -19,7 +19,7 @@ typedef struct {
     char entry_scene[DND_SHORT_LEN];
     char scenes_file[DND_SHORT_LEN];
     uint8_t bundled;
-} PocketCampaignSummary;
+} DndAdventureCampaignSummary;
 
 typedef struct {
     char campaign[DNDADVENTURE_CAMPAIGN_ID_LEN];
@@ -27,7 +27,7 @@ typedef struct {
     char checkpoint[DND_SHORT_LEN];
     uint32_t quest_flags;
     uint32_t achievements;
-} PocketCampaignProgress;
+} DndAdventureCampaignProgress;
 
 typedef struct {
     uint16_t records;
@@ -39,14 +39,14 @@ typedef struct {
     uint16_t broken_links;
     char problem_id[DNDADVENTURE_CAMPAIGN_ID_LEN];
     char problem[48];
-} PocketCampaignDiagnostics;
+} DndAdventureCampaignDiagnostics;
 
 uint16_t dndadventure_campaigns_count(Storage* storage);
-bool dndadventure_campaigns_at(Storage* storage, uint16_t index, PocketCampaignSummary* output);
-bool dndadventure_campaigns_find(Storage* storage, const char* id, PocketCampaignSummary* output);
+bool dndadventure_campaigns_at(Storage* storage, uint16_t index, DndAdventureCampaignSummary* output);
+bool dndadventure_campaigns_find(Storage* storage, const char* id, DndAdventureCampaignSummary* output);
 bool dndadventure_campaigns_scene_path(
     Storage* storage,
-    const PocketCampaignSummary* campaign,
+    const DndAdventureCampaignSummary* campaign,
     char* output,
     size_t size);
 bool dndadventure_campaigns_active_load(
@@ -61,12 +61,12 @@ bool dndadventure_campaigns_active_save(
 bool dndadventure_campaigns_progress_load(
     Storage* storage,
     uint32_t profile_id,
-    const PocketCampaignSummary* campaign,
-    PocketCampaignProgress* progress);
+    const DndAdventureCampaignSummary* campaign,
+    DndAdventureCampaignProgress* progress);
 bool dndadventure_campaigns_progress_save(
     Storage* storage,
     uint32_t profile_id,
-    const PocketCampaignSummary* campaign,
-    const PocketCampaignProgress* progress);
-void dndadventure_campaigns_diagnose(Storage* storage, PocketCampaignDiagnostics* output);
+    const DndAdventureCampaignSummary* campaign,
+    const DndAdventureCampaignProgress* progress);
+void dndadventure_campaigns_diagnose(Storage* storage, DndAdventureCampaignDiagnostics* output);
 void dndadventure_campaigns_cache_reset(void);

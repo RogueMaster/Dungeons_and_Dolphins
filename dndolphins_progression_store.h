@@ -26,7 +26,7 @@ bool dndolphins_progression_store_features_find_name(
     Storage* storage,
     uint32_t profile,
     const char* name,
-    PocketFeature* feature_out,
+    DndFeature* feature_out,
     bool* found);
 bool dndolphins_progression_store_features_contains_name(
     Storage* storage,
@@ -37,13 +37,13 @@ bool dndolphins_progression_store_features_load_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count);
 bool dndolphins_progression_store_features_load_window_indexed(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_PROGRESS_PAGE_COUNT],
     uint8_t* valid_pages);
@@ -51,11 +51,11 @@ bool dndolphins_progression_store_features_save_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    const PocketCharacter* character);
+    const DndCharacter* character);
 bool dndolphins_progression_store_features_append(
     Storage* storage,
     uint32_t profile,
-    const PocketFeature* feature);
+    const DndFeature* feature);
 bool dndolphins_progression_store_features_delete(
     Storage* storage,
     uint32_t profile,
@@ -63,7 +63,7 @@ bool dndolphins_progression_store_features_delete(
 bool dndolphins_progression_store_features_recharge(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* character,
+    const DndCharacter* character,
     DndFeatureRechargeEvent event);
 bool dndolphins_progression_store_features_remap_classes(
     Storage* storage,

@@ -27,7 +27,7 @@ typedef struct {
 } CampaignPackReader;
 
 typedef struct {
-    PocketCampaignPackSummary summary;
+    DndAdventureCampaignPackSummary summary;
 } CampaignPackRecord;
 
 typedef struct {
@@ -173,7 +173,7 @@ static bool dndadventure_campaign_packs_write_registry(
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     bool ok = storage_file_open(file, CAMPAIGN_REGISTRY, FSAM_WRITE, FSOM_CREATE_ALWAYS);
-    static const char header[] = "# PocketCampaignRegistry=1\n# id|name|enabled\n";
+    static const char header[] = "# DNDAdventureCampaignRegistry=1\n# id|name|enabled\n";
     if(ok) ok = storage_file_write(file, header, sizeof(header) - 1U) == sizeof(header) - 1U;
     char line[128];
     for(uint16_t i = 0U; ok && i < count; ++i) {
@@ -273,7 +273,7 @@ static bool
         char* value = strchr(line, '=');
         if(!value) continue;
         *value++ = '\0';
-        if(!strcmp(line, "PocketPack")) {
+        if(!strcmp(line, "DNDPack") || !strcmp(line, "PocketPack")) {
             /* Version is informational; recognized manifest fields remain usable. */
         } else if(!strcmp(line, "Id")) {
             dndadventure_campaign_packs_copy(output->id, sizeof(output->id), value);
@@ -317,7 +317,7 @@ static bool dndadventure_campaign_packs_content_has_scene(Storage* storage, cons
 static bool dndadventure_campaign_packs_validate_index(
     Storage* storage,
     const char* pack_id,
-    PocketCampaignPackPreview* preview) {
+    DndAdventureCampaignPackPreview* preview) {
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     bool ok = storage_file_open(file, CAMPAIGN_INBOX_INDEX, FSAM_READ, FSOM_OPEN_EXISTING);
@@ -442,7 +442,7 @@ uint16_t dndadventure_campaign_packs_count(Storage* storage) {
 bool dndadventure_campaign_packs_at(
     Storage* storage,
     uint16_t index,
-    PocketCampaignPackSummary* output) {
+    DndAdventureCampaignPackSummary* output) {
     if(!output) return false;
     CampaignPackRecord* records = dndadventure_campaign_packs_records_alloc();
     if(!records) return false;
@@ -456,7 +456,7 @@ bool dndadventure_campaign_packs_at(
 
 bool dndadventure_campaign_packs_preview_inbox(
     Storage* storage,
-    PocketCampaignPackPreview* output,
+    DndAdventureCampaignPackPreview* output,
     char* status,
     size_t status_size) {
     if(output) memset(output, 0, sizeof(*output));
@@ -465,7 +465,7 @@ bool dndadventure_campaign_packs_preview_inbox(
         dndadventure_campaign_packs_status(status, status_size, "Inbox manifest invalid");
         return false;
     }
-    PocketCampaignPackPreview preview;
+    DndAdventureCampaignPackPreview preview;
     memset(&preview, 0, sizeof(preview));
     dndadventure_campaign_packs_copy(preview.summary.id, sizeof(preview.summary.id), manifest.id);
     dndadventure_campaign_packs_copy(
@@ -502,7 +502,7 @@ bool dndadventure_campaign_packs_preview_inbox(
 
 bool dndadventure_campaign_packs_install_inbox(Storage* storage, char* status, size_t status_size) {
     CampaignPackManifest manifest;
-    PocketCampaignPackPreview preview;
+    DndAdventureCampaignPackPreview preview;
     memset(&preview, 0, sizeof(preview));
     if(!dndadventure_campaign_packs_read_manifest(storage, &manifest) ||
        !dndadventure_campaign_packs_validate_index(storage, manifest.id, &preview) ||

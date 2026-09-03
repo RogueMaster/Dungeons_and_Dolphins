@@ -37,7 +37,7 @@ The release gate enumerates all **44 files** under the five packed asset roots (
 
 ## Item catalog metadata
 
-Bundled Item rows use `Name|Category|Rarity|Source`. Category and Rarity drive Inventory filters/presentation; Source records provenance. Owned `PocketItem` records do not currently contain a GP cost/value field. Do not encode prices into Source, Detail, weight or another unrelated field.
+Bundled Item rows use `Name|Category|Rarity|Source`. Category and Rarity drive Inventory filters/presentation; Source records provenance. Owned `DndItem` records do not currently contain a GP cost/value field. Do not encode prices into Source, Detail, weight or another unrelated field.
 
 The bundled Scroll category contains one generic Spell Scroll row for Cantrip and for each spell level 1 through 9. Scroll rarity follows the standard level progression. Per-spell Scroll rows are not bundled.
 

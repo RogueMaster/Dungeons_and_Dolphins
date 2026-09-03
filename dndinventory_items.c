@@ -64,7 +64,7 @@ bool dndinventory_items_initialize_inventory(
     DndSettings settings;
     if(!dnd_settings_load(storage, &settings)) return false;
 
-    PocketCharacter* owner = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* owner = calloc(1U, sizeof(DndCharacter));
     if(!owner) return false;
     strncpy(owner->name, character->name, sizeof(owner->name) - 1U);
     owner->class_count = character->class_count;
@@ -76,7 +76,7 @@ bool dndinventory_items_initialize_inventory(
     owner->currency_gp = character->currency_gp;
     owner->currency_pp = character->currency_pp;
 
-    PocketD20ItemSeedAsset assets[3] = {
+    DndDolphinsItemSeedAsset assets[3] = {
         {.path = dndinventory_items_catalog_asset(
              storage,
              &settings,
@@ -118,7 +118,7 @@ bool dndinventory_items_initialize_inventory(
         char trinket_key[4];
         uint8_t trinket_roll = dnd_rules_core_roll_die(100U);
         snprintf(trinket_key, sizeof(trinket_key), "%u", trinket_roll);
-        PocketD20ItemSeedAsset fallback = {
+        DndDolphinsItemSeedAsset fallback = {
             .path = dndinventory_items_catalog_asset(
                 storage, &settings, DNDINVENTORY_DEFAULT_TRINKETS, DNDINVENTORY_DEFAULT_TRINKETS_ALL),
             .match = trinket_key,
@@ -171,7 +171,7 @@ bool dndinventory_items_regrant_inventory_once(
     DndSettings settings;
     if(!dnd_settings_load(storage, &settings)) return false;
 
-    PocketCharacter* owner = calloc(1U, sizeof(PocketCharacter));
+    DndCharacter* owner = calloc(1U, sizeof(DndCharacter));
     if(!owner) return false;
     strncpy(owner->name, character->name, sizeof(owner->name) - 1U);
     owner->class_count = character->class_count;
@@ -183,7 +183,7 @@ bool dndinventory_items_regrant_inventory_once(
     owner->currency_gp = character->currency_gp;
     owner->currency_pp = character->currency_pp;
 
-    PocketD20ItemSeedAsset assets[3] = {
+    DndDolphinsItemSeedAsset assets[3] = {
         {.path = dndinventory_items_catalog_asset(
              storage,
              &settings,
@@ -201,7 +201,7 @@ bool dndinventory_items_regrant_inventory_once(
     char trinket_key[4];
     uint8_t trinket_roll = dnd_rules_core_roll_die(100U);
     snprintf(trinket_key, sizeof(trinket_key), "%u", trinket_roll);
-    PocketD20ItemSeedAsset fallback = {
+    DndDolphinsItemSeedAsset fallback = {
         .path = dndinventory_items_catalog_asset(
             storage, &settings, DNDINVENTORY_DEFAULT_TRINKETS, DNDINVENTORY_DEFAULT_TRINKETS_ALL),
         .match = trinket_key,

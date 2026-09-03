@@ -67,7 +67,7 @@ static bool dnd_data_reserve_records(
     return dnd_data_resize_records_exact(records, capacity, next, maximum, record_size);
 }
 
-static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t next) {
+static bool dnd_data_resize_spell_storage(DndCharacter* character, uint8_t next) {
     if(next > DND_RESIDENT_RECORD_LIMIT) return false;
     if(next == character->spell_capacity) return true;
     if(next == 0U) {
@@ -87,8 +87,8 @@ static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t ne
     uint8_t count = character->spell_count;
     if(count > old_capacity) count = old_capacity;
     if(count > next) count = next;
-    const size_t old_spell_bytes = (size_t)old_capacity * sizeof(PocketSpell);
-    const size_t new_spell_bytes = (size_t)next * sizeof(PocketSpell);
+    const size_t old_spell_bytes = (size_t)old_capacity * sizeof(DndSpell);
+    const size_t new_spell_bytes = (size_t)next * sizeof(DndSpell);
     const size_t new_bytes = new_spell_bytes + (size_t)next * 4U;
     uint8_t* storage = character->spell_storage;
 
@@ -135,14 +135,14 @@ static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t ne
         }
     }
 
-    PocketSpell* spells = (PocketSpell*)storage;
+    DndSpell* spells = (DndSpell*)storage;
     uint8_t* known = storage + new_spell_bytes;
     uint8_t* always_prepared = known + next;
     uint8_t* free_current = always_prepared + next;
     uint8_t* free_max = free_current + next;
 
     if(next > count) {
-        memset(&spells[count], 0, (size_t)(next - count) * sizeof(PocketSpell));
+        memset(&spells[count], 0, (size_t)(next - count) * sizeof(DndSpell));
         memset(known + count, 0, next - count);
         memset(always_prepared + count, 0, next - count);
         memset(free_current + count, 0, next - count);
@@ -160,7 +160,7 @@ static bool dnd_data_resize_spell_storage(PocketCharacter* character, uint8_t ne
     return true;
 }
 
-bool dnd_data_reserve_spells(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_spells(DndCharacter* character, uint8_t required) {
     if(required <= character->spell_capacity) return true;
     if(required > DND_RESIDENT_RECORD_LIMIT) return false;
     uint8_t next = dnd_data_next_capacity(
@@ -168,68 +168,68 @@ bool dnd_data_reserve_spells(PocketCharacter* character, uint8_t required) {
     return dnd_data_resize_spell_storage(character, next);
 }
 
-void dnd_data_clear_spells(PocketCharacter* character) {
+void dnd_data_clear_spells(DndCharacter* character) {
     if(!character) return;
     dnd_data_resize_spell_storage(character, 0U);
 }
 
-bool dnd_data_reserve_features(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_features(DndCharacter* character, uint8_t required) {
     return dnd_data_reserve_records(
         (void**)&character->features,
         &character->feature_capacity,
         required,
         DND_RESIDENT_RECORD_LIMIT,
-        sizeof(PocketFeature));
+        sizeof(DndFeature));
 }
 
-bool dnd_data_reserve_features_exact(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_features_exact(DndCharacter* character, uint8_t required) {
     return dnd_data_resize_records_exact(
         (void**)&character->features,
         &character->feature_capacity,
         required,
         DND_RESIDENT_RECORD_LIMIT,
-        sizeof(PocketFeature));
+        sizeof(DndFeature));
 }
 
-bool dnd_data_reserve_items(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_items(DndCharacter* character, uint8_t required) {
     return dnd_data_reserve_records(
         (void**)&character->items,
         &character->item_capacity,
         required,
         DND_RESIDENT_RECORD_LIMIT,
-        sizeof(PocketItem));
+        sizeof(DndItem));
 }
 
-void dnd_data_clear_items(PocketCharacter* character) {
+void dnd_data_clear_items(DndCharacter* character) {
     if(!character) return;
     dnd_data_resize_records_exact(
         (void**)&character->items,
         &character->item_capacity,
         0U,
         DND_RESIDENT_RECORD_LIMIT,
-        sizeof(PocketItem));
+        sizeof(DndItem));
     character->item_count = 0U;
 }
 
-bool dnd_data_reserve_grants(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_grants(DndCharacter* character, uint8_t required) {
     return dnd_data_reserve_records(
         (void**)&character->grants,
         &character->grant_capacity,
         required,
         DND_MAX_GRANTS,
-        sizeof(PocketGrant));
+        sizeof(DndGrant));
 }
 
-bool dnd_data_reserve_grants_exact(PocketCharacter* character, uint8_t required) {
+bool dnd_data_reserve_grants_exact(DndCharacter* character, uint8_t required) {
     return dnd_data_resize_records_exact(
         (void**)&character->grants,
         &character->grant_capacity,
         required,
         DND_MAX_GRANTS,
-        sizeof(PocketGrant));
+        sizeof(DndGrant));
 }
 
-void dnd_data_clear(PocketSaveData* data) {
+void dnd_data_clear(DndSaveData* data) {
     if(!data) return;
     free(data->character.spell_storage);
     free(data->character.features);
@@ -238,9 +238,9 @@ void dnd_data_clear(PocketSaveData* data) {
     memset(data, 0, sizeof(*data));
 }
 
-void dnd_data_set_defaults(PocketSaveData* data) {
+void dnd_data_set_defaults(DndSaveData* data) {
     memset(data, 0, sizeof(*data));
-    PocketCharacter* character = &data->character;
+    DndCharacter* character = &data->character;
 
     dnd_data_copy(character->name, sizeof(character->name), "New Hero");
     dnd_data_copy(character->player, sizeof(character->player), "Player");
@@ -248,7 +248,7 @@ void dnd_data_set_defaults(PocketSaveData* data) {
     dnd_data_copy(character->background, sizeof(character->background), "Adventurer");
     dnd_data_copy(character->alignment, sizeof(character->alignment), "True Neutral");
     dnd_data_copy(character->origin_feat, sizeof(character->origin_feat), "None");
-    character->size = PocketSizeMedium;
+    character->size = DndSizeMedium;
     dnd_data_copy(character->senses, sizeof(character->senses), "Normal vision");
     dnd_data_copy(character->movement_modes, sizeof(character->movement_modes), "Walk 30 ft");
     character->reaction_available = 1U;
@@ -260,18 +260,18 @@ void dnd_data_set_defaults(PocketSaveData* data) {
     character->classes[0].hit_die = 10U;
     character->classes[0].hit_dice_current = 1U;
     character->classes[0].hit_dice_max = 1U;
-    character->classes[0].spellcasting_mode = PocketSpellcastingNone;
-    character->classes[0].spellcasting_ability = PocketAbilityIntelligence;
+    character->classes[0].spellcasting_mode = DndSpellcastingNone;
+    character->classes[0].spellcasting_ability = DndAbilityIntelligence;
     character->milestone_leveling = 1U;
 
     /* New characters start from the standard array. Existing profiles are never
        rewritten because this path is used only for a freshly initialized save. */
-    character->ability_scores[PocketAbilityStrength] = 15;
-    character->ability_scores[PocketAbilityDexterity] = 14;
-    character->ability_scores[PocketAbilityConstitution] = 13;
-    character->ability_scores[PocketAbilityIntelligence] = 12;
-    character->ability_scores[PocketAbilityWisdom] = 10;
-    character->ability_scores[PocketAbilityCharisma] = 8;
+    character->ability_scores[DndAbilityStrength] = 15;
+    character->ability_scores[DndAbilityDexterity] = 14;
+    character->ability_scores[DndAbilityConstitution] = 13;
+    character->ability_scores[DndAbilityIntelligence] = 12;
+    character->ability_scores[DndAbilityWisdom] = 10;
+    character->ability_scores[DndAbilityCharisma] = 8;
     character->hp_current = 10;
     character->hp_max = 10;
     character->armor_class = 10;
@@ -279,34 +279,34 @@ void dnd_data_set_defaults(PocketSaveData* data) {
     character->hit_die = 10U;
     character->hit_dice_current = 1U;
     character->hit_dice_max = 1U;
-    character->spellcasting_ability = PocketAbilityIntelligence;
+    character->spellcasting_ability = DndAbilityIntelligence;
     /* Saving-throw proficiencies are class grants. Fresh characters leave them
        unset until Grant Initial Traits presents each proficiency for approval. */
 
     character->attack_template_count = 3U;
-    PocketAttackTemplate* unarmed = &character->attack_templates[0];
+    DndAttackTemplate* unarmed = &character->attack_templates[0];
     dnd_data_copy(unarmed->name, sizeof(unarmed->name), "Unarmed Strike");
     dnd_data_copy(unarmed->damage_type, sizeof(unarmed->damage_type), "Bludgeoning");
-    unarmed->type = PocketAttackTemplateUnarmed;
-    unarmed->ability = PocketAbilityStrength;
+    unarmed->type = DndAttackTemplateUnarmed;
+    unarmed->ability = DndAbilityStrength;
     unarmed->damage_dice = 1U;
     unarmed->damage_die = 1U;
-    PocketAttackTemplate* spell_attack = &character->attack_templates[1];
+    DndAttackTemplate* spell_attack = &character->attack_templates[1];
     dnd_data_copy(spell_attack->name, sizeof(spell_attack->name), "Spell Attack");
-    spell_attack->type = PocketAttackTemplateSpellAttack;
-    spell_attack->ability = PocketAbilityIntelligence;
+    spell_attack->type = DndAttackTemplateSpellAttack;
+    spell_attack->ability = DndAbilityIntelligence;
     spell_attack->damage_dice = 1U;
     spell_attack->damage_die = 10U;
-    PocketAttackTemplate* saving_throw = &character->attack_templates[2];
+    DndAttackTemplate* saving_throw = &character->attack_templates[2];
     dnd_data_copy(saving_throw->name, sizeof(saving_throw->name), "Saving Throw Action");
-    saving_throw->type = PocketAttackTemplateSavingThrow;
-    saving_throw->save_ability = PocketAbilityDexterity;
+    saving_throw->type = DndAttackTemplateSavingThrow;
+    saving_throw->save_ability = DndAbilityDexterity;
     saving_throw->damage_dice = 1U;
     saving_throw->damage_die = 6U;
 }
 
-void dnd_data_sanitize(PocketSaveData* data) {
-    PocketCharacter* character = &data->character;
+void dnd_data_sanitize(DndSaveData* data) {
+    DndCharacter* character = &data->character;
     character->name[sizeof(character->name) - 1U] = '\0';
     character->player[sizeof(character->player) - 1U] = '\0';
     character->species[sizeof(character->species) - 1U] = '\0';
@@ -316,12 +316,12 @@ void dnd_data_sanitize(PocketSaveData* data) {
         dnd_data_copy(character->alignment, sizeof(character->alignment), "True Neutral");
     character->origin_feat[sizeof(character->origin_feat) - 1U] = '\0';
     character->senses[sizeof(character->senses) - 1U] = '\0';
-    character->size = dnd_data_clamp_u8(character->size, PocketSizeCount - 1U);
+    character->size = dnd_data_clamp_u8(character->size, DndSizeCount - 1U);
 
     character->class_count = dnd_data_clamp_u8(character->class_count, DND_MAX_CLASSES);
     if(character->class_count == 0U) character->class_count = 1U;
     for(uint8_t i = 0U; i < DND_MAX_CLASSES; ++i) {
-        PocketClassLevel* class_level = &character->classes[i];
+        DndClassLevel* class_level = &character->classes[i];
         class_level->name[sizeof(class_level->name) - 1U] = '\0';
         class_level->subclass[sizeof(class_level->subclass) - 1U] = '\0';
         class_level->level = dnd_data_clamp_u8(class_level->level, 20U);
@@ -332,9 +332,9 @@ void dnd_data_sanitize(PocketSaveData* data) {
         class_level->hit_dice_current =
             dnd_data_clamp_u8(class_level->hit_dice_current, class_level->hit_dice_max);
         class_level->spellcasting_mode =
-            dnd_data_clamp_u8(class_level->spellcasting_mode, PocketSpellcastingModeCount - 1U);
+            dnd_data_clamp_u8(class_level->spellcasting_mode, DndSpellcastingModeCount - 1U);
         class_level->spellcasting_ability =
-            dnd_data_clamp_u8(class_level->spellcasting_ability, PocketAbilityCharisma);
+            dnd_data_clamp_u8(class_level->spellcasting_ability, DndAbilityCharisma);
         class_level->cantrip_limit = dnd_data_clamp_u8(class_level->cantrip_limit, 30U);
         class_level->prepared_limit = dnd_data_clamp_u8(class_level->prepared_limit, 50U);
         class_level->pact_slot_level = dnd_data_clamp_u8(class_level->pact_slot_level, 5U);
@@ -345,13 +345,13 @@ void dnd_data_sanitize(PocketSaveData* data) {
         character->ability_scores[i] =
             (int8_t)dnd_data_clamp_i16(character->ability_scores[i], 1, 30);
         character->saving_throw_proficiency[i] =
-            dnd_data_clamp_u8(character->saving_throw_proficiency[i], PocketProficiencyProficient);
+            dnd_data_clamp_u8(character->saving_throw_proficiency[i], DndProficiencyProficient);
         character->saving_throw_misc[i] =
             (int8_t)dnd_data_clamp_i16(character->saving_throw_misc[i], -20, 20);
     }
     for(uint8_t i = 0U; i < DND_SKILL_COUNT; ++i) {
         character->skill_proficiency[i] =
-            dnd_data_clamp_u8(character->skill_proficiency[i], PocketProficiencyExpertise);
+            dnd_data_clamp_u8(character->skill_proficiency[i], DndProficiencyExpertise);
         character->skill_misc[i] = (int8_t)dnd_data_clamp_i16(character->skill_misc[i], -20, 20);
     }
 
@@ -368,7 +368,7 @@ void dnd_data_sanitize(PocketSaveData* data) {
        character->hit_die != 12U)
         character->hit_die = 8U;
     character->spellcasting_ability =
-        dnd_data_clamp_u8(character->spellcasting_ability, PocketAbilityCharisma);
+        dnd_data_clamp_u8(character->spellcasting_ability, DndAbilityCharisma);
     character->spell_attack_misc =
         (int8_t)dnd_data_clamp_i16(character->spell_attack_misc, -20, 20);
     character->spell_save_misc = (int8_t)dnd_data_clamp_i16(character->spell_save_misc, -20, 20);
@@ -419,7 +419,7 @@ void dnd_data_sanitize(PocketSaveData* data) {
         character->spells[i].school[DND_SHORT_LEN - 1U] = '\0';
         character->spells[i].grant_name[DND_SHORT_LEN - 1U] = '\0';
         character->spells[i].grant_source =
-            dnd_data_clamp_u8(character->spells[i].grant_source, PocketGrantSourceCount - 1U);
+            dnd_data_clamp_u8(character->spells[i].grant_source, DndGrantSourceCount - 1U);
         character->spell_known[i] = character->spell_known[i] ? 1U : 0U;
         character->spell_always_prepared[i] = character->spell_always_prepared[i] ? 1U : 0U;
         character->spell_free_casts_max[i] =
@@ -435,18 +435,18 @@ void dnd_data_sanitize(PocketSaveData* data) {
         character->features[i].class_level_gained =
             dnd_data_clamp_u8(character->features[i].class_level_gained, 20U);
         character->features[i].recharge =
-            dnd_data_clamp_u8(character->features[i].recharge, PocketRechargeCount - 1U);
+            dnd_data_clamp_u8(character->features[i].recharge, DndRechargeCount - 1U);
         character->features[i].resource_formula = dnd_data_clamp_u8(
-            character->features[i].resource_formula, PocketResourceFormulaCount - 1U);
+            character->features[i].resource_formula, DndResourceFormulaCount - 1U);
         character->features[i].resource_ability =
-            dnd_data_clamp_u8(character->features[i].resource_ability, PocketAbilityCharisma);
+            dnd_data_clamp_u8(character->features[i].resource_ability, DndAbilityCharisma);
     }
     for(uint8_t i = 0U; i < character->item_count; ++i) {
-        PocketItem* item = &character->items[i];
+        DndItem* item = &character->items[i];
         item->name[DND_ITEM_NAME_LEN - 1U] = '\0';
         item->detail[DND_DETAIL_LEN - 1U] = '\0';
-        item->attack_ability = dnd_data_clamp_u8(item->attack_ability, PocketAttackAbilityBest);
-        item->damage_type = dnd_data_clamp_u8(item->damage_type, PocketDamageTypeCount - 1U);
+        item->attack_ability = dnd_data_clamp_u8(item->attack_ability, DndAttackAbilityBest);
+        item->damage_type = dnd_data_clamp_u8(item->damage_type, DndDamageTypeCount - 1U);
         item->damage_dice = dnd_data_clamp_u8(item->damage_dice, 20U);
         item->extra_dice = dnd_data_clamp_u8(item->extra_dice, 20U);
         if(item->container_index < -1 || item->container_index >= UINT16_MAX)
@@ -465,30 +465,30 @@ void dnd_data_sanitize(PocketSaveData* data) {
     character->movement_modes[DND_DETAIL_LEN - 1U] = '\0';
     character->reaction_available = character->reaction_available ? 1U : 0U;
     for(uint8_t i = 0U; i < character->grant_count; ++i) {
-        PocketGrant* grant = &character->grants[i];
+        DndGrant* grant = &character->grants[i];
         grant->stable_id[DND_SHORT_LEN - 1U] = '\0';
         grant->source[DND_SHORT_LEN - 1U] = '\0';
         grant->option_name[DND_NAME_LEN - 1U] = '\0';
         grant->prerequisites[DND_NAME_LEN - 1U] = '\0';
         grant->grant_value[DND_NAME_LEN - 1U] = '\0';
-        grant->source_type = dnd_data_clamp_u8(grant->source_type, PocketGrantSourceCount - 1U);
+        grant->source_type = dnd_data_clamp_u8(grant->source_type, DndGrantSourceCount - 1U);
         grant->class_index = dnd_data_clamp_u8(grant->class_index, DND_MAX_CLASSES - 1U);
         grant->level_gained = dnd_data_clamp_u8(grant->level_gained, 20U);
-        grant->status = dnd_data_clamp_u8(grant->status, PocketGrantSkipped);
+        grant->status = dnd_data_clamp_u8(grant->status, DndGrantSkipped);
     }
     character->attack_template_count =
         dnd_data_clamp_u8(character->attack_template_count, DND_MAX_ATTACK_TEMPLATES);
     for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
-        PocketAttackTemplate* attack = &character->attack_templates[i];
+        DndAttackTemplate* attack = &character->attack_templates[i];
         attack->name[DND_NAME_LEN - 1U] = '\0';
         attack->mastery[DND_SHORT_LEN - 1U] = '\0';
         attack->damage_type[DND_SHORT_LEN - 1U] = '\0';
         attack->rider_type[DND_SHORT_LEN - 1U] = '\0';
-        attack->type = dnd_data_clamp_u8(attack->type, PocketAttackTemplateTypeCount - 1U);
-        attack->ability = dnd_data_clamp_u8(attack->ability, PocketAbilityCharisma);
-        attack->save_ability = dnd_data_clamp_u8(attack->save_ability, PocketAbilityCharisma);
+        attack->type = dnd_data_clamp_u8(attack->type, DndAttackTemplateTypeCount - 1U);
+        attack->ability = dnd_data_clamp_u8(attack->ability, DndAbilityCharisma);
+        attack->save_ability = dnd_data_clamp_u8(attack->save_ability, DndAbilityCharisma);
         attack->damage_dice = dnd_data_clamp_u8(attack->damage_dice, 20U);
         attack->rider_dice = dnd_data_clamp_u8(attack->rider_dice, 20U);
-        attack->recharge = dnd_data_clamp_u8(attack->recharge, PocketRechargeCount - 1U);
+        attack->recharge = dnd_data_clamp_u8(attack->recharge, DndRechargeCount - 1U);
     }
 }

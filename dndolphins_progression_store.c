@@ -172,7 +172,7 @@ static void dndolphins_progression_store_decode(char* out, size_t size, const ch
     out[used] = '\0';
 }
 
-static bool dndolphins_progression_store_write_feature(File* file, const PocketFeature* feature) {
+static bool dndolphins_progression_store_write_feature(File* file, const DndFeature* feature) {
     /* Stream the two escaped strings instead of assembling an ~700-byte record
        plus two encoded copies on the stack. */
     char encoded[(DND_DETAIL_LEN * 3U) + 1U];
@@ -213,7 +213,7 @@ static bool dndolphins_progression_store_parse_i32(
     return true;
 }
 
-static bool dndolphins_progression_store_parse_feature(char* line, PocketFeature* feature) {
+static bool dndolphins_progression_store_parse_feature(char* line, DndFeature* feature) {
     if(!line || !feature || strncmp(line, "F|", 2U) != 0) return false;
     char* fields[9];
     char* cursor = line + 2U;
@@ -232,10 +232,10 @@ static bool dndolphins_progression_store_parse_feature(char* line, PocketFeature
            fields[4], 0, DND_MAX_CLASSES - 1U, &values[2]) ||
        !dndolphins_progression_store_parse_i32(fields[5], 0, 20, &values[3]) ||
        !dndolphins_progression_store_parse_i32(
-           fields[6], 0, PocketRechargeCount - 1U, &values[4]) ||
+           fields[6], 0, DndRechargeCount - 1U, &values[4]) ||
        !dndolphins_progression_store_parse_i32(
-           fields[7], 0, PocketResourceFormulaCount - 1U, &values[5]) ||
-       !dndolphins_progression_store_parse_i32(fields[8], 0, PocketAbilityCharisma, &values[6]))
+           fields[7], 0, DndResourceFormulaCount - 1U, &values[5]) ||
+       !dndolphins_progression_store_parse_i32(fields[8], 0, DndAbilityCharisma, &values[6]))
         return false;
     memset(feature, 0, sizeof(*feature));
     dndolphins_progression_store_decode(feature->name, sizeof(feature->name), fields[0]);
@@ -295,7 +295,7 @@ bool dndolphins_progression_store_features_exist(Storage* storage, uint32_t prof
 static bool dndolphins_progression_store_features_create(
     Storage* storage,
     uint32_t profile,
-    const PocketFeature* features,
+    const DndFeature* features,
     uint8_t count) {
     if(!storage || (count && !features)) return false;
     storage_common_mkdir(storage, DND_CHARACTER_DATA_ROOT);
@@ -334,7 +334,7 @@ bool dndolphins_progression_store_features_count(
     bool ok = true;
     while(dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature feature;
+        DndFeature feature;
         if(!dndolphins_progression_store_parse_feature(line, &feature)) {
             ok = false;
             break;
@@ -351,7 +351,7 @@ bool dndolphins_progression_store_features_find_name(
     Storage* storage,
     uint32_t profile,
     const char* name,
-    PocketFeature* feature_out,
+    DndFeature* feature_out,
     bool* found) {
     if(found) *found = false;
     if(feature_out) memset(feature_out, 0, sizeof(*feature_out));
@@ -370,7 +370,7 @@ bool dndolphins_progression_store_features_find_name(
     bool ok = true;
     while(dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature feature;
+        DndFeature feature;
         if(!dndolphins_progression_store_parse_feature(line, &feature)) {
             ok = false;
             break;
@@ -399,7 +399,7 @@ static bool dndolphins_progression_store_features_load_window_internal(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_PROGRESS_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -441,7 +441,7 @@ static bool dndolphins_progression_store_features_load_window_internal(
         }
     }
 
-    PocketFeature* page = NULL;
+    DndFeature* page = NULL;
     uint8_t page_count = 0U;
     uint16_t logical = direct ? start : 0U;
     const uint16_t window_end = start + DND_PROGRESS_CACHE_SIZE;
@@ -453,7 +453,7 @@ static bool dndolphins_progression_store_features_load_window_internal(
         uint32_t line_offset = reader.raw_offset;
         if(!dndolphins_progression_store_read_line(&reader, line, sizeof(line))) break;
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature feature;
+        DndFeature feature;
         if(!dndolphins_progression_store_parse_feature(line, &feature)) {
             ok = false;
             break;
@@ -467,7 +467,7 @@ static bool dndolphins_progression_store_features_load_window_internal(
         }
         if(logical >= start && logical < window_end) {
             if(!page) {
-                page = malloc(DND_PROGRESS_CACHE_SIZE * sizeof(PocketFeature));
+                page = malloc(DND_PROGRESS_CACHE_SIZE * sizeof(DndFeature));
                 if(!page) {
                     ok = false;
                     break;
@@ -500,7 +500,7 @@ bool dndolphins_progression_store_features_load_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count) {
     return dndolphins_progression_store_features_load_window_internal(
         storage, profile, start, character, total_count, NULL, NULL);
@@ -510,7 +510,7 @@ bool dndolphins_progression_store_features_load_window_indexed(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_PROGRESS_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -522,9 +522,9 @@ static bool dndolphins_progression_store_features_rewrite_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    const PocketCharacter* replacement,
+    const DndCharacter* replacement,
     int32_t delete_index,
-    const PocketFeature* append) {
+    const DndFeature* append) {
     char live[DND_PROGRESS_PATH_LEN], temp[DND_PROGRESS_PATH_LEN], backup[DND_PROGRESS_PATH_LEN];
     dndolphins_progression_store_feature_path(live, sizeof(live), profile);
     if(!storage_file_exists(storage, live)) return false;
@@ -550,7 +550,7 @@ static bool dndolphins_progression_store_features_rewrite_window(
     uint8_t replacement_written = 0U;
     while(ok && dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature parsed;
+        DndFeature parsed;
         if(!dndolphins_progression_store_parse_feature(line, &parsed)) {
             ok = false;
             break;
@@ -593,7 +593,7 @@ bool dndolphins_progression_store_features_save_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     if(!storage || !character || (character->feature_count && !character->features)) return false;
     char path[DND_PROGRESS_PATH_LEN];
     dndolphins_progression_store_feature_path(path, sizeof(path), profile);
@@ -609,7 +609,7 @@ bool dndolphins_progression_store_features_save_window(
 bool dndolphins_progression_store_features_append(
     Storage* storage,
     uint32_t profile,
-    const PocketFeature* feature) {
+    const DndFeature* feature) {
     if(!storage || !feature) return false;
     char path[DND_PROGRESS_PATH_LEN];
     dndolphins_progression_store_feature_path(path, sizeof(path), profile);
@@ -634,17 +634,17 @@ bool dndolphins_progression_store_features_delete(
 }
 
 static int16_t dndolphins_progression_store_feature_max_uses(
-    const PocketCharacter* character,
-    const PocketFeature* feature) {
+    const DndCharacter* character,
+    const DndFeature* feature) {
     if(!character) return feature->uses_max;
-    if(feature->resource_formula == PocketResourceProficiency) {
+    if(feature->resource_formula == DndResourceProficiency) {
         uint8_t level = 0U;
         for(uint8_t i = 0U; i < character->class_count && i < DND_MAX_CLASSES; ++i)
             level += character->classes[i].level;
         if(level < 1U) level = 1U;
         return (int16_t)(2U + ((level - 1U) / 4U));
     }
-    if(feature->resource_formula == PocketResourceAbility &&
+    if(feature->resource_formula == DndResourceAbility &&
        feature->resource_ability < DND_ABILITY_COUNT) {
         int16_t delta = (int16_t)character->ability_scores[feature->resource_ability] - 10;
         int16_t modifier = delta >= 0 ? delta / 2 : -(((-delta) + 1) / 2);
@@ -657,14 +657,14 @@ static bool
     dndolphins_progression_store_recharge_matches(uint8_t recharge, DndFeatureRechargeEvent event) {
     switch(event) {
     case DndFeatureRechargeTurn:
-        return recharge == PocketRechargeTurn;
+        return recharge == DndRechargeTurn;
     case DndFeatureRechargeEncounter:
-        return recharge == PocketRechargeEncounter;
+        return recharge == DndRechargeEncounter;
     case DndFeatureRechargeShortRest:
-        return recharge == PocketRechargeShortOrLong;
+        return recharge == DndRechargeShortOrLong;
     case DndFeatureRechargeLongRest:
-        return recharge != PocketRechargeManual && recharge != PocketRechargeTurn &&
-               recharge != PocketRechargeEncounter;
+        return recharge != DndRechargeManual && recharge != DndRechargeTurn &&
+               recharge != DndRechargeEncounter;
     default:
         return false;
     }
@@ -673,7 +673,7 @@ static bool
 bool dndolphins_progression_store_features_recharge(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* character,
+    const DndCharacter* character,
     DndFeatureRechargeEvent event) {
     if(!storage) return false;
     char live[DND_PROGRESS_PATH_LEN], temp[DND_PROGRESS_PATH_LEN], backup[DND_PROGRESS_PATH_LEN];
@@ -699,7 +699,7 @@ bool dndolphins_progression_store_features_recharge(
     char line[DND_PROGRESS_LINE_LEN];
     while(ok && dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature feature;
+        DndFeature feature;
         if(!dndolphins_progression_store_parse_feature(line, &feature)) {
             ok = false;
             break;
@@ -749,7 +749,7 @@ bool dndolphins_progression_store_features_remap_classes(
     char line[DND_PROGRESS_LINE_LEN];
     while(ok && dndolphins_progression_store_read_line(&reader, line, sizeof(line))) {
         if(!line[0] || line[0] == '#' || strncmp(line, "DNDFeatures=", 12U) == 0) continue;
-        PocketFeature feature;
+        DndFeature feature;
         if(!dndolphins_progression_store_parse_feature(line, &feature)) {
             ok = false;
             break;

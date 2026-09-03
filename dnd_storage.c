@@ -84,7 +84,7 @@ static bool dnd_storage_copy_file(
     const char* destination,
     const char* temporary);
 
-static uint8_t dnd_storage_character_level(const PocketCharacter* character) {
+static uint8_t dnd_storage_character_level(const DndCharacter* character) {
     uint16_t total = 0U;
     for(uint8_t i = 0U; i < character->class_count; ++i)
         total += character->classes[i].level;
@@ -117,7 +117,7 @@ static void dnd_storage_profile_path(
     char* output,
     size_t size,
     uint32_t profile,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     char safe_name[DND_CHARACTER_NAME_LEN];
     dnd_storage_filename_name(safe_name, sizeof(safe_name), character->name);
     snprintf(
@@ -232,19 +232,19 @@ typedef struct {
     uint16_t count;
     uint32_t raw_offset;
     bool eof;
-} PocketD20Reader;
+} DndDolphinsReader;
 
-static void dnd_storage_reader_init_at(PocketD20Reader* reader, File* file, uint32_t raw_offset) {
+static void dnd_storage_reader_init_at(DndDolphinsReader* reader, File* file, uint32_t raw_offset) {
     memset(reader, 0, sizeof(*reader));
     reader->file = file;
     reader->raw_offset = raw_offset;
 }
 
-static void dnd_storage_reader_init(PocketD20Reader* reader, File* file) {
+static void dnd_storage_reader_init(DndDolphinsReader* reader, File* file) {
     dnd_storage_reader_init_at(reader, file, 0U);
 }
 
-static bool dnd_storage_reader_next(PocketD20Reader* reader, char* value) {
+static bool dnd_storage_reader_next(DndDolphinsReader* reader, char* value) {
     if(reader->position >= reader->count) {
         reader->count =
             (uint16_t)storage_file_read(reader->file, reader->buffer, sizeof(reader->buffer));
@@ -259,7 +259,7 @@ static bool dnd_storage_reader_next(PocketD20Reader* reader, char* value) {
     return true;
 }
 
-static bool dnd_storage_read_line(PocketD20Reader* reader, char* line, size_t size) {
+static bool dnd_storage_read_line(DndDolphinsReader* reader, char* line, size_t size) {
     size_t position = 0U;
     char character = '\0';
     while(position + 1U < size) {
@@ -427,7 +427,7 @@ static void dnd_storage_collection_snapshot_path(
     char* output,
     size_t size,
     uint32_t profile,
-    const PocketCharacter* character,
+    const DndCharacter* character,
     const char* collection) {
     char safe_name[DND_CHARACTER_NAME_LEN];
     dnd_storage_filename_name(
@@ -527,7 +527,7 @@ static bool
 static File* dnd_storage_open_collection_snapshot(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     const char* collection,
     char* snapshot,
     size_t snapshot_size,
@@ -605,7 +605,7 @@ static bool dnd_storage_copy_live_collection_to_snapshot(
 
 static bool dnd_storage_write_spell_record(
     File* file,
-    const PocketSpell* spell,
+    const DndSpell* spell,
     uint8_t known,
     uint8_t always_prepared,
     uint8_t free_casts_current,
@@ -639,7 +639,7 @@ static bool dnd_storage_write_spell_record(
 
 static bool dnd_storage_parse_spell_record(
     char* line,
-    PocketSpell* spell,
+    DndSpell* spell,
     uint8_t* known,
     uint8_t* always_prepared,
     uint8_t* free_casts_current,
@@ -671,11 +671,11 @@ static bool dnd_storage_parse_spell_record(
     if(spell->class_index >= DND_MAX_CLASSES) spell->class_index = 0U;
     if(*free_casts_max > 20U) *free_casts_max = 20U;
     if(*free_casts_current > *free_casts_max) *free_casts_current = *free_casts_max;
-    if(spell->grant_source >= PocketGrantSourceCount) spell->grant_source = PocketGrantSpecies;
+    if(spell->grant_source >= DndGrantSourceCount) spell->grant_source = DndGrantSpecies;
     return true;
 }
 
-static bool dnd_storage_write_item_record(File* file, const PocketItem* item) {
+static bool dnd_storage_write_item_record(File* file, const DndItem* item) {
     if(!file || !item) return false;
     return dnd_storage_write_raw(file, "I|") &&
            dnd_storage_write_collection_field(file, item->name) &&
@@ -713,7 +713,7 @@ static bool dnd_storage_write_item_record(File* file, const PocketItem* item) {
                item->shield_bonus);
 }
 
-static bool dnd_storage_parse_item_record(char* line, PocketItem* item) {
+static bool dnd_storage_parse_item_record(char* line, DndItem* item) {
     if(!line || !item) return false;
     char* fields[5];
     uint8_t field_count = dnd_storage_split_collection_line(line, fields, 5U);
@@ -749,9 +749,9 @@ static bool dnd_storage_parse_item_record(char* line, PocketItem* item) {
     item->armor_base = (uint8_t)n[22];
     item->armor_dex_cap = (int8_t)n[23];
     item->shield_bonus = (uint8_t)n[24];
-    if(item->attack_ability > PocketAttackAbilityBest)
-        item->attack_ability = PocketAttackAbilityAuto;
-    if(item->damage_type >= PocketDamageTypeCount) item->damage_type = PocketDamageBludgeoning;
+    if(item->attack_ability > DndAttackAbilityBest)
+        item->attack_ability = DndAttackAbilityAuto;
+    if(item->damage_type >= DndDamageTypeCount) item->damage_type = DndDamageBludgeoning;
     if(item->damage_dice > 20U) item->damage_dice = 20U;
     if(item->extra_dice > 20U) item->extra_dice = 20U;
     if(item->container_index < -1) item->container_index = -1;
@@ -762,7 +762,7 @@ static bool dnd_storage_parse_item_record(char* line, PocketItem* item) {
 bool dnd_storage_visit_spells(
     Storage* storage,
     uint32_t profile,
-    PocketD20SpellRecordVisitor visitor,
+    DndDolphinsSpellRecordVisitor visitor,
     void* context,
     uint16_t* total_count) {
     if(!storage) return false;
@@ -782,13 +782,13 @@ bool dnd_storage_visit_spells(
         storage_file_free(file);
         return false;
     }
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, file);
     bool success = true;
     uint16_t logical = 0U;
     while(dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
         if(strncmp(line, "S|", 2U)) continue;
-        PocketSpell parsed;
+        DndSpell parsed;
         uint8_t known = 0U, always = 0U, free_current = 0U, free_max = 0U;
         if(!dnd_storage_parse_spell_record(
                line, &parsed, &known, &always, &free_current, &free_max))
@@ -812,7 +812,7 @@ static bool dnd_storage_load_spellbook_window_internal(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -858,7 +858,7 @@ static bool dnd_storage_load_spellbook_window_internal(
         storage_file_free(file);
         return false;
     }
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init_at(&reader, file, initial_offset);
     bool success = true;
     uint16_t logical = direct ? start : 0U;
@@ -867,7 +867,7 @@ static bool dnd_storage_load_spellbook_window_internal(
         uint32_t line_offset = reader.raw_offset;
         if(!dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) break;
         if(strncmp(line, "S|", 2U)) continue;
-        PocketSpell parsed;
+        DndSpell parsed;
         uint8_t known = 0U, always = 0U, free_current = 0U, free_max = 0U;
         if(!dnd_storage_parse_spell_record(
                line, &parsed, &known, &always, &free_current, &free_max))
@@ -910,7 +910,7 @@ bool dnd_storage_load_spellbook_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count) {
     return dnd_storage_load_spellbook_window_internal(
         storage, profile, start, character, total_count, NULL, NULL);
@@ -920,7 +920,7 @@ bool dnd_storage_load_spellbook_window_indexed(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -931,11 +931,11 @@ bool dnd_storage_load_spellbook_window_indexed(
 static bool dnd_storage_rewrite_spellbook(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     uint16_t replace_start,
-    const PocketCharacter* replacement,
+    const DndCharacter* replacement,
     int32_t delete_index,
-    const PocketSpell* append_spell,
+    const DndSpell* append_spell,
     uint8_t append_known,
     uint8_t append_always,
     uint8_t append_free_current,
@@ -958,7 +958,7 @@ static bool dnd_storage_rewrite_spellbook(
             if(!line) success = false;
         }
         if(success) {
-            PocketD20Reader reader;
+            DndDolphinsReader reader;
             dnd_storage_reader_init(&reader, input);
             while(success &&
                   dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
@@ -971,7 +971,7 @@ static bool dnd_storage_rewrite_spellbook(
                 /* Logical indexes are based only on valid records, exactly like the
                    page loader. Preserve malformed/manual lines without allowing them
                    to shift which later valid spell is edited or deleted. */
-                PocketSpell parsed;
+                DndSpell parsed;
                 uint8_t parsed_known = 0U, parsed_always = 0U;
                 uint8_t parsed_free_current = 0U, parsed_free_max = 0U;
                 if(!dnd_storage_parse_spell_record(
@@ -1054,7 +1054,7 @@ bool dnd_storage_save_spellbook_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     if(!storage || !character) return false;
     if(character->spell_count &&
        (!character->spells || !character->spell_known || !character->spell_always_prepared ||
@@ -1067,8 +1067,8 @@ bool dnd_storage_save_spellbook_window(
 bool dnd_storage_append_spell(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
-    const PocketSpell* spell,
+    const DndCharacter* owner,
+    const DndSpell* spell,
     uint8_t known,
     uint8_t always_prepared,
     uint8_t free_casts_current,
@@ -1096,7 +1096,7 @@ bool dnd_storage_append_spell(
 bool dnd_storage_delete_spell(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     uint16_t index) {
     if(!storage || !owner) return false;
     return dnd_storage_rewrite_spellbook(
@@ -1106,7 +1106,7 @@ bool dnd_storage_delete_spell(
 static bool dnd_storage_rewrite_spellbook_maintenance(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     bool reset_free_casts,
     bool remap_classes,
     uint8_t removed_class) {
@@ -1132,7 +1132,7 @@ static bool dnd_storage_rewrite_spellbook_maintenance(
         if(!line) success = false;
     }
     if(success) {
-        PocketD20Reader reader;
+        DndDolphinsReader reader;
         dnd_storage_reader_init(&reader, input);
         while(success && dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
             if(!strncmp(line, "DNDSpellbook=", 13U)) continue;
@@ -1141,7 +1141,7 @@ static bool dnd_storage_rewrite_spellbook_maintenance(
                           dnd_storage_write_raw(output, "\n");
                 continue;
             }
-            PocketSpell spell;
+            DndSpell spell;
             uint8_t known = 0U, always = 0U, free_current = 0U, free_max = 0U;
             if(!dnd_storage_parse_spell_record(
                    line, &spell, &known, &always, &free_current, &free_max)) {
@@ -1172,14 +1172,14 @@ static bool dnd_storage_rewrite_spellbook_maintenance(
 bool dnd_storage_reset_spell_free_casts(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner) {
+    const DndCharacter* owner) {
     return dnd_storage_rewrite_spellbook_maintenance(storage, profile, owner, true, false, 0U);
 }
 
 bool dnd_storage_remap_spell_classes(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     uint8_t removed_class) {
     return dnd_storage_rewrite_spellbook_maintenance(
         storage, profile, owner, false, true, removed_class);
@@ -1188,7 +1188,7 @@ bool dnd_storage_remap_spell_classes(
 bool dnd_storage_visit_items(
     Storage* storage,
     uint32_t profile,
-    PocketD20ItemRecordVisitor visitor,
+    DndDolphinsItemRecordVisitor visitor,
     void* context,
     uint16_t* total_count) {
     if(!storage) return false;
@@ -1208,13 +1208,13 @@ bool dnd_storage_visit_items(
         storage_file_free(file);
         return false;
     }
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, file);
     bool success = true;
     uint16_t logical = 0U;
     while(dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
         if(strncmp(line, "I|", 2U)) continue;
-        PocketItem parsed;
+        DndItem parsed;
         if(!dnd_storage_parse_item_record(line, &parsed)) continue;
         bool keep_scanning = true;
         if(visitor) keep_scanning = visitor(logical, &parsed, context);
@@ -1273,7 +1273,7 @@ bool dnd_storage_load_inventory_currency(
         return false;
     }
     char line[128];
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, file);
     bool success = true;
     while(dnd_storage_read_line(&reader, line, sizeof(line))) {
@@ -1304,7 +1304,7 @@ bool dnd_storage_inventory_initial_grant_state(Storage* storage, uint32_t profil
         return false;
     }
     char line[64];
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, file);
     bool success = true;
     while(dnd_storage_read_line(&reader, line, sizeof(line))) {
@@ -1357,7 +1357,7 @@ static bool dnd_storage_compose_item_asset(
         storage_file_free(input);
         return false;
     }
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, input);
     bool success = true;
     while(success && dnd_storage_read_line(&reader, line, DND_STORAGE_ITEM_SEED_LINE_LEN)) {
@@ -1373,7 +1373,7 @@ static bool dnd_storage_compose_item_asset(
             for(uint8_t i = 0U; i < 5U; ++i)
                 currency[i] = dnd_storage_add_currency_saturated(currency[i], values[i]);
         } else if(!strncmp(payload, "I|", 2U)) {
-            PocketItem item;
+            DndItem item;
             if(!dnd_storage_parse_item_record(payload, &item)) continue;
             success = dnd_storage_write_item_record(output, &item);
             if(success) ++(*item_count);
@@ -1389,8 +1389,8 @@ static bool dnd_storage_compose_item_asset(
 bool dnd_storage_create_items_from_assets(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
-    const PocketD20ItemSeedAsset* assets,
+    const DndCharacter* owner,
+    const DndDolphinsItemSeedAsset* assets,
     uint8_t asset_count,
     int32_t currency_total[5],
     bool* created) {
@@ -1437,10 +1437,10 @@ bool dnd_storage_create_items_from_assets(
 bool dnd_storage_regrant_items_from_assets(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
-    const PocketD20ItemSeedAsset* assets,
+    const DndCharacter* owner,
+    const DndDolphinsItemSeedAsset* assets,
     uint8_t asset_count,
-    const PocketD20ItemSeedAsset* fallback_asset,
+    const DndDolphinsItemSeedAsset* fallback_asset,
     int32_t currency_total[5],
     bool* applied) {
     if(currency_total) memset(currency_total, 0, 5U * sizeof(currency_total[0]));
@@ -1484,7 +1484,7 @@ bool dnd_storage_regrant_items_from_assets(
         if(!line) success = false;
     }
     if(success) {
-        PocketD20Reader reader;
+        DndDolphinsReader reader;
         dnd_storage_reader_init(&reader, input);
         while(success && dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
             if(!strncmp(line, "DNDItems=", 9U) || !strncmp(line, "Currency=", 9U) ||
@@ -1543,7 +1543,7 @@ static bool dnd_storage_load_items_window_internal(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -1589,7 +1589,7 @@ static bool dnd_storage_load_items_window_internal(
         storage_file_free(file);
         return false;
     }
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init_at(&reader, file, initial_offset);
     bool success = true;
     uint16_t logical = direct ? start : 0U;
@@ -1598,7 +1598,7 @@ static bool dnd_storage_load_items_window_internal(
         uint32_t line_offset = reader.raw_offset;
         if(!dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) break;
         if(strncmp(line, "I|", 2U)) continue;
-        PocketItem parsed;
+        DndItem parsed;
         if(!dnd_storage_parse_item_record(line, &parsed)) continue;
 
         if(!direct && indexed && (logical % DND_STORAGE_COLLECTION_CACHE_SIZE) == 0U) {
@@ -1633,7 +1633,7 @@ bool dnd_storage_load_items_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count) {
     return dnd_storage_load_items_window_internal(
         storage, profile, start, character, total_count, NULL, NULL);
@@ -1643,7 +1643,7 @@ bool dnd_storage_load_items_window_indexed(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    PocketCharacter* character,
+    DndCharacter* character,
     uint16_t* total_count,
     uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages) {
@@ -1654,11 +1654,11 @@ bool dnd_storage_load_items_window_indexed(
 static bool dnd_storage_rewrite_items(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     uint16_t replace_start,
-    const PocketCharacter* replacement,
+    const DndCharacter* replacement,
     int32_t delete_index,
-    const PocketItem* append_item) {
+    const DndItem* append_item) {
     if(!owner) return false;
     int32_t currency[5] = {0, 0, 0, 0, 0};
     bool currency_found = false;
@@ -1685,7 +1685,7 @@ static bool dnd_storage_rewrite_items(
             if(!line) success = false;
         }
         if(success) {
-            PocketD20Reader reader;
+            DndDolphinsReader reader;
             dnd_storage_reader_init(&reader, input);
             while(success &&
                   dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
@@ -1698,7 +1698,7 @@ static bool dnd_storage_rewrite_items(
                 }
                 /* Keep malformed/manual item lines, but do not count them as logical
                    records when locating a page replacement or delete target. */
-                PocketItem parsed;
+                DndItem parsed;
                 if(!dnd_storage_parse_item_record(line, &parsed)) {
                     success = dnd_storage_write_raw(output, line) &&
                               dnd_storage_write_raw(output, "\n");
@@ -1748,7 +1748,7 @@ bool dnd_storage_save_items_window(
     Storage* storage,
     uint32_t profile,
     uint16_t start,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     if(!storage || !character || (character->item_count && !character->items)) return false;
     return dnd_storage_rewrite_items(storage, profile, character, start, character, -1, NULL);
 }
@@ -1756,7 +1756,7 @@ bool dnd_storage_save_items_window(
 bool dnd_storage_save_inventory_currency(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     const int32_t currency[5]) {
     if(!storage || !owner || !currency) return false;
     char path[DND_FS_PATH_LEN], snapshot[DND_FS_PATH_LEN];
@@ -1776,7 +1776,7 @@ bool dnd_storage_save_inventory_currency(
             if(!line) success = false;
         }
         if(success) {
-            PocketD20Reader reader;
+            DndDolphinsReader reader;
             dnd_storage_reader_init(&reader, input);
             while(success &&
                   dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
@@ -1798,8 +1798,8 @@ bool dnd_storage_save_inventory_currency(
 bool dnd_storage_append_items(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
-    const PocketItem* item,
+    const DndCharacter* owner,
+    const DndItem* item,
     uint8_t count) {
     if(!storage || !owner || !item || !count) return false;
     if(!dnd_storage_ensure_items_sidecar(storage, profile)) return false;
@@ -1826,26 +1826,26 @@ bool dnd_storage_append_items(
 bool dnd_storage_append_item(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
-    const PocketItem* item) {
+    const DndCharacter* owner,
+    const DndItem* item) {
     return dnd_storage_append_items(storage, profile, owner, item, 1U);
 }
 
 bool dnd_storage_delete_item(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* owner,
+    const DndCharacter* owner,
     uint16_t index) {
     if(!storage || !owner) return false;
     return dnd_storage_rewrite_items(storage, profile, owner, 0U, NULL, index, NULL);
 }
 
-static bool dnd_storage_parse_profile_filename(const char* filename, PocketProfileEntry* entry);
+static bool dnd_storage_parse_profile_filename(const char* filename, DndProfileEntry* entry);
 
-static void dnd_storage_prepare_character_load(PocketSaveData* data) {
+static void dnd_storage_prepare_character_load(DndSaveData* data) {
     dnd_data_clear(data);
     dnd_data_set_defaults(data);
-    PocketCharacter* c = &data->character;
+    DndCharacter* c = &data->character;
     /* Spells, items, Features, and applied-grant history live outside the core
        character. Legacy embedded Feature/Grant rows are ignored by the parser
        and never allocated during profile load. */
@@ -1857,14 +1857,14 @@ static void dnd_storage_prepare_character_load(PocketSaveData* data) {
     c->grant_count = 0U;
 }
 
-static bool dnd_storage_write_character(File* file, const PocketSaveData* data) {
-    const PocketCharacter* c = &data->character;
+static bool dnd_storage_write_character(File* file, const DndSaveData* data) {
+    const DndCharacter* c = &data->character;
     /* Features and applied grants are lazy sidecars. Never serialize a resident
        feature page or transient grant-review batch into the core character. */
     const uint8_t feature_count = 0U;
     const uint8_t grant_count = 0U;
     char key[48];
-    if(!dnd_storage_writef(file, "PocketD20Character=%u\n", DND_STORAGE_TEXT_VERSION) ||
+    if(!dnd_storage_writef(file, "DNDolphinsCharacter=%u\n", DND_STORAGE_TEXT_VERSION) ||
        !dnd_storage_write_string(file, "Name", c->name) ||
        !dnd_storage_write_string(file, "Player", c->player) ||
        !dnd_storage_write_string(file, "Species", c->species) ||
@@ -1984,7 +1984,7 @@ static bool dnd_storage_write_character(File* file, const PocketSaveData* data) 
         return false;
 
     for(uint8_t i = 0U; i < grant_count; ++i) {
-        const PocketGrant* grant = &c->grants[i];
+        const DndGrant* grant = &c->grants[i];
         snprintf(key, sizeof(key), "Grant%uStableId", i);
         if(!dnd_storage_write_string(file, key, grant->stable_id)) return false;
         snprintf(key, sizeof(key), "Grant%uSource", i);
@@ -2009,7 +2009,7 @@ static bool dnd_storage_write_character(File* file, const PocketSaveData* data) 
     if(!dnd_storage_writef(file, "AttackTemplateCount=%u\n", c->attack_template_count))
         return false;
     for(uint8_t i = 0U; i < c->attack_template_count; ++i) {
-        const PocketAttackTemplate* attack = &c->attack_templates[i];
+        const DndAttackTemplate* attack = &c->attack_templates[i];
         snprintf(key, sizeof(key), "AttackTemplate%uName", i);
         if(!dnd_storage_write_string(file, key, attack->name)) return false;
         snprintf(key, sizeof(key), "AttackTemplate%uMastery", i);
@@ -2039,18 +2039,18 @@ static bool dnd_storage_write_character(File* file, const PocketSaveData* data) 
 
 static bool dnd_storage_read_character(
     File* file,
-    PocketSaveData* data,
-    const PocketProfileEntry* fallback_entry) {
+    DndSaveData* data,
+    const DndProfileEntry* fallback_entry) {
     if(!file || !data) return false;
     dnd_storage_prepare_character_load(data);
-    PocketCharacter* c = &data->character;
+    DndCharacter* c = &data->character;
     /* Filename name metadata is a safe fallback for partial/older character files.
        A missing/malformed Name must never turn an existing character into the
        synthetic New Hero default on the next save. The filename level is total
        character level, so it is applied only later when no class-level records
        were recovered and the character remains single-class. */
     if(fallback_entry) dnd_storage_copy(c->name, sizeof(c->name), fallback_entry->name);
-    PocketD20Reader reader;
+    DndDolphinsReader reader;
     dnd_storage_reader_init(&reader, file);
     char line[DND_STORAGE_ENCODED_LINE_LEN];
     int32_t n[32];
@@ -2070,7 +2070,9 @@ static bool dnd_storage_read_character(
 
         /* Version is intentionally informational. A mismatched or malformed version
            never rejects fields that this build still recognizes. */
-        if(!strcmp(key, "PocketD20Character") || !strcmp(key, "End")) continue;
+        if(!strcmp(key, "DNDolphinsCharacter") || !strcmp(key, "PocketD20Character") ||
+           !strcmp(key, "End"))
+            continue;
 
 #define LOAD_STRING(field, name)                                  \
     if(!strcmp(key, name)) {                                      \
@@ -2127,7 +2129,7 @@ static bool dnd_storage_read_character(
         }
         if(dnd_storage_indexed_key(key, "Class", "Data", DND_MAX_CLASSES, &index)) {
             size_t count = dnd_storage_parse_numbers(value, n, 16U);
-            PocketClassLevel* cl = &c->classes[index];
+            DndClassLevel* cl = &c->classes[index];
             if(count >= 1U) {
                 cl->level = (uint8_t)n[0];
                 class_level_seen = true;
@@ -2264,7 +2266,7 @@ static bool dnd_storage_read_character(
            dnd_storage_indexed_key(
                key, "AttackTemplate", "Data", DND_MAX_ATTACK_TEMPLATES, &index)) {
             if(c->attack_template_count <= index) c->attack_template_count = (uint8_t)(index + 1U);
-            PocketAttackTemplate* attack = &c->attack_templates[index];
+            DndAttackTemplate* attack = &c->attack_templates[index];
             if(dnd_storage_indexed_key(
                    key, "AttackTemplate", "Name", DND_MAX_ATTACK_TEMPLATES, &index))
                 dnd_storage_decode_string(attack->name, sizeof(attack->name), value);
@@ -2316,9 +2318,9 @@ static bool dnd_storage_read_character(
     return io_ok && recognized_data;
 }
 
-static bool dnd_storage_load_text_path(Storage* storage, const char* path, PocketSaveData* data) {
-    PocketProfileEntry fallback;
-    const PocketProfileEntry* fallback_entry = NULL;
+static bool dnd_storage_load_text_path(Storage* storage, const char* path, DndSaveData* data) {
+    DndProfileEntry fallback;
+    const DndProfileEntry* fallback_entry = NULL;
     const char* filename = strrchr(path, '/');
     filename = filename ? filename + 1U : path;
     if(dnd_storage_parse_profile_filename(filename, &fallback)) fallback_entry = &fallback;
@@ -2337,7 +2339,7 @@ static void dnd_storage_work_path(char* output, size_t size, uint32_t profile, c
         output, size, "%s/custom_%s_%lu.tmp", DND_STORAGE_DATA_DIR, kind, (unsigned long)profile);
 }
 
-static bool dnd_storage_parse_profile_filename(const char* filename, PocketProfileEntry* entry) {
+static bool dnd_storage_parse_profile_filename(const char* filename, DndProfileEntry* entry) {
     if(!filename || !entry) return false;
     size_t length = strlen(filename);
     if(length < 11U || strncmp(filename, "ch_", 3U) != 0 ||
@@ -2380,7 +2382,7 @@ bool dnd_storage_find_profile_path(Storage* storage, uint32_t profile, char* out
     char filename[128];
     bool found = false;
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(!file_info_is_dir(&info) && dnd_storage_parse_profile_filename(filename, &entry) &&
            entry.id == profile) {
             size_t prefix_length = strlen(DND_STORAGE_DATA_DIR);
@@ -2408,7 +2410,7 @@ static bool dnd_storage_character_shd_path(char* output, size_t size, const char
     return true;
 }
 
-static bool dnd_storage_parse_core_shd_filename(const char* filename, PocketProfileEntry* entry) {
+static bool dnd_storage_parse_core_shd_filename(const char* filename, DndProfileEntry* entry) {
     if(!filename || !entry) return false;
     size_t length = strlen(filename);
     if(length < 11U || strcmp(filename + length - 4U, ".shd") != 0) return false;
@@ -2438,7 +2440,7 @@ static bool dnd_storage_find_shd_path(
     char filename[128];
     bool found = false;
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(file_info_is_dir(&info) || !dnd_storage_parse_core_shd_filename(filename, &entry) ||
            entry.id != profile || entry.level != level)
             continue;
@@ -2471,7 +2473,7 @@ static void dnd_storage_remove_duplicate_core_shd(
         char filename[128];
         char stale[DND_FS_PATH_LEN] = {0};
         while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-            PocketProfileEntry entry;
+            DndProfileEntry entry;
             if(file_info_is_dir(&info) || !dnd_storage_parse_core_shd_filename(filename, &entry) ||
                entry.id != profile || entry.level != level)
                 continue;
@@ -2497,7 +2499,7 @@ static bool dnd_storage_refresh_character_shd(
     if(!storage || !dnd_storage_character_shd_path(shd_path, sizeof(shd_path), character_path))
         return false;
     if(!dnd_storage_copy_file_direct(storage, character_path, shd_path)) return false;
-    PocketProfileEntry entry;
+    DndProfileEntry entry;
     const char* filename = strrchr(shd_path, '/');
     filename = filename ? filename + 1U : shd_path;
     if(dnd_storage_parse_core_shd_filename(filename, &entry))
@@ -2532,7 +2534,7 @@ static void dnd_storage_level_sidecar_snapshot_path(
     char* output,
     size_t size,
     uint32_t profile,
-    const PocketCharacter* character,
+    const DndCharacter* character,
     const char* suffix) {
     dnd_storage_level_sidecar_snapshot_path_fields(
         output,
@@ -2590,7 +2592,7 @@ static bool dnd_storage_write_level_bundle_marker(
 static uint8_t dnd_storage_level_bundle_marker_version(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     if(!storage || !character) return false;
     char marker[DND_FS_PATH_LEN];
     if(!dnd_storage_level_bundle_marker_path_fields(
@@ -2645,7 +2647,7 @@ static bool dnd_storage_refresh_level_sidecars_fields(
 static bool dnd_storage_refresh_level_sidecars(
     Storage* storage,
     uint32_t profile,
-    const PocketCharacter* character) {
+    const DndCharacter* character) {
     if(!character) return false;
     return dnd_storage_refresh_level_sidecars_fields(
         storage, profile, character->name, dnd_storage_character_level(character));
@@ -2654,7 +2656,7 @@ static bool dnd_storage_refresh_level_sidecars(
 static bool dnd_storage_save_profile_internal(
     Storage* storage,
     uint32_t profile,
-    const PocketSaveData* data,
+    const DndSaveData* data,
     const char* known_old_path,
     bool update_history) {
     furi_assert(storage);
@@ -2679,7 +2681,7 @@ static bool dnd_storage_save_profile_internal(
         bool core_history_ok = dnd_storage_refresh_character_shd(storage, profile, old_path);
         const char* old_filename = strrchr(old_path, '/');
         old_filename = old_filename ? old_filename + 1U : old_path;
-        PocketProfileEntry old_entry;
+        DndProfileEntry old_entry;
         if(dnd_storage_parse_profile_filename(old_filename, &old_entry)) {
             dnd_storage_clear_level_bundle_marker(
                 storage, profile, old_entry.name, old_entry.level);
@@ -2731,21 +2733,21 @@ static bool dnd_storage_save_profile_internal(
     return true;
 }
 
-bool dnd_storage_save_profile(Storage* storage, uint32_t profile, const PocketSaveData* data) {
+bool dnd_storage_save_profile(Storage* storage, uint32_t profile, const DndSaveData* data) {
     return dnd_storage_save_profile_internal(storage, profile, data, NULL, false);
 }
 
 bool dnd_storage_save_profile_updated(
     Storage* storage,
     uint32_t profile,
-    const PocketSaveData* data) {
+    const DndSaveData* data) {
     return dnd_storage_save_profile_internal(storage, profile, data, NULL, true);
 }
 
 bool dnd_storage_save_profile_known_updated(
     Storage* storage,
-    const PocketProfileEntry* current_entry,
-    const PocketSaveData* data) {
+    const DndProfileEntry* current_entry,
+    const DndSaveData* data) {
     furi_assert(current_entry);
     char safe_name[DND_CHARACTER_NAME_LEN];
     char current_path[DND_FS_PATH_LEN];
@@ -2764,7 +2766,7 @@ bool dnd_storage_save_profile_known_updated(
 bool dnd_storage_load_profile(
     Storage* storage,
     uint32_t profile,
-    PocketSaveData* data,
+    DndSaveData* data,
     bool* recovered_backup) {
     furi_assert(storage);
     furi_assert(data);
@@ -2870,7 +2872,7 @@ bool dnd_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t d
         return false;
     const char* filename = strrchr(source_path, '/');
     filename = filename ? filename + 1U : source_path;
-    PocketProfileEntry entry;
+    DndProfileEntry entry;
     if(!dnd_storage_parse_profile_filename(filename, &entry)) return false;
     char safe_name[DND_CHARACTER_NAME_LEN];
     dnd_storage_filename_name(safe_name, sizeof(safe_name), entry.name);
@@ -2998,7 +3000,7 @@ bool dnd_storage_verify_profile(Storage* storage, uint32_t profile) {
        state is transient and must not consume nearly 4 KiB of the UI thread
        stack. Keep the save format and parser behavior unchanged while owning
        the temporary state on checked heap storage. */
-    PocketSaveData* parsed = calloc(1U, sizeof(PocketSaveData));
+    DndSaveData* parsed = calloc(1U, sizeof(DndSaveData));
     if(!parsed) return false;
     bool ok = dnd_storage_load_text_path(storage, path, parsed);
     dnd_data_clear(parsed);
@@ -3006,7 +3008,7 @@ bool dnd_storage_verify_profile(Storage* storage, uint32_t profile) {
     return ok;
 }
 
-bool dnd_storage_restore_backup(Storage* storage, uint32_t profile, PocketSaveData* data) {
+bool dnd_storage_restore_backup(Storage* storage, uint32_t profile, DndSaveData* data) {
     char backup_path[DND_FS_PATH_LEN];
     char primary_path[DND_FS_PATH_LEN];
     char rejected_path[DND_FS_PATH_LEN];
@@ -3043,7 +3045,7 @@ uint8_t dnd_storage_list_shd_levels(
     char filename[128];
     uint8_t count = 0U;
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(file_info_is_dir(&info) || !dnd_storage_parse_core_shd_filename(filename, &entry) ||
            entry.id != profile)
             continue;
@@ -3080,7 +3082,7 @@ static void dnd_storage_restore_sidecar_snapshot_path(
     char* output,
     size_t size,
     uint32_t profile,
-    const PocketCharacter* character,
+    const DndCharacter* character,
     uint8_t index) {
     const char* suffixes[] = {
         "spellbook", "items", "features", "appliedgrants", "languages", "proficiencies"};
@@ -3103,7 +3105,7 @@ bool dnd_storage_restore_shd(
     Storage* storage,
     uint32_t profile,
     uint8_t level,
-    PocketSaveData* data) {
+    DndSaveData* data) {
     if(!storage || !data || level < 1U || level > 20U) return false;
     DndShdRestoreContext* context = calloc(1U, sizeof(DndShdRestoreContext));
     if(!context) return false;
@@ -3190,7 +3192,7 @@ cleanup:
     return success;
 }
 
-bool dnd_storage_import_first(Storage* storage, uint32_t destination, PocketSaveData* data) {
+bool dnd_storage_import_first(Storage* storage, uint32_t destination, DndSaveData* data) {
     File* directory = storage_file_alloc(storage);
     if(!directory) return false;
     if(!storage_dir_open(directory, DND_STORAGE_EXPORT_DIR)) {
@@ -3208,7 +3210,7 @@ bool dnd_storage_import_first(Storage* storage, uint32_t destination, PocketSave
 
         /* Only import a core character export here. Collection exports are
            companions and are copied after their matching core file succeeds. */
-        PocketProfileEntry source_entry;
+        DndProfileEntry source_entry;
         if(!dnd_storage_parse_profile_filename(filename + 7U, &source_entry)) continue;
 
         char path[DND_FS_LONG_PATH_LEN];
@@ -3287,7 +3289,7 @@ bool dnd_storage_move_legacy_profiles(Storage* storage) {
             if(file_info_is_dir(&info) || strncmp(filename, "ch_", 3U) != 0 || length < 8U ||
                strcmp(filename + length - 4U, ".txt") != 0)
                 continue;
-            PocketProfileEntry legacy_entry;
+            DndProfileEntry legacy_entry;
             if(!dnd_storage_parse_profile_filename(filename, &legacy_entry)) continue;
 
             char source[DND_FS_LONG_PATH_LEN];
@@ -3320,18 +3322,18 @@ bool dnd_storage_move_legacy_profiles(Storage* storage) {
     return all_ok;
 }
 
-void dnd_storage_profiles_set_defaults(PocketProfileState* profiles) {
+void dnd_storage_profiles_set_defaults(DndProfileState* profiles) {
     memset(profiles, 0, sizeof(*profiles));
 }
 
-void dnd_storage_profiles_free(PocketProfileState* profiles) {
+void dnd_storage_profiles_free(DndProfileState* profiles) {
     if(!profiles) return;
     dnd_storage_profiles_set_defaults(profiles);
 }
 
 static void dnd_storage_profiles_insert_smallest(
-    PocketProfileState* profiles,
-    const PocketProfileEntry* entry) {
+    DndProfileState* profiles,
+    const DndProfileEntry* entry) {
     if(profiles->cache_count < DND_STORAGE_PROFILE_CACHE_SIZE) {
         profiles->entries[profiles->cache_count++] = *entry;
     } else {
@@ -3340,7 +3342,7 @@ static void dnd_storage_profiles_insert_smallest(
     }
     uint8_t position = (uint8_t)(profiles->cache_count - 1U);
     while(position > 0U && profiles->entries[position - 1U].id > profiles->entries[position].id) {
-        PocketProfileEntry swap = profiles->entries[position - 1U];
+        DndProfileEntry swap = profiles->entries[position - 1U];
         profiles->entries[position - 1U] = profiles->entries[position];
         profiles->entries[position] = swap;
         --position;
@@ -3348,14 +3350,14 @@ static void dnd_storage_profiles_insert_smallest(
 }
 
 static void dnd_storage_profiles_insert_largest(
-    PocketProfileState* profiles,
-    const PocketProfileEntry* entry) {
+    DndProfileState* profiles,
+    const DndProfileEntry* entry) {
     if(profiles->cache_count < DND_STORAGE_PROFILE_CACHE_SIZE) {
         profiles->entries[profiles->cache_count++] = *entry;
         uint8_t position = (uint8_t)(profiles->cache_count - 1U);
         while(position > 0U &&
               profiles->entries[position - 1U].id > profiles->entries[position].id) {
-            PocketProfileEntry swap = profiles->entries[position - 1U];
+            DndProfileEntry swap = profiles->entries[position - 1U];
             profiles->entries[position - 1U] = profiles->entries[position];
             profiles->entries[position] = swap;
             --position;
@@ -3367,7 +3369,7 @@ static void dnd_storage_profiles_insert_largest(
     uint8_t position = 0U;
     while(position + 1U < profiles->cache_count &&
           profiles->entries[position].id > profiles->entries[position + 1U].id) {
-        PocketProfileEntry swap = profiles->entries[position + 1U];
+        DndProfileEntry swap = profiles->entries[position + 1U];
         profiles->entries[position + 1U] = profiles->entries[position];
         profiles->entries[position] = swap;
         ++position;
@@ -3376,7 +3378,7 @@ static void dnd_storage_profiles_insert_largest(
 
 static bool dnd_storage_profiles_scan_cache(
     Storage* storage,
-    PocketProfileState* profiles,
+    DndProfileState* profiles,
     uint32_t boundary,
     bool after,
     uint16_t cache_start) {
@@ -3390,7 +3392,7 @@ static bool dnd_storage_profiles_scan_cache(
     char filename[128];
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
         if(file_info_is_dir(&info)) continue;
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(!dnd_storage_parse_profile_filename(filename, &entry)) continue;
         if(after) {
             if(entry.id <= boundary) continue;
@@ -3410,7 +3412,7 @@ static bool dnd_storage_profiles_scan_cache(
     return true;
 }
 
-bool dnd_storage_profiles_find(Storage* storage, uint32_t profile, PocketProfileEntry* output) {
+bool dnd_storage_profiles_find(Storage* storage, uint32_t profile, DndProfileEntry* output) {
     if(!storage) return false;
     File* directory = storage_file_alloc(storage);
     if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
@@ -3422,7 +3424,7 @@ bool dnd_storage_profiles_find(Storage* storage, uint32_t profile, PocketProfile
     bool found = false;
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
         if(file_info_is_dir(&info)) continue;
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(dnd_storage_parse_profile_filename(filename, &entry) && entry.id == profile) {
             if(output) *output = entry;
             found = true;
@@ -3434,7 +3436,7 @@ bool dnd_storage_profiles_find(Storage* storage, uint32_t profile, PocketProfile
     return found;
 }
 
-bool dnd_storage_profiles_refresh(Storage* storage, PocketProfileState* profiles) {
+bool dnd_storage_profiles_refresh(Storage* storage, DndProfileState* profiles) {
     furi_assert(storage);
     furi_assert(profiles);
     storage_common_mkdir(storage, DND_STORAGE_DATA_DIR);
@@ -3471,7 +3473,7 @@ bool dnd_storage_profiles_refresh(Storage* storage, PocketProfileState* profiles
             !strncmp(filename, "custom_write_", 13U);
         if(character_related) profiles->character_file_seen = 1U;
 
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         bool primary = dnd_storage_parse_profile_filename(filename, &entry);
         if(!primary) continue;
         if(!profiles->reserved_id_seen || entry.id > profiles->highest_reserved_id)
@@ -3495,8 +3497,8 @@ bool dnd_storage_profiles_refresh(Storage* storage, PocketProfileState* profiles
     return success;
 }
 
-const PocketProfileEntry*
-    dnd_storage_profiles_entry_at(Storage* storage, PocketProfileState* profiles, uint16_t index) {
+const DndProfileEntry*
+    dnd_storage_profiles_entry_at(Storage* storage, DndProfileState* profiles, uint16_t index) {
     if(!storage || !profiles || index >= profiles->count) return NULL;
     if(!profiles->cache_count && !dnd_storage_profiles_refresh(storage, profiles)) return NULL;
 
@@ -3522,7 +3524,7 @@ const PocketProfileEntry*
     return &profiles->entries[index - profiles->cache_start];
 }
 
-bool dnd_storage_profiles_window(Storage* storage, PocketProfileState* profiles, uint16_t start) {
+bool dnd_storage_profiles_window(Storage* storage, DndProfileState* profiles, uint16_t start) {
     if(!storage || !profiles || start >= profiles->count) return false;
     if(profiles->cache_count && profiles->cache_start == start) return true;
     if(start == 0U) {
@@ -3531,7 +3533,7 @@ bool dnd_storage_profiles_window(Storage* storage, PocketProfileState* profiles,
         profiles->active_profile = active;
         return scanned && profiles->cache_count;
     }
-    const PocketProfileEntry* previous =
+    const DndProfileEntry* previous =
         dnd_storage_profiles_entry_at(storage, profiles, start - 1U);
     if(!previous) return false;
     uint32_t boundary = previous->id;
@@ -3541,7 +3543,7 @@ bool dnd_storage_profiles_window(Storage* storage, PocketProfileState* profiles,
 bool dnd_storage_profiles_next_after(
     Storage* storage,
     uint32_t after_profile,
-    PocketProfileEntry* output) {
+    DndProfileEntry* output) {
     if(!storage || !output) return false;
     File* directory = storage_file_alloc(storage);
     if(!directory) return false;
@@ -3551,13 +3553,13 @@ bool dnd_storage_profiles_next_after(
     }
     FileInfo info;
     char filename[128];
-    PocketProfileEntry next = {0};
-    PocketProfileEntry first = {0};
+    DndProfileEntry next = {0};
+    DndProfileEntry first = {0};
     bool have_next = false;
     bool have_first = false;
     while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
         if(file_info_is_dir(&info)) continue;
-        PocketProfileEntry entry;
+        DndProfileEntry entry;
         if(!dnd_storage_parse_profile_filename(filename, &entry)) continue;
         if(!have_first || entry.id < first.id) {
             first = entry;
@@ -3581,13 +3583,13 @@ bool dnd_storage_profiles_next_after(
     return false;
 }
 
-uint32_t dnd_storage_profiles_next_id(const PocketProfileState* profiles) {
+uint32_t dnd_storage_profiles_next_id(const DndProfileState* profiles) {
     if(!profiles->reserved_id_seen) return 0U;
     return profiles->highest_reserved_id < UINT32_MAX ? profiles->highest_reserved_id + 1U :
                                                         UINT32_MAX;
 }
 
-bool dnd_storage_profiles_load(Storage* storage, PocketProfileState* profiles) {
+bool dnd_storage_profiles_load(Storage* storage, DndProfileState* profiles) {
     furi_assert(storage);
     furi_assert(profiles);
     dnd_storage_profiles_set_defaults(profiles);
@@ -3602,7 +3604,7 @@ bool dnd_storage_profiles_load(Storage* storage, PocketProfileState* profiles) {
     bool scanned = dnd_storage_profiles_refresh(storage, profiles);
     bool active_found = dnd_storage_profiles_find(storage, profiles->active_profile, NULL);
     if(!active_found && profiles->count) {
-        PocketProfileEntry next;
+        DndProfileEntry next;
         if(dnd_storage_profiles_next_after(storage, profiles->active_profile, &next)) {
             profiles->active_profile = next.id;
             profiles->active_entry = next;
@@ -3612,7 +3614,7 @@ bool dnd_storage_profiles_load(Storage* storage, PocketProfileState* profiles) {
     return scanned;
 }
 
-bool dnd_storage_profiles_save(Storage* storage, const PocketProfileState* profiles) {
+bool dnd_storage_profiles_save(Storage* storage, const DndProfileState* profiles) {
     furi_assert(storage);
     furi_assert(profiles);
     storage_common_mkdir(storage, DND_STORAGE_DATA_DIR);
