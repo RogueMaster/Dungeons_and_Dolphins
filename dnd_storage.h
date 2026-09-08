@@ -13,6 +13,7 @@ typedef struct {
 #define DND_STORAGE_PROFILE_CACHE_SIZE    8U
 #define DND_STORAGE_COLLECTION_CACHE_SIZE 8U
 #define DND_STORAGE_COLLECTION_PAGE_COUNT 32U
+#define DND_INVENTORY_BAG_NAME_LEN       24U
 
 typedef struct {
     uint32_t active_profile;
@@ -61,6 +62,39 @@ bool dnd_storage_visit_spells(
     DndDolphinsSpellRecordVisitor visitor,
     void* context,
     uint16_t* total_count);
+
+/* Inventory bags. Main is the legacy inventory_<id>.txt sidecar. Group uses
+   invGroup_<id>.txt; additional bags use inv<safeBagName>_<id>.txt. Bag lists
+   are streamed from filenames/header metadata rather than retained in RAM. */
+bool dnd_storage_inventory_bag_at(
+    Storage* storage, uint32_t profile, uint8_t index, char* name, size_t size);
+uint8_t dnd_storage_inventory_bag_count(Storage* storage, uint32_t profile);
+bool dnd_storage_inventory_bag_create(Storage* storage, uint32_t profile, const char* name);
+bool dnd_storage_inventory_bag_delete(Storage* storage, uint32_t profile, const char* name);
+bool dnd_storage_visit_items_bag(
+    Storage* storage, uint32_t profile, const char* bag, DndDolphinsItemRecordVisitor visitor,
+    void* context, uint16_t* total_count);
+bool dnd_storage_load_items_window_indexed_bag(
+    Storage* storage, uint32_t profile, const char* bag, uint16_t start, DndCharacter* character,
+    uint16_t* total_count, uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages);
+bool dnd_storage_items_exist_bag(Storage* storage, uint32_t profile, const char* bag);
+bool dnd_storage_save_items_window_bag(
+    Storage* storage, uint32_t profile, const char* bag, uint16_t start, const DndCharacter* character);
+bool dnd_storage_append_item_bag(
+    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, const DndItem* item);
+bool dnd_storage_delete_item_bag(
+    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, uint16_t index);
+bool dnd_storage_move_items_bag_selected(
+    Storage* storage,
+    uint32_t profile,
+    const char* source_bag,
+    const char* destination_bag,
+    const DndCharacter* owner,
+    const uint8_t* selected_bits,
+    uint16_t source_total,
+    uint16_t* moved_count);
+
 bool dnd_storage_visit_items(
     Storage* storage,
     uint32_t profile,
@@ -200,6 +234,7 @@ bool dnd_storage_delete_item(
 /* Resolve the current canonical profile filename for a profile id. Read-only
    projections use this to stream only fields they own/need. */
 bool dnd_storage_find_profile_path(Storage* storage, uint32_t profile, char* output, size_t size);
+bool dnd_storage_validate_character_path(Storage* storage, const char* path);
 
 bool dnd_storage_load_profile(
     Storage* storage,
@@ -217,10 +252,10 @@ bool dnd_storage_save_profile_known_updated(
     const DndSaveData* data);
 bool dnd_storage_delete_profile(Storage* storage, uint32_t profile);
 bool dnd_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t destination);
-bool dnd_storage_export_profile(Storage* storage, uint32_t profile);
 bool dnd_storage_archive_profile(Storage* storage, uint32_t profile);
 bool dnd_storage_verify_profile(Storage* storage, uint32_t profile);
-bool dnd_storage_restore_backup(Storage* storage, uint32_t profile, DndSaveData* data);
+bool dnd_storage_validate_profile_semantics(Storage* storage, uint32_t profile);
+bool dnd_storage_recover_profile_backup(Storage* storage, uint32_t profile, DndSaveData* data);
 /* Level-tagged SHD history. Core character state is restored to the canonical
    character file while Inventory, Spellbook and progression sidecars are
    restored to their respective live files. */
@@ -234,4 +269,8 @@ bool dnd_storage_restore_shd(
     uint32_t profile,
     uint8_t level,
     DndSaveData* data);
-bool dnd_storage_import_first(Storage* storage, uint32_t destination, DndSaveData* data);
+bool dnd_storage_restore_shd_path(
+    Storage* storage,
+    uint32_t profile,
+    const char* core_snapshot,
+    DndSaveData* data);

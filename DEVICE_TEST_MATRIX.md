@@ -2,9 +2,9 @@
 
 ## Launch and handoff
 
-- [ ] Build all seven FAPs and confirm no unresolved application symbols. All seven must resolve active-profile/handoff calls from the shared `dnd_profile_handoff.*` module; apps that only need active-profile metadata must not pull in `dnd_storage.c` for that purpose.
+- [ ] Build all eleven FAPs and confirm no unresolved application symbols. All eleven must resolve active-profile/handoff calls from the shared `dnd_profile_handoff.*` module; apps that only need active-profile metadata must not pull in `dnd_storage.c` for that purpose.
 - [ ] Open Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook with active IDs 0 and nonzero; confirm `[id]` appears at the top-right on each app's main screen only and disappears from detail/editor/tool/result screens.
-- [ ] Launch all seven FAPs directly.
+- [ ] Launch all eleven FAPs directly: DNDolphins, DNDCharacter Sheet, DNDGrants, DNDCombat, DNDInventory, DNDSpellbook, DNDAdventure, DNDJournal, DNDInitiative and DNDBestiary.
 - [ ] In Adventure, Bestiary, Journal, Initiative, Inventory and Spellbook, press Short Back from the main screen and confirm DNDolphins is launched when `/ext/apps/Games/dndolphins.fap` exists. Temporarily remove/rename that FAP and confirm the same Short Back exits cleanly without a dead Loader handoff.
 - [ ] In each companion main screen, Hold Back and confirm the companion exits back to firmware without launching DNDolphins. Confirm Initiative and Bestiary no longer contain a normal main-menu Return/Open-DNDolphins row.
 - [ ] In companion sub-screens, Short Back must continue to move up one screen rather than immediately returning to DNDolphins; Initiative active-combat Short Back returns to the Initiative main menu without ending the encounter, while Hold Up handles previous-turn navigation.
@@ -16,7 +16,7 @@
 - [ ] With `custom_active_profile.txt` containing `Active=1`, repeatedly open/close DNDInventory and DNDSpellbook both directly and from DNDolphins; every launch must show `[1]`, never transient `[0]`, and must enter the list rather than `No character`.
 - [ ] On all six companion main views, confirm `[4294967295]` never appears. Exercise absent/unreadable metadata, stale IDs, repeated character changes and no-character paths; valid ID `[0]` must remain displayable. On Inventory/Spellbook specifically, confirm the draw callback and input callback agree on the same screen: a displayed `No character / OK: Open DNDolphins` screen must actually launch DNDolphins on OK, and a displayed list/detail screen must perform only that screen's actions.
 - [ ] Repeatedly press Back from the Inventory/Spellbook top-level list and no-character screen; confirm the dispatcher exits promptly without an extra redraw or apparent input loop.
-- [ ] In Inventory with 0–3 Items, confirm **Currency** and **+ Add New** share the first viewport with available Item rows; with 4+ Items, confirm those anchors scroll away only when selection moves into later Item rows. Repeat the original 1–5 **+ Add New** visibility check in Spellbook.
+- [ ] In Inventory with 0–3 Items, confirm **Bag: Main <>**, **+ Add New** and **Currency** share the first viewport with available Item rows; with more Items, confirm those anchors scroll away only when selection moves into later Item rows. Repeat the original 1–5 **+ Add New** visibility check in Spellbook.
 - [ ] Populate more than eight Items and Spells. Confirm Inventory shows right-aligned `PgX<>` while its transient status is clear, and Spellbook shows `Spellbook` with `PgX<>`; Up/Down Repeat remains responsive and performs storage I/O only when crossing an eight-record boundary. If using short Left/Right list page jumps, confirm each changes only one aligned eight-record page and holding does not churn through pages.
 - [ ] From a later Inventory page, wrap Up/Down back to **Currency** / **+ Add New**; from a later Spellbook page, wrap back to **+ Add New**. Confirm page zero is reloaded with no `Page unavailable`, empty-page artifact or stale later-page data.
 - [ ] Empty never-granted Inventory: delete/no sidecar on a new character and enter Inventory; confirm normal starting equipment is granted automatically. Then delete every granted Item while retaining `InitialInventory=1`, reopen Inventory, and confirm starting equipment is **not** duplicated.
@@ -33,11 +33,11 @@
 - [ ] Enable DNDolphins Settings > Debug and record `Heap after app state`, `Heap after core UI`, `Heap app ready`, and Combat-entry heap lines. Reproduce the failing path and compare free heap across repeated cycles; a monotonic decline indicates a leak/retained framework object, while a stable low baseline points to Loader/code residency.
 
 - [ ] DNDolphins Home focus: enter and Back out of Character, Vitals, Abilities & Saves, Skills, Features & Perks, Combat and Dice Roller; each return must restore the same named Home row rather than row 0. Repeat after returning from Inventory, Spellbook, Bestiary, Initiative, Adventure and Journal and confirm each `focus=` argument resolves to its named Home index.
-- [ ] Settings persistence/recovery: open **Settings** after Journal, toggle **Skip Dice Loading** and **Debug**, exit/relaunch DNDolphins, and confirm both values persist in `/ext/apps_data/dndolphins/settings.txt`. Delete the file and confirm defaults are used. Then corrupt one line while leaving another valid and confirm the valid setting is recovered while the malformed/unreadable setting keeps its default; app launch must not fail because Settings are reconstructable.
+- [ ] Settings persistence/recovery: open **Settings** after Journal, toggle **Skip Dice Loading** and **Debug**, exit/relaunch DNDolphins, and confirm both values persist in `/ext/apps_data/dndolphins/settings.txt`. Delete the file and confirm defaults are used. Then corrupt one line while leaving another valid and confirm the valid setting is recovered while the malformed/unreadable setting keeps its default; app launch must not fail because Settings are reconstructable. During a Settings save, interrupt SD I/O/power and confirm the prior complete `settings.txt` survives and no stale `.tmp`/`.bak` remains after the next successful save.
 - [ ] Skip Dice Loading: with the setting Off, verify the normal DNDolphins rolling animation appears for the general Dice Roller, Spend Hit Die, weapon attack/damage and spell-combat rolls. Turn it On and repeat; the exact same roll paths must show the resolved result immediately without the loading/rolling animation. Verify Adventure skill rolls and Initiative rolls remain immediate and continue reading the shared setting without creating per-FAP settings files.
-- [ ] Debug: enable Debug, exercise Settings save, an Adventure skill roll and an SHD restore, and confirm diagnostic log messages appear without changing dice totals, save data or gameplay behavior. Disable Debug and confirm those opt-in messages stop.
+- [ ] Debug: enable Debug, exercise Settings save, an Adventure skill roll and an SHD restore through DNDBackup & Restore, and confirm diagnostic log messages appear without changing dice totals, save data or gameplay behavior. Disable Debug and confirm those opt-in messages stop.
 - [ ] SHD history creation: on a character with Inventory, Spellbook, Features and applied-grant state, save at one level, change level/state and save again. Confirm each retained level has one core `ch_<id>_<name>_<level>.shd`, matching sidecar SHDs only for sidecars that existed at that level, and the internal `_bundle.shd` completeness marker; live `.txt` files remain authoritative.
-- [ ] Characters Hold OK → **Restore from SHD**: verify only the active character can open restore, available levels are listed highest-first, and restoring a current bundled level replaces the canonical character plus Inventory/Spellbook/Feature/applied-grant live sidecars with that level's matching snapshots. With a `_bundle.shd` marker, a sidecar absent in the selected snapshot must become absent/empty rather than retaining later data.
+- [ ] DNDBackup & Restore → **Restore Backup**: verify the active profile is shown, the native `.shd` browser selects an exact core snapshot from the configured backup folder, and restoring a current bundled level replaces the canonical character plus Inventory/Spellbook/Feature/applied-grant/Language/Proficiency live sidecars with that level's matching snapshots. With a `_bundle.shd` marker, a sidecar absent in the selected snapshot must become absent/empty rather than retaining later data.
 - [ ] Legacy SHD compatibility: restore a pre-bundle core-only `.shd` while current Inventory/Spellbook/Feature/applied-grant sidecars exist. Confirm the character core restores but current sidecars are preserved because the older SHD did not record collection presence.
 - [ ] SHD rollback fault injection: fail the core publish and each sidecar copy in turn. Confirm the restore reports failure and attempts to leave the pre-restore canonical core and all four live sidecars intact; temporary rollback work files must be cleaned afterward.
 - [ ] Combat menu order: confirm Weapon Attacks, Spell Attacks, **Spell <ability> Atk+X DCY**, Rituals and Attack Templates appear in the attack section; Initiative Tracker is absent from Combat, and the state-free section header changes correctly across Attacks, Encounter, Recovery, Status and Defenses without allocating or reading storage during redraw. Short OK on the spellcasting-stat row opens Magic.
@@ -94,7 +94,7 @@
 ## Inventory actions / initial grant
 
 - [ ] With no `inventory_{id}.txt` and no prior grant marker, open DNDInventory and confirm no starting package is silently created. Select **Grant Initial Inventory**, confirm the review screen, cancel once with Back, then approve with OK and verify the package is created exactly once.
-- [ ] Confirm Inventory has no hidden Hold-Up tools menu: **Currency** is the first normal-list row, **Inventory Resources** and **Grant Initial Inventory** are the final action rows, and Hold Up on the list performs no alternate action.
+- [ ] Confirm Inventory has no hidden Hold-Up tools menu: **Bag: <name> <>** is first, **+ Add New** second and **Currency** third; **Inventory Resources** and **Grant Initial Inventory** are the final action rows, and Hold Up on the list performs no alternate action.
 - [ ] Confirm Hold OK gestures: Inventory row = Equip/Unequip; + Add New = blank full editor; Item Catalog = category filter.
 - [ ] Exercise all five Currency fields with Left/Right and direct numeric entry, restart, and confirm values persisted.
 - [ ] Add a `Currency=` line to a character profile with no Inventory currency record and confirm DNDInventory ignores it; only `inventory_{id}.txt` may supply persisted currency.
@@ -146,7 +146,7 @@
 
 ## Adventure campaign selection
 
-- [ ] Put a valid campaign pack in the inbox and confirm Preview shows name, pack/app compatibility and entry scene before installation; Hold OK installs only when validation passes.
+- [ ] Put a valid campaign pack in the inbox and confirm Preview shows name, pack/app compatibility and entry scene before installation; Hold OK installs only when validation passes. Interrupt installation during the second file copy and during registry/index publish; confirm no partial installed path blocks retry, the prior registry/index remains usable, and the unchanged inbox can be installed successfully afterward.
 - [ ] Test malformed index, missing `scenes.txt`, missing declared entry scene, incompatible min/max app range and duplicate campaign ID; each must refuse installation without deleting existing campaign content.
 - [ ] With a large campaign index, navigate rows before and beyond the sparse-hint window and confirm names remain correct without a campaign-sized heap allocation.
 - [ ] From a Journal milestone entry choose **Continue active Adventure** and confirm Adventure opens the persisted active campaign/current scene directly; if no valid active campaign exists, confirm it falls back safely without creating progress.
@@ -213,15 +213,15 @@
 
 ### Inventory / Spellbook direct-entry checks
 
-- Launch DNDInventory from DNDolphins with a populated Inventory: the first frame is the Item list with **Currency** row zero and **+ Add New** row one; owned Items follow and **Inventory Resources** / **Grant Initial Inventory** are at the end. Hold Up has no hidden Inventory Tools action.
-- Launch DNDInventory with no Inventory sidecar: the first frame shows **Currency**, **+ Add New**, then the end actions; opening alone does not create the sidecar. Adding the first Item creates Inventory-owned `Currency=0,0,0,0,0`.
+- Launch DNDInventory from DNDolphins with a populated Inventory: the first frame is the Item list with **Bag: Main <>** row zero, **+ Add New** row one and **Currency** row two; owned Items follow and **Inventory Resources** / **Grant Initial Inventory** are at the end. Hold Up has no hidden Inventory Tools action.
+- Launch DNDInventory with no Inventory sidecar: the first frame shows **Bag: Main <>**, **+ Add New**, **Currency**, then the end actions; opening alone does not create the Main sidecar. Adding the first Main Item creates Inventory-owned `Currency=0,0,0,0,0`.
 - Launch DNDSpellbook from DNDolphins with a populated Spellbook: the first frame is the Spell list with `+ Add New` row zero.
 - Launch DNDSpellbook with no Spellbook sidecar: the first frame is an empty Spell list with `+ Add New`; opening alone does not create the sidecar, and the first saved Spell creates it.
 
 ### Return focus / paging performance / ordering
 
 - [ ] From each companion main screen, Short Back and confirm DNDolphins opens with the corresponding home row already highlighted: Inventory, Magic & Spells for Spellbook, Journal, Adventure, Bestiary and Initiative. Repeat with Hold Back and confirm it exits to firmware instead of launching DNDolphins.
-- [ ] Confirm the DNDolphins Home menu order is Characters, Character, Vitals, Abilities & Saves, Skills, Features & Perks, Inventory, Magic & Spells, Bestiary, Initiative, Combat, Dice Roller, Adventure, Journal. Enter and return from each internal submenu and companion FAP; confirm the same named row is restored rather than a stale numeric position.
+- [ ] Confirm the DNDolphins Home menu order is Characters, Character, Vitals, Abilities & Saves, Skills, Features & Perks, Inventory, Magic & Spells, Bestiary, Initiative, Combat, Dice Roller, Adventure, Journal, Settings. Enter and return from each internal submenu and companion FAP; confirm the same named row is restored rather than a stale numeric position.
 - [ ] In DNDolphins, highlight each internal home row that opens a submenu (Profiles, Character, Vitals, Abilities, Skills, Magic, Features, Combat and Dice), enter it, then Short Back; confirm Home returns to the same highlighted row/scroll position rather than row 0.
 - [ ] Open Initiative and confirm the title bar is dark on the main menu and during Combat; `[id]` is right-aligned on the main menu and compact `R# T#/#` replaces it during Combat.
 - [ ] Fill Initiative to the maximum roster. In Roster, Setup, Combat and participant Edit, move through every row and wrap both directions; the selected/current participant must remain inside the visible window. Start/Resume, next turn and Hold Up previous turn must recenter the active participant without changing roster capacity or encounter state.
@@ -258,7 +258,7 @@
 - **Declarative content:** complete at least one branch of Torii Between Tides and Moonlit Market and inspect each new folklore-inspired monster stat screen.
 
 - [ ] Level HP/Hit Dice: for d6/d8/d10/d12 classes with several Constitution modifiers, increase one and multiple levels and confirm HP gains are 4/5/6/7 + CON per level (minimum 1), current HP gains the same amount without erasing prior damage, class Hit Dice current=max=class level, and global Hit Dice current=max=total level. Repeat through a Journal milestone.
-- [ ] Bestiary home menu order: Browse Monsters, Generate Encounter, Party Level, Party Size, encounter settings, Saved Encounters, browse settings/lists, Create Custom Monster, Pack Diagnostics. Confirm Monster Pack Controls is absent and Pack Diagnostics is last.
+- [ ] Bestiary home menu order: Browse Monsters, Generate Encounter, **Custom Encounter**, Party Level, Party Size, encounter settings, Saved Encounters, browse settings/lists, Create Custom Monster, Pack Diagnostics. Confirm Monster Pack Controls is absent and Pack Diagnostics is last when Debug is enabled.
 ## Grant/delete focused hardware checks
 
 - On a fresh Human Fighter, run **Grant Initial Traits**: confirm the review contains starting language/save/Feature grants. Apply deterministic rows, resolve every choice, verify Second Wind and the selected languages/saves, then rerun and expect **No new grants**.
@@ -291,12 +291,34 @@
 - [ ] Exercise all six accessory outcomes, quantity bounds, repeated-strain wrap and exact final names. Confirm Homebrew No hides the 420 filter/results while Get Elevated Off does not hide catalog rows and owned items remain.
 - [ ] Toggle Off to 420 with existing Inventory and with no Inventory; the latter must still receive normal starting equipment later.
 - [ ] Interrupt failed writes/renames in a controlled SD test; verify whole-bundle publication and preservation of previous live collections.
-- [ ] Duplicate/export/import/archive/delete a character with all six sidecars. Restore current, version-1 and core-only SHD history; older missing companions must preserve current sidecars.
+- [ ] Duplicate/export/import/archive/delete a character with all six fixed sidecars plus Group and at least two named Inventory bags. Confirm every bag stays separate. Restore a v3 SHD and confirm Main/Group/named bags match that level; restore version-1 and core-only SHD history and confirm older snapshots preserve bag state they never recorded.
 
-Host regression verification is recorded in `tests/host/VALIDATION.md`; the seven passing ARM SDK builds and API checks are recorded in `tests/sdk/VALIDATION.md`. These device boxes remain unchecked until hardware testing is performed.
 - [ ] **Grant performance stress:** use a level-20 multiclass/profile with many species/background/class/subclass/feat grants. Confirm opening a review batch is a bounded one-time scan, applying a batch does not freeze on repeated whole-file rescans, the next batch continues promptly, and no draw/tick slowdown occurs while simply leaving the review/Magic screens visible.
 - [ ] **Magic totals draw path:** open Magic with a large Spellbook and confirm Known / knowable / free-granted totals appear. Leave the screen idle through multiple marquee/tick refreshes and confirm there is no repeated SD activity or visible periodic stall.
 - [ ] **Item Source tags:** browse bundled SRD and project Homebrew Items and confirm compact Source tags are present and survive selection into owned records.
 - [ ] **SRD catalog:** confirm Character, Spellbook and Inventory SRD rows browse normally and paging does not duplicate, skip or restart unexpectedly.
 - [ ] **Homebrew independence:** toggle **Homebrew Yes/No** and confirm Inventory `[DND]`/`[HB]` rows appear/disappear while already-owned Homebrew/DND items remain visible.
 
+
+- [ ] In DNDCombat, use **Jump to Initiative** and verify Short Back returns to DNDCombat. Launch Initiative from DNDolphins and verify Short Back returns to DNDolphins. Hold Back from Initiative exits without a parent relaunch.
+- [ ] Verify Combat can browse and select attacks well past record 24. Host coverage uses 300 weapons and 300 spells; repeat a large real sidecar test on device.
+- [ ] Verify **Settings → Menu Type** persists both **Text** and **Graphical** across cold launches. In Graphical mode verify all Home actions remain reachable with Up/Down/Left/Right, the selected icon is framed, the selected menu name appears in the header, and page transitions remain correct across all 15 entries.
+
+### 3.6 Combat/Spellbook/Bestiary additions
+
+- [ ] In DNDCombat verify **Spell Attacks** contains attack-roll spells while **Combat Utility Spells** (above Rituals) contains castable non-attack spells such as save/heal/control spells.
+- [ ] Verify Spell Combat rows display the spell-specific casting ability/attack modifier, e.g. `(WIS/+5)`, without overwriting long spell names or damage text.
+- [ ] Verify Unarmed Strike displays/uses attack = ability + PB (+ attack-only modifiers), damage = `1 + ability modifier`, and Grapple/Shove DC = `8 + ability modifier + PB`.
+- [ ] In DNDSpellbook verify right-aligned source tags for class-sourced and grant-sourced spells (e.g. `WIZ`, `HIG`, `MAG`).
+- [ ] With Debug Off, DNDBestiary Home must omit Pack Diagnostics; relaunch after enabling Debug and verify Pack Diagnostics appears.
+- [ ] Cycle DNDBestiary Source through **Homebrew** and verify custom-pack monsters are included while other source filters still work.
+- [ ] Set **Homebrew: No**, relaunch DNDBestiary and confirm the Homebrew Source choice disappears; Source: Any, Favorites, Recents, generated encounters and Custom Encounter cannot surface/pick custom-pack monsters. User-created **Custom** monsters must remain available. A saved encounter containing a custom-pack monster must remain saved but refuse Resume/Add to Initiative until Homebrew is enabled again.
+- [ ] Open **Custom Encounter** and confirm it starts empty. Add a monster with **Hold OK directly on a Monster Catalog row** and through the monster-detail **Add to Custom Encounter** action; adding the same monster again increments quantity. Exercise Difficulty Simulator, Save Encounter, Composition and Add to Initiative; Initiative must receive the full custom composition.
+- [ ] Inventory bags: Left/Right on **Bag** cycles Main, Group and named bags. Hold OK opens Manage Bags; add two named bags, remove one with the confirmation step, and confirm Main/Group are protected. Verify Main uses `inventory_<id>.txt`, Group uses `invGroup_<id>.txt`, and named bags preserve their display name while using a safe `inv<BagName>_<id>.txt` filename.
+- [ ] Put Items in Main, Group and named bags; confirm only the selected bag page is shown while Inventory Resources aggregates weight/equipped/attuned totals across every bag. Confirm adding/editing/deleting in one bag does not modify another bag.
+
+### Storage interruption checks added by 3.6.8 audit
+
+- [ ] From Journal, convert an Item-category entry into an Inventory item while exercising an SD-card write interruption. After restart, confirm the pre-existing Inventory remains intact and no partial item row is visible; retry should add the item exactly once.
+- [ ] During external SHD backup, interrupt an SD-card read. Confirm the backup is reported failed and no bundle completeness marker is published for the partial copy.
+- [ ] Create a directory/non-file collision at a fresh `inventory_<id>.txt` path, then trigger starting-equipment initialization. Confirm initialization fails without removing the collision. Repeat with the next generated Adventure milestone Journal filename and confirm the choice rolls back while the collision remains untouched.

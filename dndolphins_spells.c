@@ -94,7 +94,12 @@ int8_t dndolphins_spells_save_dc(const DndCharacter* character) {
     return dndolphins_spells_save_dc_for(character, NULL);
 }
 
-void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character) {
+void dndolphins_spells_recalculate_shared_slots(
+    const DndClassLevel* classes,
+    uint8_t class_count,
+    uint8_t spell_slots_current[DND_SLOT_COUNT],
+    uint8_t spell_slots_max[DND_SLOT_COUNT]) {
+    if(!classes || !spell_slots_current || !spell_slots_max) return;
     static const uint8_t slots[20][9] = {
         {2, 0, 0, 0, 0, 0, 0, 0, 0}, {3, 0, 0, 0, 0, 0, 0, 0, 0}, {4, 2, 0, 0, 0, 0, 0, 0, 0},
         {4, 3, 0, 0, 0, 0, 0, 0, 0}, {4, 3, 2, 0, 0, 0, 0, 0, 0}, {4, 3, 3, 0, 0, 0, 0, 0, 0},
@@ -104,11 +109,12 @@ void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character) {
         {4, 3, 3, 3, 2, 1, 1, 1, 0}, {4, 3, 3, 3, 2, 1, 1, 1, 1}, {4, 3, 3, 3, 3, 1, 1, 1, 1},
         {4, 3, 3, 3, 3, 2, 1, 1, 1}, {4, 3, 3, 3, 3, 2, 2, 1, 1},
     };
+    if(class_count > DND_MAX_CLASSES) class_count = DND_MAX_CLASSES;
     uint8_t caster_level = 0U;
     uint8_t shared_caster_count = 0U;
     const DndClassLevel* sole_shared_caster = NULL;
-    for(uint8_t i = 0U; i < character->class_count; ++i) {
-        const DndClassLevel* level = &character->classes[i];
+    for(uint8_t i = 0U; i < class_count; ++i) {
+        const DndClassLevel* level = &classes[i];
         if(level->spellcasting_mode == DndSpellcastingFull ||
            level->spellcasting_mode == DndSpellcastingHalf ||
            level->spellcasting_mode == DndSpellcastingThird) {
@@ -116,19 +122,12 @@ void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character) {
             sole_shared_caster = level;
         }
     }
-
-    /* If only one class supplies the Spellcasting feature, use that class's
-       native progression. This only differs from the shared multiclass table
-       for third casters: Eldritch Knight/Arcane Trickster use ceil(level/3)
-       for their own subclass slot table, but contribute floor(level/3) when
-       combined with another Spellcasting class. Pact Magic is separate and
-       does not turn a sole third caster into a multiclass Spellcasting pool. */
     if(shared_caster_count == 1U && sole_shared_caster &&
        sole_shared_caster->spellcasting_mode == DndSpellcastingThird) {
         caster_level = sole_shared_caster->level < 3U ? 0U : (sole_shared_caster->level + 2U) / 3U;
     } else {
-        for(uint8_t i = 0U; i < character->class_count; ++i) {
-            const DndClassLevel* level = &character->classes[i];
+        for(uint8_t i = 0U; i < class_count; ++i) {
+            const DndClassLevel* level = &classes[i];
             if(level->spellcasting_mode == DndSpellcastingFull)
                 caster_level += level->level;
             else if(level->spellcasting_mode == DndSpellcastingHalf)
@@ -138,14 +137,22 @@ void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character) {
         }
     }
     if(caster_level > 20U) caster_level = 20U;
-    character->spell_slots_max[0] = 0U;
-    character->spell_slots_current[0] = 0U;
+    spell_slots_max[0] = 0U;
+    spell_slots_current[0] = 0U;
     for(uint8_t level = 1U; level <= 9U; ++level) {
         uint8_t maximum = caster_level ? slots[caster_level - 1U][level - 1U] : 0U;
-        character->spell_slots_max[level] = maximum;
-        if(character->spell_slots_current[level] > maximum)
-            character->spell_slots_current[level] = maximum;
+        spell_slots_max[level] = maximum;
+        if(spell_slots_current[level] > maximum) spell_slots_current[level] = maximum;
     }
+}
+
+void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character) {
+    if(!character) return;
+    dndolphins_spells_recalculate_shared_slots(
+        character->classes,
+        character->class_count,
+        character->spell_slots_current,
+        character->spell_slots_max);
 }
 
 bool dndolphins_spells_initialize_spell_slots_if_unset(DndCharacter* character) {
@@ -628,7 +635,9 @@ static bool dndolphins_spells_combat_spell_index_visitor(
            spell->level,
            dnd_rules_core_total_level(scan->character),
            ability_modifier,
-           &damage)) {
+           &damage) &&
+       (damage.resolution == DndSpellResolutionAttack ||
+        damage.secondary_resolution == DndSpellResolutionAttack || damage.attack_rolls)) {
         if(scan->count >= scan->start && scan->count - scan->start < scan->capacity)
             scan->indices[scan->count - scan->start] = logical_index;
         ++scan->count;
@@ -656,6 +665,66 @@ bool dndolphins_spells_collect_combat_indices(
     uint16_t total = 0U;
     bool success = dnd_storage_visit_spells(
         storage, profile, dndolphins_spells_combat_spell_index_visitor, &context, &total);
+    *count = context.count;
+    if(total_count) *total_count = total;
+    return success;
+}
+
+typedef DndDolphinsCombatSpellIndexContext DndDolphinsUtilitySpellIndexContext;
+
+static bool dndolphins_spells_utility_spell_index_visitor(
+    uint16_t logical_index,
+    const DndSpell* spell,
+    uint8_t known,
+    uint8_t always_prepared,
+    uint8_t free_casts_current,
+    uint8_t free_casts_max,
+    void* context) {
+    (void)free_casts_max;
+    DndDolphinsUtilitySpellIndexContext* scan = context;
+    if(!dndolphins_spells_record_has_cast_resource(
+           scan->character, spell, known, always_prepared, free_casts_current))
+        return true;
+    uint8_t ability = dndolphins_spells_casting_ability_for(scan->character, spell);
+    int8_t ability_modifier =
+        dnd_rules_core_ability_modifier(scan->character->ability_scores[ability]);
+    DndSpellDamageSpec damage;
+    bool mapped = dndolphins_spell_combat_damage_spec(
+        spell,
+        spell->level,
+        dnd_rules_core_total_level(scan->character),
+        ability_modifier,
+        &damage);
+    bool attack_roll = mapped &&
+        (damage.resolution == DndSpellResolutionAttack ||
+         damage.secondary_resolution == DndSpellResolutionAttack || damage.attack_rolls);
+    if(attack_roll) return true;
+    if(scan->count >= scan->start && scan->count - scan->start < scan->capacity)
+        scan->indices[scan->count - scan->start] = logical_index;
+    ++scan->count;
+    return true;
+}
+
+bool dndolphins_spells_collect_utility_indices(
+    Storage* storage,
+    uint32_t profile,
+    const DndCharacter* character,
+    uint16_t start,
+    uint16_t* indices,
+    uint16_t capacity,
+    uint16_t* count,
+    uint16_t* total_count) {
+    if(!storage || !character || !count || (capacity && !indices)) return false;
+    DndDolphinsUtilitySpellIndexContext context = {
+        .character = character,
+        .indices = indices,
+        .start = start,
+        .capacity = capacity,
+        .count = 0U,
+    };
+    uint16_t total = 0U;
+    bool success = dnd_storage_visit_spells(
+        storage, profile, dndolphins_spells_utility_spell_index_visitor, &context, &total);
     *count = context.count;
     if(total_count) *total_count = total;
     return success;

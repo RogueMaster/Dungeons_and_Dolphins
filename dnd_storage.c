@@ -340,8 +340,27 @@ static void dnd_storage_spellbook_path(char* output, size_t size, uint32_t profi
     snprintf(output, size, "%s/spellbook_%lu.txt", DND_STORAGE_DATA_DIR, (unsigned long)profile);
 }
 
+static bool dnd_storage_inventory_bag_is_main(const char* bag) {
+    return !bag || !bag[0] || !strcmp(bag, "Main");
+}
+
+static bool dnd_storage_inventory_bag_is_group(const char* bag) {
+    return bag && !strcmp(bag, "Group");
+}
+
+static void dnd_storage_items_bag_path(
+    char* output, size_t size, uint32_t profile, const char* bag) {
+    if(dnd_storage_inventory_bag_is_main(bag)) {
+        snprintf(output, size, "%s/inventory_%lu.txt", DND_STORAGE_DATA_DIR, (unsigned long)profile);
+        return;
+    }
+    char safe[DND_INVENTORY_BAG_NAME_LEN];
+    dnd_storage_filename_name(safe, sizeof(safe), bag);
+    snprintf(output, size, "%s/inv%s_%lu.txt", DND_STORAGE_DATA_DIR, safe, (unsigned long)profile);
+}
+
 static void dnd_storage_items_path(char* output, size_t size, uint32_t profile) {
-    snprintf(output, size, "%s/inventory_%lu.txt", DND_STORAGE_DATA_DIR, (unsigned long)profile);
+    dnd_storage_items_bag_path(output, size, profile, "Main");
 }
 
 static void dnd_storage_collection_path(
@@ -403,13 +422,28 @@ static bool
        CREATE_ALWAYS cannot overwrite a live collection here. */
     File* file = storage_file_alloc(storage);
     if(!file) return false;
-    bool success = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+    bool opened = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool success = opened &&
                    storage_file_write(file, header, strlen(header)) == strlen(header) &&
                    storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    return success && storage_file_exists(storage, path);
+    if(!success) {
+        /* Remove only a file that this create attempt actually opened. A
+           pre-existing non-file collision (for example a directory with this
+           name) must not be deleted as collateral cleanup. */
+        if(opened) (void)storage_common_remove(storage, path);
+        return false;
+    }
+    return storage_file_exists(storage, path);
 }
+
+static bool dnd_storage_write_raw(File* file, const char* value);
+static void dnd_storage_collection_snapshot_path(
+    char* output, size_t size, uint32_t profile, const DndCharacter* character, const char* collection);
+static File* dnd_storage_open_collection_snapshot(
+    Storage* storage, uint32_t profile, const DndCharacter* owner, const char* collection,
+    char* snapshot, size_t snapshot_size, char* live, size_t live_size);
 
 static bool dnd_storage_ensure_spellbook_sidecar(Storage* storage, uint32_t profile) {
     char path[DND_FS_PATH_LEN];
@@ -421,6 +455,52 @@ static bool dnd_storage_ensure_items_sidecar(Storage* storage, uint32_t profile)
     char path[DND_FS_PATH_LEN];
     dnd_storage_items_path(path, sizeof(path), profile);
     return dnd_storage_ensure_collection_sidecar(storage, path, "DNDItems=1\n");
+}
+
+static bool dnd_storage_ensure_items_bag_sidecar(
+    Storage* storage, uint32_t profile, const char* bag) {
+    if(dnd_storage_inventory_bag_is_main(bag)) return dnd_storage_ensure_items_sidecar(storage, profile);
+    char path[DND_FS_PATH_LEN];
+    dnd_storage_items_bag_path(path, sizeof(path), profile, bag);
+    if(storage_file_exists(storage, path)) return true;
+    storage_common_mkdir(storage, DND_STORAGE_DATA_DIR);
+    File* file = storage_file_alloc(storage);
+    if(!file) return false;
+    bool opened = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool success = opened && dnd_storage_write_raw(file, "DNDItems=1\n") &&
+                   dnd_storage_writef(file, "BagName=%s\n", bag ? bag : "") &&
+                   storage_file_sync(file);
+    storage_file_close(file);
+    storage_file_free(file);
+    if(!success) {
+        /* Remove only an incomplete file created by this attempt; never remove
+           a pre-existing non-file path that merely blocked file creation. */
+        if(opened) (void)storage_common_remove(storage, path);
+        return false;
+    }
+    return storage_file_exists(storage, path);
+}
+
+static File* dnd_storage_open_items_bag_snapshot(
+    Storage* storage, uint32_t profile, const DndCharacter* owner, const char* bag,
+    char* snapshot, size_t snapshot_size, char* live, size_t live_size) {
+    if(dnd_storage_inventory_bag_is_main(bag))
+        return dnd_storage_open_collection_snapshot(
+            storage, profile, owner, "items", snapshot, snapshot_size, live, live_size);
+    dnd_storage_items_bag_path(live, live_size, profile, bag);
+    char safe[DND_INVENTORY_BAG_NAME_LEN];
+    dnd_storage_filename_name(safe, sizeof(safe), bag);
+    char suffix[40];
+    snprintf(suffix, sizeof(suffix), "items_%s", safe);
+    dnd_storage_collection_snapshot_path(snapshot, snapshot_size, profile, owner, suffix);
+    storage_common_mkdir(storage, DND_STORAGE_DATA_DIR);
+    File* file = storage_file_alloc(storage);
+    if(!file) return NULL;
+    if(!storage_file_open(file, snapshot, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+        storage_file_free(file);
+        return NULL;
+    }
+    return file;
 }
 
 static void dnd_storage_collection_snapshot_path(
@@ -625,7 +705,7 @@ static bool dnd_storage_write_spell_record(
            dnd_storage_write_collection_field(file, spell->grant_name) &&
            dnd_storage_writef(
                file,
-               "|%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
+               "|%u,%u,%u,%u,%u,%u,%u,%u,%u,%u\n",
                spell->level,
                spell->class_index,
                spell->prepared,
@@ -634,7 +714,8 @@ static bool dnd_storage_write_spell_record(
                always_prepared,
                free_casts_current,
                free_casts_max,
-               spell->grant_source);
+               spell->grant_source,
+               spell->favorite);
 }
 
 static bool dnd_storage_parse_spell_record(
@@ -649,8 +730,9 @@ static bool dnd_storage_parse_spell_record(
     char* fields[8];
     uint8_t field_count = dnd_storage_split_collection_line(line, fields, 8U);
     if(field_count != 8U || strcmp(fields[0], "S")) return false;
-    int32_t n[9];
-    if(dnd_storage_parse_numbers(fields[7], n, 9U) != 9U) return false;
+    int32_t n[10] = {0};
+    uint8_t number_count = dnd_storage_parse_numbers(fields[7], n, 10U);
+    if(number_count != 9U && number_count != 10U) return false;
     memset(spell, 0, sizeof(*spell));
     dnd_storage_decode_string(spell->name, sizeof(spell->name), fields[1]);
     dnd_storage_decode_string(spell->detail, sizeof(spell->detail), fields[2]);
@@ -667,6 +749,7 @@ static bool dnd_storage_parse_spell_record(
     *free_casts_current = (uint8_t)n[6];
     *free_casts_max = (uint8_t)n[7];
     spell->grant_source = (uint8_t)n[8];
+    spell->favorite = number_count >= 10U && n[9] ? 1U : 0U;
     if(spell->level > 9U) spell->level = 9U;
     if(spell->class_index >= DND_MAX_CLASSES) spell->class_index = 0U;
     if(*free_casts_max > 20U) *free_casts_max = 20U;
@@ -1185,16 +1268,17 @@ bool dnd_storage_remap_spell_classes(
         storage, profile, owner, false, true, removed_class);
 }
 
-bool dnd_storage_visit_items(
+bool dnd_storage_visit_items_bag(
     Storage* storage,
     uint32_t profile,
+    const char* bag,
     DndDolphinsItemRecordVisitor visitor,
     void* context,
     uint16_t* total_count) {
     if(!storage) return false;
     if(total_count) *total_count = 0U;
     char path[DND_FS_PATH_LEN];
-    dnd_storage_items_path(path, sizeof(path), profile);
+    dnd_storage_items_bag_path(path, sizeof(path), profile, bag);
     if(!storage_file_exists(storage, path)) return true;
     File* file = storage_file_alloc(storage);
     if(!file) return false;
@@ -1229,11 +1313,24 @@ bool dnd_storage_visit_items(
     return success;
 }
 
-bool dnd_storage_items_exist(Storage* storage, uint32_t profile) {
+bool dnd_storage_visit_items(
+    Storage* storage,
+    uint32_t profile,
+    DndDolphinsItemRecordVisitor visitor,
+    void* context,
+    uint16_t* total_count) {
+    return dnd_storage_visit_items_bag(storage, profile, "Main", visitor, context, total_count);
+}
+
+bool dnd_storage_items_exist_bag(Storage* storage, uint32_t profile, const char* bag) {
     if(!storage) return false;
     char path[DND_FS_PATH_LEN];
-    dnd_storage_items_path(path, sizeof(path), profile);
+    dnd_storage_items_bag_path(path, sizeof(path), profile, bag);
     return storage_file_exists(storage, path);
+}
+
+bool dnd_storage_items_exist(Storage* storage, uint32_t profile) {
+    return dnd_storage_items_exist_bag(storage, profile, "Main");
 }
 
 bool dnd_storage_remove_live_items(Storage* storage, uint32_t profile) {
@@ -1406,7 +1503,8 @@ bool dnd_storage_create_items_from_assets(
     /* items_exist() above is the ownership guard. Use the same proven create
        mode as the rest of the app rather than CREATE_NEW, which can fail on
        first use before inventory_<id>.txt ever appears on the SD card. */
-    if(!storage_file_open(output, live, FSAM_WRITE, FSOM_CREATE_ALWAYS)) {
+    bool opened = storage_file_open(output, live, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    if(!opened) {
         storage_file_free(output);
         return false;
     }
@@ -1427,7 +1525,10 @@ bool dnd_storage_create_items_from_assets(
     storage_file_close(output);
     storage_file_free(output);
     if(!success) {
-        storage_common_remove(storage, live);
+        /* The destination was confirmed absent before this create attempt.
+           Remove only the incomplete regular file we successfully opened; a
+           pre-existing directory/path collision must survive a failed open. */
+        if(opened) (void)storage_common_remove(storage, live);
         return false;
     }
     if(created) *created = true;
@@ -1542,6 +1643,7 @@ bool dnd_storage_regrant_items_from_assets(
 static bool dnd_storage_load_items_window_internal(
     Storage* storage,
     uint32_t profile,
+    const char* bag,
     uint16_t start,
     DndCharacter* character,
     uint16_t* total_count,
@@ -1564,7 +1666,7 @@ static bool dnd_storage_load_items_window_internal(
     }
 
     char path[DND_FS_PATH_LEN];
-    dnd_storage_items_path(path, sizeof(path), profile);
+    dnd_storage_items_bag_path(path, sizeof(path), profile, bag);
     if(!storage_file_exists(storage, path)) return true;
     File* file = storage_file_alloc(storage);
     if(!file) return false;
@@ -1636,7 +1738,7 @@ bool dnd_storage_load_items_window(
     DndCharacter* character,
     uint16_t* total_count) {
     return dnd_storage_load_items_window_internal(
-        storage, profile, start, character, total_count, NULL, NULL);
+        storage, profile, "Main", start, character, total_count, NULL, NULL);
 }
 
 bool dnd_storage_load_items_window_indexed(
@@ -1648,12 +1750,27 @@ bool dnd_storage_load_items_window_indexed(
     uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages) {
     return dnd_storage_load_items_window_internal(
-        storage, profile, start, character, total_count, page_offsets, valid_pages);
+        storage, profile, "Main", start, character, total_count, page_offsets, valid_pages);
+}
+
+
+bool dnd_storage_load_items_window_indexed_bag(
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    uint16_t start,
+    DndCharacter* character,
+    uint16_t* total_count,
+    uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
+    uint8_t* valid_pages) {
+    return dnd_storage_load_items_window_internal(
+        storage, profile, bag, start, character, total_count, page_offsets, valid_pages);
 }
 
 static bool dnd_storage_rewrite_items(
     Storage* storage,
     uint32_t profile,
+    const char* bag,
     const DndCharacter* owner,
     uint16_t replace_start,
     const DndCharacter* replacement,
@@ -1662,16 +1779,19 @@ static bool dnd_storage_rewrite_items(
     if(!owner) return false;
     int32_t currency[5] = {0, 0, 0, 0, 0};
     bool currency_found = false;
-    if(!dnd_storage_load_inventory_currency(storage, profile, currency, &currency_found))
+    if(dnd_storage_inventory_bag_is_main(bag) &&
+       !dnd_storage_load_inventory_currency(storage, profile, currency, &currency_found))
         return false;
     /* Inventory sidecar currency is authoritative. Other FAPs preserve the
        absence of Currency=; DNDInventory creates that metadata when it opens
        an item-only sidecar. */
     char path[DND_FS_PATH_LEN], snapshot[DND_FS_PATH_LEN];
-    File* output = dnd_storage_open_collection_snapshot(
-        storage, profile, owner, "items", snapshot, sizeof(snapshot), path, sizeof(path));
+    File* output = dnd_storage_open_items_bag_snapshot(
+        storage, profile, owner, bag, snapshot, sizeof(snapshot), path, sizeof(path));
     if(!output) return false;
     bool success = dnd_storage_write_raw(output, "DNDItems=1\n");
+    if(success && !dnd_storage_inventory_bag_is_main(bag))
+        success = dnd_storage_writef(output, "BagName=%s\n", bag ? bag : "");
     if(success && currency_found) success = dnd_storage_write_inventory_currency(output, currency);
     File* input = NULL;
     char* line = NULL;
@@ -1691,6 +1811,7 @@ static bool dnd_storage_rewrite_items(
                   dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
                 if(!strncmp(line, "DNDItems=", 9U)) continue;
                 if(!strncmp(line, "Currency=", 9U)) continue;
+                if(!strncmp(line, "BagName=", 8U)) continue;
                 if(strncmp(line, "I|", 2U)) {
                     success = dnd_storage_write_raw(output, line) &&
                               dnd_storage_write_raw(output, "\n");
@@ -1750,7 +1871,13 @@ bool dnd_storage_save_items_window(
     uint16_t start,
     const DndCharacter* character) {
     if(!storage || !character || (character->item_count && !character->items)) return false;
-    return dnd_storage_rewrite_items(storage, profile, character, start, character, -1, NULL);
+    return dnd_storage_rewrite_items(storage, profile, "Main", character, start, character, -1, NULL);
+}
+
+bool dnd_storage_save_items_window_bag(
+    Storage* storage, uint32_t profile, const char* bag, uint16_t start, const DndCharacter* character) {
+    if(!storage || !character || (character->item_count && !character->items)) return false;
+    return dnd_storage_rewrite_items(storage, profile, bag, character, start, character, -1, NULL);
 }
 
 bool dnd_storage_save_inventory_currency(
@@ -1795,49 +1922,436 @@ bool dnd_storage_save_inventory_currency(
     return dnd_storage_publish_collection_snapshot(storage, output, snapshot, path, success);
 }
 
-bool dnd_storage_append_items(
+static bool dnd_storage_append_items_bag_internal(
     Storage* storage,
     uint32_t profile,
+    const char* bag,
     const DndCharacter* owner,
     const DndItem* item,
     uint8_t count) {
     if(!storage || !owner || !item || !count) return false;
-    if(!dnd_storage_ensure_items_sidecar(storage, profile)) return false;
+    if(!dnd_storage_ensure_items_bag_sidecar(storage, profile, bag)) return false;
 
     /* Append-only writers do not own Inventory metadata. Copy the sidecar byte
        for byte and add only the new item record; DNDInventory is solely
        responsible for creating Currency= when it later opens an item-only file. */
     char live[DND_FS_PATH_LEN], snapshot[DND_FS_PATH_LEN];
-    File* output = dnd_storage_open_collection_snapshot(
-        storage, profile, owner, "items", snapshot, sizeof(snapshot), live, sizeof(live));
+    File* output = dnd_storage_open_items_bag_snapshot(
+        storage, profile, owner, bag, snapshot, sizeof(snapshot), live, sizeof(live));
     if(!output) return false;
 
     uint64_t copied_size = 0U;
     bool needs_separator = false;
     bool success = dnd_storage_copy_live_collection_to_snapshot(
         storage, live, output, &copied_size, &needs_separator);
-    if(success && !copied_size) success = dnd_storage_write_raw(output, "DNDItems=1\n");
+    if(success && !copied_size) {
+        success = dnd_storage_write_raw(output, "DNDItems=1\n");
+        if(success && !dnd_storage_inventory_bag_is_main(bag))
+            success = dnd_storage_writef(output, "BagName=%s\n", bag ? bag : "");
+    }
     if(success && needs_separator) success = dnd_storage_write_raw(output, "\n");
     for(uint8_t i = 0U; success && i < count; ++i)
         success = dnd_storage_write_item_record(output, &item[i]);
     return dnd_storage_publish_collection_snapshot(storage, output, snapshot, live, success);
 }
 
+bool dnd_storage_append_items(
+    Storage* storage, uint32_t profile, const DndCharacter* owner, const DndItem* item, uint8_t count) {
+    return dnd_storage_append_items_bag_internal(storage, profile, "Main", owner, item, count);
+}
+
+bool dnd_storage_append_item_bag(
+    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, const DndItem* item) {
+    return dnd_storage_append_items_bag_internal(storage, profile, bag, owner, item, 1U);
+}
+
 bool dnd_storage_append_item(
-    Storage* storage,
-    uint32_t profile,
-    const DndCharacter* owner,
-    const DndItem* item) {
+    Storage* storage, uint32_t profile, const DndCharacter* owner, const DndItem* item) {
     return dnd_storage_append_items(storage, profile, owner, item, 1U);
 }
 
-bool dnd_storage_delete_item(
+bool dnd_storage_delete_item_bag(
+    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, uint16_t index) {
+    if(!storage || !owner) return false;
+    return dnd_storage_rewrite_items(storage, profile, bag, owner, 0U, NULL, index, NULL);
+}
+
+static bool dnd_storage_item_selected(
+    const uint8_t* selected_bits, uint16_t source_total, uint16_t index) {
+    return selected_bits && index < source_total &&
+           (selected_bits[index >> 3U] & (uint8_t)(1U << (index & 7U)));
+}
+
+static uint16_t dnd_storage_selected_rank_before(
+    const uint8_t* selected_bits, uint16_t source_total, uint16_t index) {
+    if(!selected_bits || !source_total || !index) return 0U;
+    if(index > source_total) index = source_total;
+    uint16_t count = 0U;
+    for(uint16_t i = 0U; i < index; ++i)
+        if(dnd_storage_item_selected(selected_bits, source_total, i)) ++count;
+    return count;
+}
+
+static bool dnd_storage_publish_two_item_snapshots(
+    Storage* storage,
+    File* source_output,
+    const char* source_snapshot,
+    const char* source_live,
+    File* destination_output,
+    const char* destination_snapshot,
+    const char* destination_live,
+    bool success) {
+    success = dnd_storage_close_synced_file(source_output, success);
+    success = dnd_storage_close_synced_file(destination_output, success);
+    if(!success) return false;
+
+    char source_temp[DND_FS_LONG_PATH_LEN], destination_temp[DND_FS_LONG_PATH_LEN];
+    char source_backup[DND_FS_LONG_PATH_LEN], destination_backup[DND_FS_LONG_PATH_LEN];
+    snprintf(source_temp, sizeof(source_temp), "%s.move.tmp", source_live);
+    snprintf(destination_temp, sizeof(destination_temp), "%s.move.tmp", destination_live);
+    snprintf(source_backup, sizeof(source_backup), "%s.move.bak", source_live);
+    snprintf(destination_backup, sizeof(destination_backup), "%s.move.bak", destination_live);
+
+    (void)storage_common_remove(storage, source_temp);
+    (void)storage_common_remove(storage, destination_temp);
+    if(!dnd_storage_copy_file_direct(storage, source_snapshot, source_temp) ||
+       !dnd_storage_copy_file_direct(storage, destination_snapshot, destination_temp)) {
+        (void)storage_common_remove(storage, source_temp);
+        (void)storage_common_remove(storage, destination_temp);
+        return false;
+    }
+
+    /* Recover stale backups before beginning a new two-file transaction. */
+    if(storage_file_exists(storage, source_backup)) {
+        if(!storage_file_exists(storage, source_live))
+            (void)storage_common_rename(storage, source_backup, source_live);
+        else
+            (void)storage_common_remove(storage, source_backup);
+    }
+    if(storage_file_exists(storage, destination_backup)) {
+        if(!storage_file_exists(storage, destination_live))
+            (void)storage_common_rename(storage, destination_backup, destination_live);
+        else
+            (void)storage_common_remove(storage, destination_backup);
+    }
+
+    bool source_had_live = storage_file_exists(storage, source_live);
+    bool destination_had_live = storage_file_exists(storage, destination_live);
+    if(source_had_live && storage_common_rename(storage, source_live, source_backup) != FSE_OK)
+        return false;
+    if(destination_had_live &&
+       storage_common_rename(storage, destination_live, destination_backup) != FSE_OK) {
+        if(source_had_live) (void)storage_common_rename(storage, source_backup, source_live);
+        return false;
+    }
+
+    bool source_published = storage_common_rename(storage, source_temp, source_live) == FSE_OK;
+    bool destination_published = false;
+    if(source_published)
+        destination_published =
+            storage_common_rename(storage, destination_temp, destination_live) == FSE_OK;
+
+    if(!source_published || !destination_published) {
+        if(storage_file_exists(storage, source_live)) (void)storage_common_remove(storage, source_live);
+        if(storage_file_exists(storage, destination_live))
+            (void)storage_common_remove(storage, destination_live);
+        if(source_had_live) (void)storage_common_rename(storage, source_backup, source_live);
+        if(destination_had_live)
+            (void)storage_common_rename(storage, destination_backup, destination_live);
+        (void)storage_common_remove(storage, source_temp);
+        (void)storage_common_remove(storage, destination_temp);
+        return false;
+    }
+
+    if(source_had_live) (void)storage_common_remove(storage, source_backup);
+    if(destination_had_live) (void)storage_common_remove(storage, destination_backup);
+    return true;
+}
+
+bool dnd_storage_move_items_bag_selected(
     Storage* storage,
     uint32_t profile,
+    const char* source_bag,
+    const char* destination_bag,
     const DndCharacter* owner,
-    uint16_t index) {
-    if(!storage || !owner) return false;
-    return dnd_storage_rewrite_items(storage, profile, owner, 0U, NULL, index, NULL);
+    const uint8_t* selected_bits,
+    uint16_t source_total,
+    uint16_t* moved_count) {
+    if(moved_count) *moved_count = 0U;
+    if(!storage || !owner || !selected_bits || !source_total || !source_bag || !destination_bag ||
+       !strcmp(source_bag, destination_bag))
+        return false;
+
+    uint16_t selected_count = dnd_storage_selected_rank_before(selected_bits, source_total, source_total);
+    if(!selected_count) return false;
+    if(!dnd_storage_ensure_items_bag_sidecar(storage, profile, source_bag) ||
+       !dnd_storage_ensure_items_bag_sidecar(storage, profile, destination_bag))
+        return false;
+
+    uint16_t destination_total = 0U;
+    if(!dnd_storage_visit_items_bag(
+           storage, profile, destination_bag, NULL, NULL, &destination_total))
+        return false;
+    if((uint32_t)destination_total + selected_count > UINT16_MAX) return false;
+
+    char source_live[DND_FS_PATH_LEN], source_snapshot[DND_FS_PATH_LEN];
+    char destination_live[DND_FS_PATH_LEN], destination_snapshot[DND_FS_PATH_LEN];
+    File* source_output = dnd_storage_open_items_bag_snapshot(
+        storage,
+        profile,
+        owner,
+        source_bag,
+        source_snapshot,
+        sizeof(source_snapshot),
+        source_live,
+        sizeof(source_live));
+    if(!source_output) return false;
+    File* destination_output = dnd_storage_open_items_bag_snapshot(
+        storage,
+        profile,
+        owner,
+        destination_bag,
+        destination_snapshot,
+        sizeof(destination_snapshot),
+        destination_live,
+        sizeof(destination_live));
+    if(!destination_output) {
+        dnd_storage_close_synced_file(source_output, false);
+        return false;
+    }
+
+    uint64_t copied_size = 0U;
+    bool needs_separator = false;
+    bool success = dnd_storage_copy_live_collection_to_snapshot(
+        storage, destination_live, destination_output, &copied_size, &needs_separator);
+    if(success && !copied_size) {
+        success = dnd_storage_write_raw(destination_output, "DNDItems=1\n");
+        if(success && !dnd_storage_inventory_bag_is_main(destination_bag))
+            success = dnd_storage_writef(
+                destination_output, "BagName=%s\n", destination_bag ? destination_bag : "");
+    }
+    if(success && needs_separator) success = dnd_storage_write_raw(destination_output, "\n");
+
+    File* input = NULL;
+    char* line = NULL;
+    uint16_t logical = 0U;
+    if(success) {
+        input = storage_file_alloc(storage);
+        if(!input || !storage_file_open(input, source_live, FSAM_READ, FSOM_OPEN_EXISTING))
+            success = false;
+    }
+    if(success) {
+        line = malloc(DND_STORAGE_COLLECTION_LINE_LEN);
+        if(!line) success = false;
+    }
+    if(success) {
+        DndDolphinsReader reader;
+        dnd_storage_reader_init(&reader, input);
+        while(success && dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
+            if(strncmp(line, "I|", 2U)) continue;
+            DndItem item;
+            if(!dnd_storage_parse_item_record(line, &item)) continue;
+            if(dnd_storage_item_selected(selected_bits, source_total, logical)) {
+                if(item.container_index >= 0) {
+                    uint16_t container = (uint16_t)item.container_index;
+                    if(container < source_total &&
+                       dnd_storage_item_selected(selected_bits, source_total, container)) {
+                        item.container_index = (int32_t)destination_total +
+                                               dnd_storage_selected_rank_before(
+                                                   selected_bits, source_total, container);
+                    } else {
+                        item.container_index = -1;
+                    }
+                }
+                success = dnd_storage_write_item_record(destination_output, &item);
+            }
+            if(logical < UINT16_MAX) ++logical;
+        }
+        if(storage_file_get_error(input) != FSE_OK) success = false;
+        if(logical != source_total) success = false;
+    }
+    if(input) {
+        storage_file_close(input);
+        storage_file_free(input);
+        input = NULL;
+    }
+    free(line);
+    line = NULL;
+
+    /* Rewrite the source, preserving non-item metadata and malformed/manual lines. */
+    logical = 0U;
+    if(success) {
+        input = storage_file_alloc(storage);
+        if(!input || !storage_file_open(input, source_live, FSAM_READ, FSOM_OPEN_EXISTING))
+            success = false;
+    }
+    if(success) {
+        line = malloc(DND_STORAGE_COLLECTION_LINE_LEN);
+        if(!line) success = false;
+    }
+    if(success) {
+        DndDolphinsReader reader;
+        dnd_storage_reader_init(&reader, input);
+        while(success && dnd_storage_read_line(&reader, line, DND_STORAGE_COLLECTION_LINE_LEN)) {
+            if(strncmp(line, "I|", 2U)) {
+                success = dnd_storage_write_raw(source_output, line) &&
+                          dnd_storage_write_raw(source_output, "\n");
+                continue;
+            }
+            DndItem item;
+            if(!dnd_storage_parse_item_record(line, &item)) {
+                success = dnd_storage_write_raw(source_output, line) &&
+                          dnd_storage_write_raw(source_output, "\n");
+                continue;
+            }
+            bool selected = dnd_storage_item_selected(selected_bits, source_total, logical);
+            if(!selected) {
+                if(item.container_index >= 0) {
+                    uint16_t container = (uint16_t)item.container_index;
+                    if(container < source_total &&
+                       dnd_storage_item_selected(selected_bits, source_total, container)) {
+                        item.container_index = -1;
+                    } else if(container < source_total) {
+                        item.container_index =
+                            (int32_t)container -
+                            dnd_storage_selected_rank_before(selected_bits, source_total, container);
+                    }
+                }
+                success = dnd_storage_write_item_record(source_output, &item);
+            }
+            if(logical < UINT16_MAX) ++logical;
+        }
+        if(storage_file_get_error(input) != FSE_OK) success = false;
+        if(logical != source_total) success = false;
+    }
+    if(input) {
+        storage_file_close(input);
+        storage_file_free(input);
+    }
+    free(line);
+
+    success = dnd_storage_publish_two_item_snapshots(
+        storage,
+        source_output,
+        source_snapshot,
+        source_live,
+        destination_output,
+        destination_snapshot,
+        destination_live,
+        success);
+    if(success && moved_count) *moved_count = selected_count;
+    return success;
+}
+
+bool dnd_storage_delete_item(
+    Storage* storage, uint32_t profile, const DndCharacter* owner, uint16_t index) {
+    return dnd_storage_delete_item_bag(storage, profile, "Main", owner, index);
+}
+
+static bool dnd_storage_inventory_nonmain_bag_filename(
+    const char* filename, uint32_t profile, char* safe, size_t safe_size) {
+    if(!filename || strncmp(filename, "inv", 3U) || !strncmp(filename, "inventory_", 10U)) return false;
+    char suffix[32];
+    snprintf(suffix, sizeof(suffix), "_%lu.txt", (unsigned long)profile);
+    size_t length = strlen(filename), suffix_len = strlen(suffix);
+    if(length <= 3U + suffix_len || strcmp(filename + length - suffix_len, suffix)) return false;
+    size_t name_len = length - 3U - suffix_len;
+    if(!name_len || name_len >= safe_size) return false;
+    memcpy(safe, filename + 3U, name_len);
+    safe[name_len] = '\0';
+    return true;
+}
+
+static bool dnd_storage_inventory_custom_bag_filename(
+    const char* filename, uint32_t profile, char* safe, size_t safe_size) {
+    return dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, safe_size) &&
+           strcmp(safe, "Group") != 0;
+}
+
+static bool dnd_storage_inventory_read_bag_name(
+    Storage* storage, const char* path, const char* fallback, char* name, size_t size) {
+    dnd_storage_copy(name, size, fallback);
+    File* file = storage_file_alloc(storage);
+    if(!file) return false;
+    if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
+        storage_file_free(file);
+        return false;
+    }
+    char line[64];
+    DndDolphinsReader reader;
+    dnd_storage_reader_init(&reader, file);
+    while(dnd_storage_read_line(&reader, line, sizeof(line))) {
+        if(strncmp(line, "BagName=", 8U)) continue;
+        if(line[8]) dnd_storage_copy(name, size, line + 8U);
+        break;
+    }
+    bool ok = storage_file_get_error(file) == FSE_OK;
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
+uint8_t dnd_storage_inventory_bag_count(Storage* storage, uint32_t profile) {
+    if(!storage) return 2U;
+    uint8_t count = 2U;
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return count;
+    }
+    FileInfo info;
+    char filename[128], safe[DND_INVENTORY_BAG_NAME_LEN];
+    while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) || !dnd_storage_inventory_custom_bag_filename(filename, profile, safe, sizeof(safe))) continue;
+        if(count < UINT8_MAX) ++count;
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return count;
+}
+
+bool dnd_storage_inventory_bag_at(
+    Storage* storage, uint32_t profile, uint8_t index, char* name, size_t size) {
+    if(!name || !size) return false;
+    if(index == 0U) { dnd_storage_copy(name, size, "Main"); return true; }
+    if(index == 1U) { dnd_storage_copy(name, size, "Group"); return true; }
+    if(!storage) return false;
+    uint8_t logical = 2U;
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    bool found = false;
+    FileInfo info;
+    char filename[128], safe[DND_INVENTORY_BAG_NAME_LEN], path[DND_FS_PATH_LEN];
+    while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) || !dnd_storage_inventory_custom_bag_filename(filename, profile, safe, sizeof(safe))) continue;
+        if(logical++ != index) continue;
+        if(dnd_fs_child_path(path, sizeof(path), DND_STORAGE_DATA_DIR, NULL, filename))
+            (void)dnd_storage_inventory_read_bag_name(storage, path, safe, name, size);
+        found = true;
+        break;
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return found;
+}
+
+bool dnd_storage_inventory_bag_create(Storage* storage, uint32_t profile, const char* name) {
+    if(!storage || !name || !name[0] || !strcmp(name, "Main") || !strcmp(name, "Group")) return false;
+    for(const char* p = name; *p; ++p) if(*p == '\n' || *p == '\r' || *p == '=') return false;
+    char path[DND_FS_PATH_LEN];
+    dnd_storage_items_bag_path(path, sizeof(path), profile, name);
+    if(storage_file_exists(storage, path)) return false;
+    return dnd_storage_ensure_items_bag_sidecar(storage, profile, name);
+}
+
+bool dnd_storage_inventory_bag_delete(Storage* storage, uint32_t profile, const char* name) {
+    if(!storage || !name || dnd_storage_inventory_bag_is_main(name) || dnd_storage_inventory_bag_is_group(name)) return false;
+    char path[DND_FS_PATH_LEN];
+    dnd_storage_items_bag_path(path, sizeof(path), profile, name);
+    return storage_file_exists(storage, path) && storage_common_remove(storage, path) == FSE_OK;
 }
 
 static bool dnd_storage_parse_profile_filename(const char* filename, DndProfileEntry* entry);
@@ -2583,7 +3097,7 @@ static bool dnd_storage_write_level_bundle_marker(
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     bool success = storage_file_open(file, marker, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
-                   dnd_storage_write_raw(file, "DNDHistoryBundle=2\n") && storage_file_sync(file);
+                   dnd_storage_write_raw(file, "DNDHistoryBundle=3\n") && storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
     return success && storage_file_exists(storage, marker);
@@ -2611,9 +3125,93 @@ static uint8_t dnd_storage_level_bundle_marker_version(
     storage_file_close(file);
     storage_file_free(file);
     if(!ok) return 0U;
-    return !strncmp(value, "DNDHistoryBundle=2", 18U) ? 2U :
+    return !strncmp(value, "DNDHistoryBundle=3", 18U) ? 3U :
+           !strncmp(value, "DNDHistoryBundle=2", 18U) ? 2U :
            !strncmp(value, "DNDHistoryBundle=1", 18U) ? 1U :
                                                         0U;
+}
+
+static bool dnd_storage_remove_level_bag_snapshots(
+    Storage* storage,
+    uint32_t profile,
+    const char* character_name,
+    uint8_t level) {
+    char safe_name[DND_CHARACTER_NAME_LEN];
+    char prefix[96];
+    dnd_storage_filename_name(
+        safe_name,
+        sizeof(safe_name),
+        character_name && character_name[0] ? character_name : "Unnamed");
+    snprintf(
+        prefix,
+        sizeof(prefix),
+        "ch_%lu_%s_%u_itemsbag_",
+        (unsigned long)profile,
+        safe_name,
+        level ? level : 1U);
+    const size_t prefix_len = strlen(prefix);
+
+    while(true) {
+        File* directory = storage_file_alloc(storage);
+        if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+            if(directory) storage_file_free(directory);
+            return false;
+        }
+        FileInfo info;
+        char filename[128];
+        char path[DND_FS_PATH_LEN] = {0};
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            size_t length = strlen(filename);
+            if(file_info_is_dir(&info) || strncmp(filename, prefix, prefix_len) != 0 ||
+               length < 4U || strcmp(filename + length - 4U, ".shd") != 0)
+                continue;
+            if(dnd_fs_child_path(path, sizeof(path), DND_STORAGE_DATA_DIR, NULL, filename))
+                break;
+            path[0] = '\0';
+        }
+        storage_dir_close(directory);
+        storage_file_free(directory);
+        if(!path[0]) return true;
+        if(storage_common_remove(storage, path) != FSE_OK) return false;
+    }
+}
+
+static bool dnd_storage_refresh_level_inventory_bags_fields(
+    Storage* storage,
+    uint32_t profile,
+    const char* character_name,
+    uint8_t level) {
+    if(!dnd_storage_remove_level_bag_snapshots(storage, profile, character_name, level))
+        return false;
+
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    bool success = true;
+    FileInfo info;
+    char filename[128];
+    char safe[DND_INVENTORY_BAG_NAME_LEN];
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, sizeof(safe)))
+            continue;
+        char live[DND_FS_PATH_LEN];
+        char snapshot[DND_FS_PATH_LEN];
+        char suffix[48];
+        if(!dnd_fs_child_path(live, sizeof(live), DND_STORAGE_DATA_DIR, NULL, filename)) {
+            success = false;
+            break;
+        }
+        snprintf(suffix, sizeof(suffix), "itemsbag_%s", safe);
+        dnd_storage_level_sidecar_snapshot_path_fields(
+            snapshot, sizeof(snapshot), profile, character_name, level, suffix);
+        success = dnd_storage_copy_file_direct(storage, live, snapshot);
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return success;
 }
 
 static bool dnd_storage_refresh_level_sidecars_fields(
@@ -2641,6 +3239,8 @@ static bool dnd_storage_refresh_level_sidecars_fields(
             success = false;
         }
     }
+    if(!dnd_storage_refresh_level_inventory_bags_fields(storage, profile, character_name, level))
+        success = false;
     return success;
 }
 
@@ -2763,6 +3363,16 @@ bool dnd_storage_save_profile_known_updated(
     return dnd_storage_save_profile_internal(storage, current_entry->id, data, current_path, true);
 }
 
+bool dnd_storage_validate_character_path(Storage* storage, const char* path) {
+    if(!storage || !path || !path[0]) return false;
+    DndSaveData* data = calloc(1U, sizeof(DndSaveData));
+    if(!data) return false;
+    bool ok = dnd_storage_load_text_path(storage, path, data);
+    dnd_data_clear(data);
+    free(data);
+    return ok;
+}
+
 bool dnd_storage_load_profile(
     Storage* storage,
     uint32_t profile,
@@ -2793,6 +3403,198 @@ static bool dnd_storage_remove_if_present(Storage* storage, const char* path) {
     return !storage_file_exists(storage, path) || storage_common_remove(storage, path) == FSE_OK;
 }
 
+static bool dnd_storage_remove_nonmain_inventory_bags(Storage* storage, uint32_t profile) {
+    if(!storage) return false;
+    while(true) {
+        File* directory = storage_file_alloc(storage);
+        if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+            if(directory) storage_file_free(directory);
+            return false;
+        }
+        FileInfo info;
+        char filename[128], safe[DND_INVENTORY_BAG_NAME_LEN], path[DND_FS_PATH_LEN] = {0};
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            if(file_info_is_dir(&info) ||
+               !dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, sizeof(safe)))
+                continue;
+            if(dnd_fs_child_path(path, sizeof(path), DND_STORAGE_DATA_DIR, NULL, filename)) break;
+            path[0] = '\0';
+        }
+        storage_dir_close(directory);
+        storage_file_free(directory);
+        if(!path[0]) return true;
+        if(storage_common_remove(storage, path) != FSE_OK) return false;
+    }
+}
+
+static bool dnd_storage_copy_nonmain_inventory_bags(
+    Storage* storage, uint32_t source_profile, uint32_t destination_profile) {
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    bool success = true;
+    FileInfo info;
+    char filename[128], safe[DND_INVENTORY_BAG_NAME_LEN];
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dnd_storage_inventory_nonmain_bag_filename(filename, source_profile, safe, sizeof(safe)))
+            continue;
+        char source[DND_FS_PATH_LEN], destination[DND_FS_PATH_LEN];
+        if(!dnd_fs_child_path(source, sizeof(source), DND_STORAGE_DATA_DIR, NULL, filename)) {
+            success = false;
+            break;
+        }
+        snprintf(destination, sizeof(destination), "%s/inv%s_%lu.txt", DND_STORAGE_DATA_DIR, safe,
+                 (unsigned long)destination_profile);
+        success = dnd_storage_copy_file_direct(storage, source, destination);
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return success;
+}
+
+
+
+
+
+static bool dnd_storage_archive_inventory_bag_path(
+    char* output, size_t size, uint32_t profile, const char* safe) {
+    if(!output || !size || !safe || !safe[0]) return false;
+    int written = snprintf(
+        output,
+        size,
+        "%s/ch_%lu_invbag_%s.txt",
+        DND_STORAGE_ARCHIVE_DIR,
+        (unsigned long)profile,
+        safe);
+    return written > 0 && (size_t)written < size;
+}
+
+static bool dnd_storage_remove_archived_inventory_bags(Storage* storage, uint32_t profile) {
+    if(!storage) return false;
+    char prefix[48];
+    snprintf(prefix, sizeof(prefix), "ch_%lu_invbag_", (unsigned long)profile);
+    while(true) {
+        File* directory = storage_file_alloc(storage);
+        if(!directory || !storage_dir_open(directory, DND_STORAGE_ARCHIVE_DIR)) {
+            if(directory) storage_file_free(directory);
+            return false;
+        }
+        FileInfo info;
+        char filename[128];
+        char path[DND_FS_LONG_PATH_LEN] = {0};
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            size_t length = strlen(filename);
+            if(file_info_is_dir(&info) || strncmp(filename, prefix, strlen(prefix)) != 0 ||
+               length < 5U || strcmp(filename + length - 4U, ".txt") != 0)
+                continue;
+            if(dnd_fs_child_path(path, sizeof(path), DND_STORAGE_ARCHIVE_DIR, NULL, filename))
+                break;
+            path[0] = '\0';
+        }
+        storage_dir_close(directory);
+        storage_file_free(directory);
+        if(!path[0]) return true;
+        if(storage_common_remove(storage, path) != FSE_OK) return false;
+    }
+}
+
+static bool dnd_storage_archive_nonmain_inventory_bags(Storage* storage, uint32_t profile) {
+    if(!storage) return false;
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    bool success = true;
+    FileInfo info;
+    char filename[128], safe[DND_INVENTORY_BAG_NAME_LEN];
+    /* Preflight all destinations before copying anything. */
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, sizeof(safe)))
+            continue;
+        char destination[DND_FS_LONG_PATH_LEN];
+        if(!dnd_storage_archive_inventory_bag_path(
+               destination, sizeof(destination), profile, safe) ||
+           storage_file_exists(storage, destination))
+            success = false;
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    if(!success) return false;
+
+    directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, sizeof(safe)))
+            continue;
+        char source[DND_FS_PATH_LEN], destination[DND_FS_LONG_PATH_LEN];
+        if(!dnd_fs_child_path(source, sizeof(source), DND_STORAGE_DATA_DIR, NULL, filename) ||
+           !dnd_storage_archive_inventory_bag_path(
+               destination, sizeof(destination), profile, safe)) {
+            success = false;
+            break;
+        }
+        success = dnd_storage_copy_file_direct(storage, source, destination);
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    if(!success) (void)dnd_storage_remove_archived_inventory_bags(storage, profile);
+    return success;
+}
+
+static bool dnd_storage_restore_archived_inventory_bags(Storage* storage, uint32_t profile) {
+    if(!storage) return false;
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_ARCHIVE_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    char prefix[48];
+    snprintf(prefix, sizeof(prefix), "ch_%lu_invbag_", (unsigned long)profile);
+    const size_t prefix_len = strlen(prefix);
+    bool success = true;
+    FileInfo info;
+    char filename[128];
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        size_t length = strlen(filename);
+        if(file_info_is_dir(&info) || strncmp(filename, prefix, prefix_len) != 0 ||
+           length <= prefix_len + 4U || strcmp(filename + length - 4U, ".txt") != 0)
+            continue;
+        size_t safe_len = length - prefix_len - 4U;
+        if(!safe_len || safe_len >= DND_INVENTORY_BAG_NAME_LEN) {
+            success = false;
+            break;
+        }
+        char safe[DND_INVENTORY_BAG_NAME_LEN];
+        memcpy(safe, filename + prefix_len, safe_len);
+        safe[safe_len] = '\0';
+        char source[DND_FS_LONG_PATH_LEN], destination[DND_FS_PATH_LEN];
+        if(!dnd_fs_child_path(source, sizeof(source), DND_STORAGE_ARCHIVE_DIR, NULL, filename)) {
+            success = false;
+            break;
+        }
+        snprintf(
+            destination,
+            sizeof(destination),
+            "%s/inv%s_%lu.txt",
+            DND_STORAGE_DATA_DIR,
+            safe,
+            (unsigned long)profile);
+        success = dnd_storage_copy_file_direct(storage, source, destination);
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return success;
+}
+
 bool dnd_storage_delete_profile(Storage* storage, uint32_t profile) {
     char path[DND_FS_PATH_LEN];
     char temp_path[DND_FS_PATH_LEN];
@@ -2821,6 +3623,7 @@ bool dnd_storage_delete_profile(Storage* storage, uint32_t profile) {
         dnd_storage_collection_path(path, sizeof(path), profile, added[i]);
         success = dnd_storage_remove_if_present(storage, path) && success;
     }
+    success = dnd_storage_remove_nonmain_inventory_bags(storage, profile) && success;
     /* Level-tagged .shd files are historical records. They are intentionally
        never deleted when the live profile or sidecars are removed. */
     return success;
@@ -2901,42 +3704,9 @@ bool dnd_storage_duplicate_profile(Storage* storage, uint32_t source, uint32_t d
             return false;
         }
     }
-    return true;
-}
-
-bool dnd_storage_export_profile(Storage* storage, uint32_t profile) {
-    char source_path[DND_FS_PATH_LEN];
-    if(!dnd_storage_find_profile_path(storage, profile, source_path, sizeof(source_path)))
+    if(!dnd_storage_copy_nonmain_inventory_bags(storage, source, destination)) {
+        dnd_storage_delete_profile(storage, destination);
         return false;
-    storage_common_mkdir(storage, DND_STORAGE_EXPORT_DIR);
-    const char* filename = strrchr(source_path, '/');
-    filename = filename ? filename + 1U : source_path;
-    char destination[DND_FS_LONG_PATH_LEN];
-    char temporary[DND_FS_LONG_PATH_LEN];
-    if(!dnd_fs_child_path(
-           destination, sizeof(destination), DND_STORAGE_EXPORT_DIR, "export_", filename))
-        return false;
-    snprintf(
-        temporary,
-        sizeof(temporary),
-        "%s/export_%lu.tmp",
-        DND_STORAGE_EXPORT_DIR,
-        (unsigned long)profile);
-    if(!dnd_storage_copy_file(storage, source_path, destination, temporary)) return false;
-
-    const char* collections[] = {
-        "spellbook", "items", "feats", "appliedgrants", "languages", "proficiencies"};
-    for(uint8_t i = 0U; i < 6U; ++i) {
-        dnd_storage_collection_path(source_path, sizeof(source_path), profile, collections[i]);
-        if(!storage_file_exists(storage, source_path)) continue;
-        snprintf(
-            destination,
-            sizeof(destination),
-            "%s/export_ch_%lu_%s.txt",
-            DND_STORAGE_EXPORT_DIR,
-            (unsigned long)profile,
-            collections[i]);
-        if(!dnd_storage_copy_file_direct(storage, source_path, destination)) return false;
     }
     return true;
 }
@@ -2973,7 +3743,11 @@ bool dnd_storage_archive_profile(Storage* storage, uint32_t profile) {
             return false;
     }
 
-    if(storage_common_rename(storage, source_path, destination) != FSE_OK) return false;
+    if(!dnd_storage_archive_nonmain_inventory_bags(storage, profile)) return false;
+    if(storage_common_rename(storage, source_path, destination) != FSE_OK) {
+        (void)dnd_storage_remove_archived_inventory_bags(storage, profile);
+        return false;
+    }
     for(uint8_t i = 0U; i < 6U; ++i) {
         if(!collection_present[i]) continue;
         if(storage_common_rename(storage, collection_source[i], collection_destination[i]) ==
@@ -2987,6 +3761,19 @@ bool dnd_storage_archive_profile(Storage* storage, uint32_t profile) {
                     storage, collection_destination[rollback], collection_source[rollback]);
         }
         storage_common_rename(storage, destination, source_path);
+        (void)dnd_storage_remove_archived_inventory_bags(storage, profile);
+        return false;
+    }
+    if(!dnd_storage_remove_nonmain_inventory_bags(storage, profile)) {
+        /* Restore the live set from archive copies, then roll the fixed files back. */
+        (void)dnd_storage_restore_archived_inventory_bags(storage, profile);
+        for(uint8_t rollback = 0U; rollback < 6U; ++rollback) {
+            if(collection_present[rollback])
+                (void)storage_common_rename(
+                    storage, collection_destination[rollback], collection_source[rollback]);
+        }
+        (void)storage_common_rename(storage, destination, source_path);
+        (void)dnd_storage_remove_archived_inventory_bags(storage, profile);
         return false;
     }
     return true;
@@ -3008,7 +3795,50 @@ bool dnd_storage_verify_profile(Storage* storage, uint32_t profile) {
     return ok;
 }
 
-bool dnd_storage_restore_backup(Storage* storage, uint32_t profile, DndSaveData* data) {
+bool dnd_storage_validate_profile_semantics(Storage* storage, uint32_t profile) {
+    if(!storage) return false;
+    char path[DND_FS_PATH_LEN];
+    if(!dnd_storage_find_profile_path(storage, profile, path, sizeof(path))) return false;
+
+    File* file = storage_file_alloc(storage);
+    if(!file) return false;
+    bool ok = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
+    DndDolphinsReader reader;
+    dnd_storage_reader_init(&reader, file);
+    char line[DND_STORAGE_ENCODED_LINE_LEN];
+    int32_t values[16];
+    while(ok && dnd_storage_read_line(&reader, line, sizeof(line))) {
+        char* value = strchr(line, '=');
+        if(!value) continue;
+        *value++ = '\0';
+        uint8_t index = 0U;
+        if(!strcmp(line, "Progress")) {
+            size_t count = dnd_storage_parse_numbers(value, values, 4U);
+            ok = count >= 1U && values[0] >= 1 &&
+                 values[0] <= (int32_t)DND_MAX_CLASSES;
+        } else if(dnd_storage_indexed_key(
+                      line, "Class", "Data", DND_MAX_CLASSES, &index)) {
+            size_t count = dnd_storage_parse_numbers(value, values, 16U);
+            ok = count >= 1U && values[0] >= 1 && values[0] <= 20;
+        } else if(!strcmp(line, "AbilityScores")) {
+            size_t count = dnd_storage_parse_numbers(value, values, DND_ABILITY_COUNT);
+            ok = count == DND_ABILITY_COUNT;
+            for(size_t i = 0U; ok && i < count; ++i)
+                ok = values[i] >= 1 && values[i] <= 30;
+        } else if(!strcmp(line, "Vitals")) {
+            size_t count = dnd_storage_parse_numbers(value, values, 12U);
+            ok = count >= 2U && values[0] >= 0 && values[1] >= 1 &&
+                 values[1] <= 999 && values[0] <= values[1];
+            if(ok && count >= 3U) ok = values[2] >= 0 && values[2] <= 999;
+        }
+    }
+    if(ok) ok = storage_file_get_error(file) == FSE_OK;
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
+bool dnd_storage_recover_profile_backup(Storage* storage, uint32_t profile, DndSaveData* data) {
     char backup_path[DND_FS_PATH_LEN];
     char primary_path[DND_FS_PATH_LEN];
     char rejected_path[DND_FS_PATH_LEN];
@@ -3089,6 +3919,162 @@ static void dnd_storage_restore_sidecar_snapshot_path(
     dnd_storage_level_sidecar_snapshot_path(output, size, profile, character, suffixes[index]);
 }
 
+static bool dnd_storage_inventory_bag_backup_filename(
+    const char* filename,
+    uint32_t profile,
+    char* original,
+    size_t original_size) {
+    if(!filename) return false;
+    const char* suffix = ".shdbak";
+    size_t length = strlen(filename);
+    size_t suffix_len = strlen(suffix);
+    if(length <= suffix_len || strcmp(filename + length - suffix_len, suffix) != 0)
+        return false;
+    size_t base_len = length - suffix_len;
+    if(base_len >= original_size) return false;
+    memcpy(original, filename, base_len);
+    original[base_len] = '\0';
+    char safe[DND_INVENTORY_BAG_NAME_LEN];
+    return dnd_storage_inventory_nonmain_bag_filename(
+        original, profile, safe, sizeof(safe));
+}
+
+static bool
+    dnd_storage_cleanup_bag_backups(Storage* storage, uint32_t profile, bool restore) {
+    while(true) {
+        File* directory = storage_file_alloc(storage);
+        if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+            if(directory) storage_file_free(directory);
+            return false;
+        }
+        FileInfo info;
+        char filename[128];
+        char original[128];
+        char backup[DND_FS_PATH_LEN] = {0};
+        char live[DND_FS_PATH_LEN] = {0};
+        while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            if(file_info_is_dir(&info) ||
+               !dnd_storage_inventory_bag_backup_filename(
+                   filename, profile, original, sizeof(original)))
+                continue;
+            if(!dnd_fs_child_path(
+                   backup, sizeof(backup), DND_STORAGE_DATA_DIR, NULL, filename) ||
+               !dnd_fs_child_path(live, sizeof(live), DND_STORAGE_DATA_DIR, NULL, original)) {
+                backup[0] = '\0';
+                continue;
+            }
+            break;
+        }
+        storage_dir_close(directory);
+        storage_file_free(directory);
+        if(!backup[0]) return true;
+        bool ok = restore ? dnd_storage_copy_file_direct(storage, backup, live) : true;
+        if(storage_common_remove(storage, backup) != FSE_OK) return false;
+        if(!ok) return false;
+    }
+}
+
+static bool dnd_storage_backup_nonmain_inventory_bags(Storage* storage, uint32_t profile) {
+    (void)dnd_storage_cleanup_bag_backups(storage, profile, false);
+    File* directory = storage_file_alloc(storage);
+    if(!directory || !storage_dir_open(directory, DND_STORAGE_DATA_DIR)) {
+        if(directory) storage_file_free(directory);
+        return false;
+    }
+    bool success = true;
+    FileInfo info;
+    char filename[128];
+    char safe[DND_INVENTORY_BAG_NAME_LEN];
+    while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dnd_storage_inventory_nonmain_bag_filename(filename, profile, safe, sizeof(safe)))
+            continue;
+        char live[DND_FS_PATH_LEN];
+        char backup[DND_FS_LONG_PATH_LEN];
+        if(!dnd_fs_child_path(live, sizeof(live), DND_STORAGE_DATA_DIR, NULL, filename)) {
+            success = false;
+            break;
+        }
+        snprintf(backup, sizeof(backup), "%s.shdbak", live);
+        success = dnd_storage_copy_file_direct(storage, live, backup);
+    }
+    storage_dir_close(directory);
+    storage_file_free(directory);
+    return success;
+}
+
+static bool dnd_storage_restore_inventory_bags(
+    Storage* storage,
+    uint32_t profile,
+    const DndCharacter* character) {
+    if(!dnd_storage_backup_nonmain_inventory_bags(storage, profile)) return false;
+    if(!dnd_storage_remove_nonmain_inventory_bags(storage, profile)) {
+        (void)dnd_storage_cleanup_bag_backups(storage, profile, true);
+        return false;
+    }
+
+    char safe_character[DND_CHARACTER_NAME_LEN];
+    char prefix[96];
+    dnd_storage_filename_name(
+        safe_character,
+        sizeof(safe_character),
+        character && character->name[0] ? character->name : "Unnamed");
+    snprintf(
+        prefix,
+        sizeof(prefix),
+        "ch_%lu_%s_%u_itemsbag_",
+        (unsigned long)profile,
+        safe_character,
+        character ? dnd_storage_character_level(character) : 1U);
+    const size_t prefix_len = strlen(prefix);
+
+    File* directory = storage_file_alloc(storage);
+    bool success = directory && storage_dir_open(directory, DND_STORAGE_DATA_DIR);
+    if(success) {
+        FileInfo info;
+        char filename[128];
+        while(success && storage_dir_read(directory, &info, filename, sizeof(filename))) {
+            size_t length = strlen(filename);
+            if(file_info_is_dir(&info) || strncmp(filename, prefix, prefix_len) != 0 ||
+               length <= prefix_len + 4U || strcmp(filename + length - 4U, ".shd") != 0)
+                continue;
+            size_t safe_len = length - prefix_len - 4U;
+            if(!safe_len || safe_len >= DND_INVENTORY_BAG_NAME_LEN) {
+                success = false;
+                break;
+            }
+            char safe[DND_INVENTORY_BAG_NAME_LEN];
+            char snapshot[DND_FS_PATH_LEN];
+            char live[DND_FS_PATH_LEN];
+            memcpy(safe, filename + prefix_len, safe_len);
+            safe[safe_len] = '\0';
+            if(!dnd_fs_child_path(
+                   snapshot, sizeof(snapshot), DND_STORAGE_DATA_DIR, NULL, filename)) {
+                success = false;
+                break;
+            }
+            snprintf(
+                live,
+                sizeof(live),
+                "%s/inv%s_%lu.txt",
+                DND_STORAGE_DATA_DIR,
+                safe,
+                (unsigned long)profile);
+            success = dnd_storage_copy_file_direct(storage, snapshot, live);
+        }
+    }
+    if(directory) {
+        if(success || storage_file_get_error(directory) == FSE_OK) storage_dir_close(directory);
+        storage_file_free(directory);
+    }
+    if(!success) {
+        (void)dnd_storage_remove_nonmain_inventory_bags(storage, profile);
+        (void)dnd_storage_cleanup_bag_backups(storage, profile, true);
+        return false;
+    }
+    return dnd_storage_cleanup_bag_backups(storage, profile, false);
+}
+
 typedef struct {
     char core_snapshot[DND_FS_PATH_LEN];
     char old_core[DND_FS_PATH_LEN];
@@ -3101,18 +4087,19 @@ typedef struct {
     bool old_core_present;
 } DndShdRestoreContext;
 
-bool dnd_storage_restore_shd(
+static bool dnd_storage_restore_shd_internal(
     Storage* storage,
     uint32_t profile,
     uint8_t level,
+    const char* core_snapshot,
     DndSaveData* data) {
-    if(!storage || !data || level < 1U || level > 20U) return false;
+    if(!storage || !data || !core_snapshot || level < 1U || level > 20U) return false;
     DndShdRestoreContext* context = calloc(1U, sizeof(DndShdRestoreContext));
     if(!context) return false;
     bool success = false;
 
-    if(!dnd_storage_find_shd_path(
-           storage, profile, level, context->core_snapshot, sizeof(context->core_snapshot)) ||
+    dnd_storage_copy(context->core_snapshot, sizeof(context->core_snapshot), core_snapshot);
+    if(strcmp(context->core_snapshot, core_snapshot) ||
        !dnd_storage_load_text_path(storage, context->core_snapshot, data))
         goto cleanup;
 
@@ -3158,6 +4145,8 @@ bool dnd_storage_restore_shd(
         else if(bundle_version >= (i < 4U ? 1U : 2U) && storage_file_exists(storage, context->live[i]))
             success = storage_common_remove(storage, context->live[i]) == FSE_OK;
     }
+    if(success && bundle_version >= 3U)
+        success = dnd_storage_restore_inventory_bags(storage, profile, &data->character);
 
     if(!success) {
         char restored_core[DND_FS_PATH_LEN];
@@ -3192,77 +4181,37 @@ cleanup:
     return success;
 }
 
-bool dnd_storage_import_first(Storage* storage, uint32_t destination, DndSaveData* data) {
-    File* directory = storage_file_alloc(storage);
-    if(!directory) return false;
-    if(!storage_dir_open(directory, DND_STORAGE_EXPORT_DIR)) {
-        storage_file_free(directory);
+bool dnd_storage_restore_shd(
+    Storage* storage,
+    uint32_t profile,
+    uint8_t level,
+    DndSaveData* data) {
+    char core_snapshot[DND_FS_PATH_LEN];
+    if(!storage || !data || level < 1U || level > 20U ||
+       !dnd_storage_find_shd_path(
+           storage, profile, level, core_snapshot, sizeof(core_snapshot)))
         return false;
-    }
-    FileInfo info;
-    char filename[128];
-    bool imported = false;
-    while(storage_dir_read(directory, &info, filename, sizeof(filename))) {
-        size_t length = strlen(filename);
-        if(file_info_is_dir(&info) || length < 12U || strncmp(filename, "export_ch_", 10U) != 0 ||
-           strcmp(filename + length - 4U, ".txt") != 0)
-            continue;
+    return dnd_storage_restore_shd_internal(storage, profile, level, core_snapshot, data);
+}
 
-        /* Only import a core character export here. Collection exports are
-           companions and are copied after their matching core file succeeds. */
-        DndProfileEntry source_entry;
-        if(!dnd_storage_parse_profile_filename(filename + 7U, &source_entry)) continue;
-
-        char path[DND_FS_LONG_PATH_LEN];
-        if(!dnd_fs_child_path(path, sizeof(path), DND_STORAGE_EXPORT_DIR, NULL, filename)) continue;
-        if(!dnd_storage_load_text_path(storage, path, data) ||
-           !dnd_storage_save_profile(storage, destination, data))
-            continue;
-
-        /* Embedded legacy Features/Grants are intentionally ignored by the
-           current parser. Only explicit current-format sidecar companions are
-           imported; otherwise progression starts with no applied history. */
-        bool companions_ok = true;
-        dnd_data_clear_spells(&data->character);
-        dnd_data_clear_items(&data->character);
-        dnd_data_reserve_features_exact(&data->character, 0U);
-        data->character.feature_count = 0U;
-        dnd_data_reserve_grants_exact(&data->character, 0U);
-        data->character.grant_count = 0U;
-
-        const char* collections[] = {
-            "spellbook", "items", "feats", "appliedgrants", "languages", "proficiencies"};
-        for(uint8_t i = 0U; companions_ok && i < 6U; ++i) {
-            char source_collection[DND_FS_LONG_PATH_LEN];
-            char destination_collection[DND_FS_PATH_LEN];
-            snprintf(
-                source_collection,
-                sizeof(source_collection),
-                "%s/export_ch_%lu_%s.txt",
-                DND_STORAGE_EXPORT_DIR,
-                (unsigned long)source_entry.id,
-                collections[i]);
-            if(!storage_file_exists(storage, source_collection)) continue;
-            dnd_storage_collection_path(
-                destination_collection,
-                sizeof(destination_collection),
-                destination,
-                collections[i]);
-            if(!dnd_storage_copy_file_direct(storage, source_collection, destination_collection)) {
-                companions_ok = false;
-                break;
-            }
-        }
-        if(!companions_ok) {
-            dnd_storage_delete_profile(storage, destination);
-            break;
-        }
-        imported = true;
-        break;
-    }
-    storage_dir_close(directory);
-    storage_file_free(directory);
-    return imported;
+bool dnd_storage_restore_shd_path(
+    Storage* storage,
+    uint32_t profile,
+    const char* core_snapshot,
+    DndSaveData* data) {
+    if(!storage || !core_snapshot || !data) return false;
+    const char* filename = strrchr(core_snapshot, '/');
+    filename = filename ? filename + 1U : core_snapshot;
+    DndProfileEntry entry;
+    if(!dnd_storage_parse_core_shd_filename(filename, &entry) || entry.id != profile)
+        return false;
+    char expected[DND_FS_PATH_LEN];
+    if(!dnd_fs_child_path(
+           expected, sizeof(expected), DND_STORAGE_DATA_DIR, NULL, filename) ||
+       strcmp(expected, core_snapshot))
+        return false;
+    return dnd_storage_restore_shd_internal(
+        storage, profile, entry.level, core_snapshot, data);
 }
 
 bool dnd_storage_move_legacy_profiles(Storage* storage) {

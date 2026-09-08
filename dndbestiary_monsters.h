@@ -98,6 +98,7 @@ typedef struct {
 
 typedef bool (*DndMonsterFilter)(const DndMonsterSummary* summary, void* context);
 
+bool dndbestiary_monsters_source_allowed(const DndMonsterSummary* summary, bool allow_homebrew);
 uint32_t dndbestiary_monsters_xp_budget(
     uint8_t party_level,
     uint8_t party_size,
@@ -155,6 +156,7 @@ bool dndbestiary_monsters_generate(
     bool allow_repeats,
     DndEncounterTemplate template_kind,
     const char* preferred_role,
+    bool allow_homebrew,
     DndMonsterEncounter* output);
 void dndbestiary_monsters_simulate(
     DndMonsterEncounter* encounter,

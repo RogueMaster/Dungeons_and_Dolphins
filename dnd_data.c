@@ -283,7 +283,7 @@ void dnd_data_set_defaults(DndSaveData* data) {
     /* Saving-throw proficiencies are class grants. Fresh characters leave them
        unset until Grant Initial Traits presents each proficiency for approval. */
 
-    character->attack_template_count = 3U;
+    character->attack_template_count = 5U;
     DndAttackTemplate* unarmed = &character->attack_templates[0];
     dnd_data_copy(unarmed->name, sizeof(unarmed->name), "Unarmed Strike");
     dnd_data_copy(unarmed->damage_type, sizeof(unarmed->damage_type), "Bludgeoning");
@@ -291,13 +291,26 @@ void dnd_data_set_defaults(DndSaveData* data) {
     unarmed->ability = DndAbilityStrength;
     unarmed->damage_dice = 1U;
     unarmed->damage_die = 1U;
-    DndAttackTemplate* spell_attack = &character->attack_templates[1];
+
+    DndAttackTemplate* grapple = &character->attack_templates[1];
+    dnd_data_copy(grapple->name, sizeof(grapple->name), "Grapple");
+    grapple->type = DndAttackTemplateGrapple;
+    grapple->ability = DndAbilityStrength;
+    grapple->save_ability = DndAbilityStrength;
+
+    DndAttackTemplate* shove = &character->attack_templates[2];
+    dnd_data_copy(shove->name, sizeof(shove->name), "Shove");
+    shove->type = DndAttackTemplateShove;
+    shove->ability = DndAbilityStrength;
+    shove->save_ability = DndAbilityStrength;
+
+    DndAttackTemplate* spell_attack = &character->attack_templates[3];
     dnd_data_copy(spell_attack->name, sizeof(spell_attack->name), "Spell Attack");
     spell_attack->type = DndAttackTemplateSpellAttack;
     spell_attack->ability = DndAbilityIntelligence;
     spell_attack->damage_dice = 1U;
     spell_attack->damage_die = 10U;
-    DndAttackTemplate* saving_throw = &character->attack_templates[2];
+    DndAttackTemplate* saving_throw = &character->attack_templates[4];
     dnd_data_copy(saving_throw->name, sizeof(saving_throw->name), "Saving Throw Action");
     saving_throw->type = DndAttackTemplateSavingThrow;
     saving_throw->save_ability = DndAbilityDexterity;
@@ -478,6 +491,33 @@ void dnd_data_sanitize(DndSaveData* data) {
     }
     character->attack_template_count =
         dnd_data_clamp_u8(character->attack_template_count, DND_MAX_ATTACK_TEMPLATES);
+
+    /* Grapple and Shove are independent attack templates. Older profiles used
+       synthetic rows derived from Unarmed Strike; append real templates when
+       room exists without renumbering or deleting any user template. */
+    bool have_grapple = false;
+    bool have_shove = false;
+    for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
+        have_grapple = have_grapple || character->attack_templates[i].type == DndAttackTemplateGrapple;
+        have_shove = have_shove || character->attack_templates[i].type == DndAttackTemplateShove;
+    }
+    if(!have_grapple && character->attack_template_count < DND_MAX_ATTACK_TEMPLATES) {
+        DndAttackTemplate* grapple = &character->attack_templates[character->attack_template_count++];
+        memset(grapple, 0, sizeof(*grapple));
+        dnd_data_copy(grapple->name, sizeof(grapple->name), "Grapple");
+        grapple->type = DndAttackTemplateGrapple;
+        grapple->ability = DndAbilityStrength;
+        grapple->save_ability = DndAbilityStrength;
+    }
+    if(!have_shove && character->attack_template_count < DND_MAX_ATTACK_TEMPLATES) {
+        DndAttackTemplate* shove = &character->attack_templates[character->attack_template_count++];
+        memset(shove, 0, sizeof(*shove));
+        dnd_data_copy(shove->name, sizeof(shove->name), "Shove");
+        shove->type = DndAttackTemplateShove;
+        shove->ability = DndAbilityStrength;
+        shove->save_ability = DndAbilityStrength;
+    }
+
     for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
         DndAttackTemplate* attack = &character->attack_templates[i];
         attack->name[DND_NAME_LEN - 1U] = '\0';

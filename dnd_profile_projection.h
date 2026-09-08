@@ -21,6 +21,13 @@ typedef struct {
     char name[DND_CHARACTER_NAME_LEN];
     uint8_t class_count;
     DndClassLevel classes[DND_MAX_CLASSES];
+    int8_t ability_scores[DND_ABILITY_COUNT];
+    uint8_t spellcasting_ability;
+    int8_t spell_attack_misc;
+    int8_t spell_save_misc;
+    uint8_t arcane_recovery_used;
+    uint8_t spell_slots_current[DND_SLOT_COUNT];
+    uint8_t spell_slots_max[DND_SLOT_COUNT];
 } DndSpellbookProfileProjection;
 
 typedef struct {
@@ -44,6 +51,10 @@ bool dnd_profile_projection_load_spellbook(
     Storage* storage,
     uint32_t profile,
     DndSpellbookProfileProjection* projection);
+bool dnd_profile_projection_save_spellbook_magic(
+    Storage* storage,
+    uint32_t profile,
+    const DndSpellbookProfileProjection* projection);
 bool dnd_profile_projection_load_adventure(
     Storage* storage,
     uint32_t profile,

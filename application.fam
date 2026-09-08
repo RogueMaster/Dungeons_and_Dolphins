@@ -1,6 +1,6 @@
 # Suite release label. FAP's binary manifest stores numeric major/minor only.
-DND_RELEASE_VERSION = "3.6"
-DND_FAP_VERSION = (3, 6)
+DND_RELEASE_VERSION = "4.19.1"
+DND_FAP_VERSION = (4, 19)
 DND_RELEASE_DEFINES = [("DND_RELEASE_VERSION", '\\"' + DND_RELEASE_VERSION + '\\"')]
 
 App(
@@ -17,10 +17,70 @@ App(
         "dnd_profile_handoff.c",
         "dnd_rules_core.c",
         "dnd_settings.c",
+        "dnd_storage.c",
+        "dnd_app_core.c",
+        "dnd_app_hub_entry.c",
+        "dndolphins_dice.c",
+        "dndolphins_menu_graphics.c",
+        "dndolphins_progression_store.c",
+        "dndolphins_rules_character.c",
+        "dndolphins_spells.c",
+        "dndolphins_splash.c",
+    ],
+    fap_icon="icon.png",
+    fap_icon_assets="dndolphins_images",
+    fap_file_assets="character_assets",
+    fap_category="Games",
+    fap_author="RogueMaster",
+    fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES + [("DND_BUILD_HUB", "1")],
+    fap_description="Offline 5E-compatible character, progression, dice, and companion-app hub.",
+)
+
+
+App(
+    appid="dndcharactersheet",
+    name="DNDCharacter Sheet",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="dndcharactersheet_app",
+    stack_size=4 * 1024,
+    flags=["UnloadAssetPacks"],
+    sources=[
+        "dnd_data.c",
+        "dnd_profile_handoff.c",
+        "dnd_rules_core.c",
+        "dnd_storage.c",
+        "dndcharactersheet.c",
+    ],
+    fap_icon="icon.png",
+    fap_category="Games",
+    fap_author="RogueMaster",
+    fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
+    fap_description="Graphical read-only D&D character sheet companion for the active DNDolphins character.",
+)
+
+
+App(
+    appid="dndcombat",
+    name="DNDCombat",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="dndcombat_app",
+    stack_size=6 * 1024,
+    flags=["UnloadAssetPacks"],
+    sources=[
+        "dnd_data.c",
+        "dnd_extra_items.c",
+        "dnd_profile_handoff.c",
+        "dnd_rules_core.c",
+        "dnd_settings.c",
         "dnd_spell_eligibility.c",
         "dnd_storage.c",
         "dnd_weapon_rules.c",
-        "dndolphins.c",
+        "dnd_app_core.c",
+        "dnd_app_combat_entry.c",
         "dndolphins_dice.c",
         "dndolphins_progression_store.c",
         "dndolphins_rules_character.c",
@@ -34,10 +94,42 @@ App(
     fap_author="RogueMaster",
     fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
     fap_version=DND_FAP_VERSION,
-    cdefines=DND_RELEASE_DEFINES,
-    fap_description="Offline 5E-compatible character, progression, dice, and combat hub.",
+    cdefines=DND_RELEASE_DEFINES + [("DND_BUILD_COMBAT", "1")],
+    fap_description="Standalone character combat, attacks, casting, recovery, and combat-state tools.",
 )
 
+App(
+    appid="dndgrants",
+    name="DNDGrants",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="dndgrants_app",
+    stack_size=6 * 1024,
+    flags=["UnloadAssetPacks"],
+    sources=[
+        "dnd_character_collections.c",
+        "dnd_data.c",
+        "dnd_extra_items.c",
+        "dnd_profile_handoff.c",
+        "dnd_rules_core.c",
+        "dnd_settings.c",
+        "dnd_spell_eligibility.c",
+        "dnd_storage.c",
+        "dnd_weapon_rules.c",
+        "dnd_app_core.c",
+        "dnd_app_grants_entry.c",
+        "dndolphins_progression_store.c",
+        "dndolphins_rules_character.c",
+        "dndolphins_spells.c",
+    ],
+    fap_icon="icon.png",
+    fap_file_assets="character_assets",
+    fap_category="Games",
+    fap_author="RogueMaster",
+    fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES + [("DND_BUILD_GRANTS", "1")],
+    fap_description="Standalone initial-trait and level-grant review/apply workflow.",
+)
 
 App(
     appid="dndinventory",
@@ -84,6 +176,7 @@ App(
         "dnd_spell_eligibility.c",
         "dnd_storage.c",
         "dnd_settings.c",
+        "dndolphins_spells.c",
         "dndspellbook.c",
         "dndspellbook_collection.c",
     ],
@@ -177,6 +270,7 @@ App(
     flags=["UnloadAssetPacks"],
     sources=[
         "dnd_profile_handoff.c",
+        "dnd_settings.c",
         "dndbestiary.c",
         "dndbestiary_monsters.c",
         "dndbestiary_packs.c",
@@ -190,4 +284,28 @@ App(
     fap_version=DND_FAP_VERSION,
     cdefines=DND_RELEASE_DEFINES,
     fap_description="Offline monster reference and party-level encounter generator.",
+)
+
+App(
+    appid="dndbackup",
+    name="DNDBackup & Restore",
+    apptype=FlipperAppType.EXTERNAL,
+    entry_point="dndbackup_app",
+    stack_size=4 * 1024,
+    flags=["UnloadAssetPacks"],
+    sources=[
+        "dnd_backup_storage.c",
+        "dnd_data.c",
+        "dnd_profile_handoff.c",
+        "dnd_storage.c",
+        "dndbackup.c",
+    ],
+    fap_icon="icon.png",
+    fap_icon_assets="dndbackup_images",
+    fap_category="Games",
+    fap_author="RogueMaster",
+    fap_weburl="https://github.com/RogueMaster/Dungeons_and_Dolphins",
+    fap_version=DND_FAP_VERSION,
+    cdefines=DND_RELEASE_DEFINES,
+    fap_description="Standalone SHD character backup and transactional restore utility.",
 )

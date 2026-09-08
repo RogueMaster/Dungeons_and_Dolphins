@@ -441,6 +441,11 @@ static bool dndbestiary_monsters_at_offset(
     return found;
 }
 
+bool dndbestiary_monsters_source_allowed(const DndMonsterSummary* summary, bool allow_homebrew) {
+    if(!summary) return false;
+    return allow_homebrew || strcmp(summary->source, "Custom Pack");
+}
+
 uint32_t dndbestiary_monsters_xp_budget(
     uint8_t party_level,
     uint8_t party_size,
@@ -1641,11 +1646,13 @@ typedef struct {
     uint8_t party_level;
     DndEncounterTemplate template_kind;
     const char* environment;
+    bool allow_homebrew;
 } MonsterGenerateFilter;
 
 static bool
     dndbestiary_monsters_generate_filter(const DndMonsterSummary* candidate, void* context) {
     const MonsterGenerateFilter* filter = context;
+    if(!dndbestiary_monsters_source_allowed(candidate, filter->allow_homebrew)) return false;
     if(candidate->xp > filter->budget) return false;
     if(filter->environment && strcmp(filter->environment, "Any") &&
        strcmp(candidate->environment, filter->environment))
@@ -1706,6 +1713,7 @@ bool dndbestiary_monsters_generate(
     bool allow_repeats,
     DndEncounterTemplate template_kind,
     const char* preferred_role,
+    bool allow_homebrew,
     DndMonsterEncounter* output) {
     memset(output, 0, sizeof(*output));
     output->budget = dndbestiary_monsters_xp_budget(party_level, party_size, difficulty);
@@ -1720,6 +1728,7 @@ bool dndbestiary_monsters_generate(
         .party_level = party_level,
         .template_kind = template_kind,
         .environment = environment,
+        .allow_homebrew = allow_homebrew,
     };
     uint16_t total_eligible = 0U;
     uint16_t candidate_count = dndbestiary_monsters_sample(

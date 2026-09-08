@@ -47,7 +47,7 @@ Choice grants can constrain spell level, school and explicit option lists. The h
 - Persisted stable grant IDs are collision-checked at the stored **23-character** limit.
 - Grant scanning is prohibited from periodic tick and Canvas draw paths by host audit.
 - Magic spell aggregates refresh on screen entry and are cached; drawing the Magic screen has a regression test requiring **zero storage reads**.
-- The release audit checks **84 direct static draw helpers** for heap/storage calls.
+- The current release audit checks **76 direct static draw helpers** for heap/storage calls.
 
 ## FAP ownership gates
 
@@ -65,4 +65,3 @@ Starting equipment, proficiencies, Abilities/Features, alignments, languages, pr
 
 ## Remaining target validation
 
-The 3.6 strict/sanitized host suite and stack-frame regression audit pass. A fresh ARM/uFBT build and physical-device free-heap/cumulative-stack high-water run are still required before claiming current target-device validation. Historical SDK evidence under `tests/sdk/` is retained only as compatibility history.

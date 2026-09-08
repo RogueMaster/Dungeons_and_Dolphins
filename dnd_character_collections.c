@@ -13,7 +13,11 @@
 
 static void dnd_character_copy(char* output, size_t size, const char* input) {
     if(!output || !size) return;
-    snprintf(output, size, "%s", input ? input : "");
+    const char* source = input ? input : "";
+    size_t length = strlen(source);
+    if(length >= size) length = size - 1U;
+    memcpy(output, source, length);
+    output[length] = '\0';
 }
 
 void dnd_character_languages_path(char* output, size_t size, uint32_t profile) {
@@ -112,7 +116,7 @@ static bool dnd_character_visit(
             }
             line[used] = '\0';
             used = 0U;
-            if(line[0] == prefix && line[1] == '|') {
+            if(line[0] != '\0' && line[1] != '\0' && line[0] == prefix && line[1] == '|') {
                 bool keep = !visitor || visitor(total, line + 2U, context);
                 if(total < UINT16_MAX) ++total;
                 if(!keep) goto done;
@@ -121,7 +125,7 @@ static bool dnd_character_visit(
     }
     if(used) {
         line[used] = '\0';
-        if(line[0] == prefix && line[1] == '|') {
+        if(line[0] != '\0' && line[1] != '\0' && line[0] == prefix && line[1] == '|') {
             bool keep = !visitor || visitor(total, line + 2U, context);
             if(total < UINT16_MAX) ++total;
             if(!keep) goto done;

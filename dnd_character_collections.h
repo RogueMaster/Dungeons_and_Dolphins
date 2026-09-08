@@ -6,7 +6,7 @@
 
 #include "dnd_data.h"
 
-#define DND_CHARACTER_COLLECTION_WINDOW    8U
+#define DND_CHARACTER_COLLECTION_WINDOW    4U
 #define DND_CHARACTER_PROFICIENCY_TYPE_LEN 16U
 
 typedef struct {

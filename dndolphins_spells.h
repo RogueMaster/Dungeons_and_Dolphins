@@ -40,6 +40,11 @@ int8_t dndolphins_spells_attack_modifier_for(
     const DndSpell* spell);
 int8_t dndolphins_spells_save_dc_for(const DndCharacter* character, const DndSpell* spell);
 
+void dndolphins_spells_recalculate_shared_slots(
+    const DndClassLevel* classes,
+    uint8_t class_count,
+    uint8_t spell_slots_current[DND_SLOT_COUNT],
+    uint8_t spell_slots_max[DND_SLOT_COUNT]);
 void dndolphins_spells_recalculate_multiclass_slots(DndCharacter* character);
 bool dndolphins_spells_refresh_class_spellcasting(DndClassLevel* class_level);
 bool dndolphins_spells_apply_level_progression(DndCharacter* character, uint8_t class_index);
@@ -70,6 +75,16 @@ bool dndolphins_spells_class_counts(
     uint16_t* total_count);
 
 bool dndolphins_spells_collect_combat_indices(
+    Storage* storage,
+    uint32_t profile,
+    const DndCharacter* character,
+    uint16_t start,
+    uint16_t* indices,
+    uint16_t capacity,
+    uint16_t* count,
+    uint16_t* total_count);
+
+bool dndolphins_spells_collect_utility_indices(
     Storage* storage,
     uint32_t profile,
     const DndCharacter* character,

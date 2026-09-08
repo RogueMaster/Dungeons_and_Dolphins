@@ -23,6 +23,9 @@
 #define INIT_PATH_LEN      128U
 #define INIT_FILE_PATH     APP_DATA_PATH("ch_%lu.%s")
 #define INIT_HISTORY_ROOT  APP_DATA_PATH("history")
+#define INIT_HISTORY_MAX   24U
+#define INIT_HISTORY_LINE_LEN 48U
+#define INIT_HISTORY_DETAIL_MAX 16U
 
 typedef struct {
     char name[INIT_NAME_LEN];
@@ -42,6 +45,8 @@ typedef enum {
     InitiativeScreenSetup,
     InitiativeScreenCombat,
     InitiativeScreenEndCombat,
+    InitiativeScreenHistory,
+    InitiativeScreenHistoryDetail,
     InitiativeScreenEdit,
 } InitiativeScreen;
 
@@ -94,10 +99,17 @@ typedef struct {
     InitiativeNumberTarget number_target;
     uint8_t number_combat;
     uint8_t return_to_dnd;
+    uint8_t return_to_combat;
     uint8_t have_character;
     uint8_t roll_mode;
     char main_character_name[INIT_NAME_LEN];
     uint32_t character_id;
+    char (*history_files)[64];
+    uint8_t history_count;
+    char (*history_lines)[INIT_HISTORY_LINE_LEN];
+    uint8_t history_line_count;
+    uint8_t pending_launch_bestiary;
+    char pending_bestiary_args[INIT_NAME_LEN + 32U];
     InitiativeScreen screen;
     char status[32];
 } InitiativeApp;
@@ -795,7 +807,11 @@ static void dndinitiative_import_args(InitiativeApp* app, const char* args) {
     /* The leading ID remains in Bestiary's transfer format for compatibility,
        but persisted Active= is authoritative for Initiative profile selection. */
     cursor = end;
-    while(*cursor == ';' && app->roster_count < INIT_MAX) {
+    /* Bestiary transfers are encounter participants, not persistent Party Roster
+       members. Keep them in the current combat/setup list so party-only logic
+       (history tagging, character sync, Monster Turn Tools gating) remains
+       correct and enemies do not leak into future encounters. */
+    while(*cursor == ';' && app->combat_count < INIT_MAX) {
         ++cursor;
         const char* record_end = strchr(cursor, ';');
         if(!record_end) record_end = cursor + strlen(cursor);
@@ -811,14 +827,16 @@ static void dndinitiative_import_args(InitiativeApp* app, const char* args) {
             *a++ = '\0';
             *b++ = '\0';
             *c++ = '\0';
-            InitiativeMember* member = &app->roster[app->roster_count];
+            InitiativeMember* member = &app->combat[app->combat_count];
             memset(member, 0, sizeof(*member));
             dndinitiative_copy(member->name, sizeof(member->name), record);
             member->hp_current = member->hp_max =
                 dndinitiative_clamp(dndinitiative_parse_i32(a), 0, 999);
             member->armor_class = dndinitiative_clamp(dndinitiative_parse_i32(b), 0, 99);
             member->modifier = (int8_t)dndinitiative_clamp(dndinitiative_parse_i32(c), -50, 50);
-            if(member->name[0]) ++app->roster_count;
+            member->total = member->modifier;
+            member->roll_mode = app->roll_mode;
+            if(member->name[0]) ++app->combat_count;
         }
         cursor = record_end;
     }
@@ -872,6 +890,164 @@ static bool
         conditions);
     return length > 0 && (size_t)length < sizeof(line) &&
            storage_file_write(file, line, (size_t)length) == (size_t)length;
+}
+
+static void dndinitiative_history_clear(InitiativeApp* app) {
+    if(!app) return;
+    free(app->history_files);
+    app->history_files = NULL;
+    app->history_count = 0U;
+    free(app->history_lines);
+    app->history_lines = NULL;
+    app->history_line_count = 0U;
+}
+
+static bool dndinitiative_history_filename_matches(const char* filename, uint32_t profile) {
+    if(!filename) return false;
+    char prefix[32];
+    snprintf(prefix, sizeof(prefix), "ch_%lu_", (unsigned long)profile);
+    size_t len = strlen(filename);
+    return !strncmp(filename, prefix, strlen(prefix)) && len > 4U &&
+           !strcmp(filename + len - 4U, ".txt");
+}
+
+static bool dndinitiative_history_load_list(InitiativeApp* app) {
+    if(!app || !app->storage || app->character_id == UINT32_MAX) return false;
+    dndinitiative_history_clear(app);
+    app->history_files = calloc(INIT_HISTORY_MAX, 64U);
+    if(!app->history_files) return false;
+    File* dir = storage_file_alloc(app->storage);
+    if(!dir || !storage_dir_open(dir, INIT_HISTORY_ROOT)) {
+        if(dir) storage_file_free(dir);
+        return true;
+    }
+    FileInfo info;
+    char filename[64];
+    while(storage_dir_read(dir, &info, filename, sizeof(filename))) {
+        if(file_info_is_dir(&info) ||
+           !dndinitiative_history_filename_matches(filename, app->character_id))
+            continue;
+        uint8_t insert = app->history_count;
+        if(insert < INIT_HISTORY_MAX) {
+            while(insert &&
+                  strcmp(app->history_files[insert - 1U], filename) < 0) {
+                if(insert < INIT_HISTORY_MAX)
+                    memcpy(app->history_files[insert],
+                           app->history_files[insert - 1U], 64U);
+                --insert;
+            }
+            dndinitiative_copy(app->history_files[insert], 64U, filename);
+            if(app->history_count < INIT_HISTORY_MAX) ++app->history_count;
+        } else if(strcmp(filename, app->history_files[INIT_HISTORY_MAX - 1U]) > 0) {
+            insert = INIT_HISTORY_MAX - 1U;
+            while(insert && strcmp(app->history_files[insert - 1U], filename) < 0) {
+                memcpy(app->history_files[insert],
+                       app->history_files[insert - 1U], 64U);
+                --insert;
+            }
+            dndinitiative_copy(app->history_files[insert], 64U, filename);
+        }
+    }
+    storage_dir_close(dir);
+    storage_file_free(dir);
+    return true;
+}
+
+static bool dndinitiative_history_read_line(File* file, char* out, size_t size) {
+    if(!file || !out || size < 2U) return false;
+    size_t used = 0U;
+    char ch = '\0';
+    bool saw = false;
+    while(storage_file_read(file, &ch, 1U) == 1U) {
+        saw = true;
+        if(ch == '\r') continue;
+        if(ch == '\n') break;
+        if(used + 1U < size) out[used++] = ch;
+    }
+    out[used] = '\0';
+    return saw;
+}
+
+static void dndinitiative_history_format_member(
+    char* out, size_t size, const char* line) {
+    char copy[192];
+    dndinitiative_copy(copy, sizeof(copy), line);
+    char* kind = copy;
+    char* name = strchr(kind, '|');
+    if(!name) { dndinitiative_copy(out, size, line); return; }
+    *name++ = '\0';
+    char* hp = strchr(name, '|');
+    if(!hp) { dndinitiative_copy(out, size, line); return; }
+    *hp++ = '\0';
+    char* hpmax = strchr(hp, '|');
+    if(!hpmax) { dndinitiative_copy(out, size, line); return; }
+    *hpmax++ = '\0';
+    char* ac = strchr(hpmax, '|');
+    if(!ac) { dndinitiative_copy(out, size, line); return; }
+    *ac++ = '\0';
+    char* cond = strchr(ac, '|');
+    if(cond) *cond++ = '\0';
+    snprintf(
+        out,
+        size,
+        "%c %.17s HP%s/%s AC%s",
+        kind[0] == 'P' ? 'P' : 'O',
+        name,
+        hp,
+        hpmax,
+        ac);
+}
+
+static bool dndinitiative_history_load_detail(InitiativeApp* app, uint8_t index) {
+    if(!app || index >= app->history_count) return false;
+    free(app->history_lines);
+    app->history_lines = calloc(INIT_HISTORY_DETAIL_MAX, INIT_HISTORY_LINE_LEN);
+    app->history_line_count = 0U;
+    if(!app->history_lines) return false;
+    char path[INIT_PATH_LEN];
+    if(!dnd_fs_child_path(
+           path, sizeof(path), INIT_HISTORY_ROOT, NULL, app->history_files[index]))
+        return false;
+    File* file = storage_file_alloc(app->storage);
+    if(!file) return false;
+    bool ok = storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING);
+    char line[192];
+    while(ok && app->history_line_count < INIT_HISTORY_DETAIL_MAX &&
+          dndinitiative_history_read_line(file, line, sizeof(line))) {
+        if(!line[0] || !strncmp(line, "DNDInitiativeHistory=", 21U) ||
+           !strncmp(line, "Profile=", 8U))
+            continue;
+        char* out = app->history_lines[app->history_line_count];
+        if(!strncmp(line, "Ended=", 6U))
+            snprintf(out, INIT_HISTORY_LINE_LEN, "Ended: %.37s", line + 6U);
+        else if(!strncmp(line, "Rounds=", 7U))
+            snprintf(out, INIT_HISTORY_LINE_LEN, "Rounds: %.36s", line + 7U);
+        else if((line[0] == 'P' || line[0] == 'O') && line[1] == '|')
+            dndinitiative_history_format_member(out, INIT_HISTORY_LINE_LEN, line);
+        else
+            dndinitiative_copy(out, INIT_HISTORY_LINE_LEN, line);
+        ++app->history_line_count;
+    }
+    storage_file_close(file);
+    storage_file_free(file);
+    return ok;
+}
+
+static bool dndinitiative_launch_monster_tools(InitiativeApp* app, const InitiativeMember* member) {
+    if(!app || !member || !member->name[0] || dndinitiative_member_is_party(app, member))
+        return false;
+    int n = snprintf(
+        app->pending_bestiary_args,
+        sizeof(app->pending_bestiary_args),
+        "%s%s",
+        DND_BESTIARY_LAUNCH_FROM_INITIATIVE,
+        member->name);
+    if(n <= 0 || (size_t)n >= sizeof(app->pending_bestiary_args)) return false;
+    dndinitiative_save(app);
+    app->pending_launch_bestiary = 1U;
+    app->return_to_dnd = 0U;
+    view_dispatcher_stop(app->dispatcher);
+    return true;
 }
 
 static bool dndinitiative_save_completed_history(InitiativeApp* app) {
@@ -1013,22 +1189,58 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
         dndinitiative_row(canvas, 3U, app->selection == 0U, "Launch DNDolphins");
         dndinitiative_row(canvas, 4U, app->selection == 1U, "Exit Initiative");
     } else if(app->screen == InitiativeScreenMenu) {
-        char rows[6][32];
+        char rows[7][32];
         snprintf(rows[0], sizeof(rows[0]), "Start New Combat");
         snprintf(rows[1], sizeof(rows[1]), "Resume%s", app->active ? "" : " (none)");
         snprintf(rows[2], sizeof(rows[2]), "Party Roster (%u)", app->roster_count);
         snprintf(rows[3], sizeof(rows[3]), "Edit Current Order");
         dndinitiative_copy(rows[4], sizeof(rows[4]), "End Current Combat");
+        dndinitiative_copy(rows[5], sizeof(rows[5]), "Combat History");
         snprintf(
-            rows[5],
-            sizeof(rows[5]),
+            rows[6],
+            sizeof(rows[6]),
             "Default Roll: %s",
             dndinitiative_roll_mode_name((InitiativeRollMode)app->roll_mode));
         for(uint8_t row = 0U; row < 5U; ++row) {
             uint8_t i = (uint8_t)(app->scroll + row);
-            if(i >= 6U) break;
+            if(i >= 7U) break;
             dndinitiative_row(canvas, row, i == app->selection, rows[i]);
         }
+    } else if(app->screen == InitiativeScreenHistory) {
+        if(!app->history_count) {
+            dndinitiative_row(canvas, 0U, false, "No saved combat history");
+        } else {
+            for(uint8_t row = 0U; row < 5U; ++row) {
+                uint8_t i = (uint8_t)(app->scroll + row);
+                if(i >= app->history_count) break;
+                const char* name = app->history_files[i];
+                const char* stamp = strchr(name, '_');
+                stamp = stamp ? strchr(stamp + 1U, '_') : NULL;
+                char text[48];
+                if(stamp && strlen(stamp) >= 16U)
+                    snprintf(
+                        text,
+                        sizeof(text),
+                        "%.4s-%.2s-%.2s %.2s:%.2s",
+                        stamp + 1U,
+                        stamp + 5U,
+                        stamp + 7U,
+                        stamp + 10U,
+                        stamp + 12U);
+                else
+                    dndinitiative_copy(text, sizeof(text), name);
+                dndinitiative_row(canvas, row, i == app->selection, text);
+            }
+        }
+    } else if(app->screen == InitiativeScreenHistoryDetail) {
+        if(!app->history_line_count)
+            dndinitiative_row(canvas, 0U, false, "History read failed");
+        else
+            for(uint8_t row = 0U; row < 5U; ++row) {
+                uint8_t i = (uint8_t)(app->scroll + row);
+                if(i >= app->history_line_count) break;
+                dndinitiative_row(canvas, row, i == app->selection, app->history_lines[i]);
+            }
     } else if(app->screen == InitiativeScreenRoster) {
         uint8_t total = (uint8_t)(app->roster_count + 1U);
         for(uint8_t row = 0U; row < 5U; ++row) {
@@ -1096,11 +1308,46 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
         };
         for(uint8_t row = 0U; row < 3U; ++row)
             dndinitiative_row(canvas, row, row == app->selection, choices[row]);
+    } else if(app->screen == InitiativeScreenHistory) {
+        if(!app->history_count) {
+            dndinitiative_row(canvas, 0U, false, "No saved combat history");
+        } else {
+            for(uint8_t row = 0U; row < 5U; ++row) {
+                uint8_t i = (uint8_t)(app->scroll + row);
+                if(i >= app->history_count) break;
+                const char* name = app->history_files[i];
+                const char* stamp = strchr(name, '_');
+                stamp = stamp ? strchr(stamp + 1U, '_') : NULL;
+                char text[48];
+                if(stamp && strlen(stamp) >= 16U)
+                    snprintf(
+                        text,
+                        sizeof(text),
+                        "%.4s-%.2s-%.2s %.2s:%.2s",
+                        stamp + 1U,
+                        stamp + 5U,
+                        stamp + 7U,
+                        stamp + 10U,
+                        stamp + 12U);
+                else
+                    dndinitiative_copy(text, sizeof(text), name);
+                dndinitiative_row(canvas, row, i == app->selection, text);
+            }
+        }
+    } else if(app->screen == InitiativeScreenHistoryDetail) {
+        if(!app->history_line_count)
+            dndinitiative_row(canvas, 0U, false, "History read failed");
+        else
+            for(uint8_t row = 0U; row < 5U; ++row) {
+                uint8_t i = (uint8_t)(app->scroll + row);
+                if(i >= app->history_line_count) break;
+                dndinitiative_row(canvas, row, i == app->selection, app->history_lines[i]);
+            }
     } else {
         InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] :
                                                       &app->roster[app->selection];
-        char rows[9][48];
-        uint8_t count = app->edit_combat ? 9U : 8U;
+        char rows[10][48];
+        uint8_t count = app->edit_combat ? 10U : 8U;
         snprintf(rows[0], sizeof(rows[0]), "Name: %.20s", member->name);
         if(app->edit_combat) {
             snprintf(rows[1], sizeof(rows[1]), "Initiative roll: %d", member->total);
@@ -1114,8 +1361,9 @@ static void dndinitiative_draw(Canvas* canvas, void* model) {
             snprintf(rows[5], sizeof(rows[5]), "Current HP: %d", member->hp_current);
             snprintf(rows[6], sizeof(rows[6]), "Maximum HP: %d", member->hp_max);
             snprintf(rows[7], sizeof(rows[7]), "Conditions: %.16s", member->conditions);
+            dndinitiative_copy(rows[8], sizeof(rows[8]), "Monster Turn Tools");
             dndinitiative_copy(
-                rows[8], sizeof(rows[8]), app->delete_armed ? "OK again: delete" : "Delete");
+                rows[9], sizeof(rows[9]), app->delete_armed ? "OK again: delete" : "Delete");
         } else {
             snprintf(rows[1], sizeof(rows[1]), "Initiative mod: %+d", member->modifier);
             snprintf(
@@ -1361,16 +1609,16 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
         } else if(
             (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
             event->key == InputKeyUp) {
-            dndinitiative_move(&app->selection, 6U, -1);
-            dndinitiative_keep_visible(app->selection, 6U, &app->scroll);
+            dndinitiative_move(&app->selection, 7U, -1);
+            dndinitiative_keep_visible(app->selection, 7U, &app->scroll);
         } else if(
             (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
             event->key == InputKeyDown) {
-            dndinitiative_move(&app->selection, 6U, 1);
-            dndinitiative_keep_visible(app->selection, 6U, &app->scroll);
+            dndinitiative_move(&app->selection, 7U, 1);
+            dndinitiative_keep_visible(app->selection, 7U, &app->scroll);
         } else if(
             (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
-            app->selection == 5U && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
+            app->selection == 6U && (event->key == InputKeyLeft || event->key == InputKeyRight)) {
             int8_t delta = event->key == InputKeyRight ? 1 : -1;
             int8_t mode = (int8_t)app->roll_mode + delta;
             if(mode < (int8_t)InitiativeRollNormal) mode = (int8_t)InitiativeRollDisadvantage;
@@ -1401,6 +1649,14 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                     dndinitiative_copy(app->status, sizeof(app->status), "No current combat");
                 }
             } else if(app->selection == 5U) {
+                if(dndinitiative_history_load_list(app)) {
+                    app->screen = InitiativeScreenHistory;
+                    app->selection = app->scroll = 0U;
+                    app->status[0] = '\0';
+                } else {
+                    dndinitiative_copy(app->status, sizeof(app->status), "History unavailable");
+                }
+            } else if(app->selection == 6U) {
                 app->roll_mode = (uint8_t)((app->roll_mode + 1U) % 3U);
                 dndinitiative_save(app);
             }
@@ -1430,6 +1686,50 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                 app->selection = 4U;
                 app->scroll = 0U;
             }
+        }
+    } else if(app->screen == InitiativeScreenHistory) {
+        if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            dndinitiative_history_clear(app);
+            app->screen = InitiativeScreenMenu;
+            app->selection = 5U;
+            app->scroll = 1U;
+        } else if(
+            (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+            event->key == InputKeyUp && app->history_count) {
+            dndinitiative_move(&app->selection, app->history_count, -1);
+            dndinitiative_keep_visible(app->selection, app->history_count, &app->scroll);
+        } else if(
+            (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+            event->key == InputKeyDown && app->history_count) {
+            dndinitiative_move(&app->selection, app->history_count, 1);
+            dndinitiative_keep_visible(app->selection, app->history_count, &app->scroll);
+        } else if(
+            event->type == InputTypeShort && event->key == InputKeyOk &&
+            app->selection < app->history_count) {
+            if(dndinitiative_history_load_detail(app, app->selection)) {
+                app->screen = InitiativeScreenHistoryDetail;
+                app->selection = app->scroll = 0U;
+            } else {
+                dndinitiative_copy(app->status, sizeof(app->status), "History read failed");
+            }
+        }
+    } else if(app->screen == InitiativeScreenHistoryDetail) {
+        if(event->type == InputTypeShort && event->key == InputKeyBack) {
+            free(app->history_lines);
+            app->history_lines = NULL;
+            app->history_line_count = 0U;
+            app->screen = InitiativeScreenHistory;
+            app->selection = app->scroll = 0U;
+        } else if(
+            (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+            event->key == InputKeyUp && app->history_line_count) {
+            dndinitiative_move(&app->selection, app->history_line_count, -1);
+            dndinitiative_keep_visible(app->selection, app->history_line_count, &app->scroll);
+        } else if(
+            (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
+            event->key == InputKeyDown && app->history_line_count) {
+            dndinitiative_move(&app->selection, app->history_line_count, 1);
+            dndinitiative_keep_visible(app->selection, app->history_line_count, &app->scroll);
         }
     } else if(app->screen == InitiativeScreenRoster) {
         uint8_t total = (uint8_t)(app->roster_count + 1U);
@@ -1618,12 +1918,12 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                 if(!app->round) app->round = 1U;
             }
             dndinitiative_focus_combat_member(app, app->current_turn);
-            dndinitiative_save(app);
+                    dndinitiative_save(app);
         }
     } else {
         InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] :
                                                       &app->roster[app->selection];
-        uint8_t edit_count = app->edit_combat ? 9U : 8U;
+        uint8_t edit_count = app->edit_combat ? 10U : 8U;
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
            event->key == InputKeyUp) {
             app->delete_armed = 0U;
@@ -1763,7 +2063,17 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                 else if(app->edit_field == 7U)
                     dndinitiative_begin_text(
                         app, InitiativeTextConditions, "Conditions", member->conditions);
-                else if(app->delete_armed) {
+                else if(app->edit_field == 8U) {
+                    if(!dndinitiative_launch_monster_tools(app, member))
+                        dndinitiative_copy(
+                            app->status,
+                            sizeof(app->status),
+                            dndinitiative_member_is_party(app, member) ?
+                                "Party member: no stat block" :
+                                "Bestiary monster not launched");
+                    else
+                        return true;
+                } else if(app->delete_armed) {
                     memmove(
                         &app->combat[app->selection],
                         &app->combat[app->selection + 1U],
@@ -1876,6 +2186,10 @@ static bool dndinitiative_navigation(void* context) {
 static InitiativeApp* dndinitiative_alloc(const char* args) {
     InitiativeApp* app = calloc(1U, sizeof(InitiativeApp));
     if(!app) return NULL;
+    app->return_to_combat =
+        args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_COMBAT) == 0 ? 1U : 0U;
+    bool from_bestiary =
+        args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_BESTIARY) == 0;
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
     if(!app->gui || !app->storage) goto fail;
@@ -1884,10 +2198,25 @@ static InitiativeApp* dndinitiative_alloc(const char* args) {
     app->have_character = dnd_profile_ref_exists(app->storage, app->character_id) ? 1U : 0U;
     if(app->have_character) {
         dndinitiative_load(app);
-        if(args) dndinitiative_import_args(app, args);
+        bool imported_bestiary =
+            args && strchr(args, ';') && !from_bestiary && !app->return_to_combat;
+        if(imported_bestiary) dndinitiative_import_args(app, args);
         bool refreshed_main = dndinitiative_refresh_main_character(app);
-        if(refreshed_main || (args && strchr(args, ';'))) dndinitiative_save(app);
-        app->screen = InitiativeScreenMenu;
+        if(refreshed_main || imported_bestiary) dndinitiative_save(app);
+        if(from_bestiary && app->active)
+            app->screen = InitiativeScreenCombat;
+        else if(imported_bestiary)
+            app->screen = app->active ? InitiativeScreenCombat : InitiativeScreenSetup;
+        else
+            app->screen = InitiativeScreenMenu;
+        if(app->screen == InitiativeScreenCombat)
+            dndinitiative_focus_combat_member(app, app->current_turn);
+        else if(app->screen == InitiativeScreenSetup) {
+            app->selection = app->combat_count ? app->combat_count : 0U;
+            app->scroll = 0U;
+            dndinitiative_keep_visible(
+                app->selection, (uint8_t)(app->combat_count + 3U), &app->scroll);
+        }
     } else {
         app->selection = app->scroll = 0U;
         app->screen = InitiativeScreenNoCharacter;
@@ -1921,6 +2250,7 @@ fail:
 
 static void dndinitiative_free(InitiativeApp* app) {
     if(!app) return;
+    dndinitiative_history_clear(app);
     if(app->dispatcher && app->text_input) view_dispatcher_remove_view(app->dispatcher, 1U);
     if(app->dispatcher && app->number_input) view_dispatcher_remove_view(app->dispatcher, 2U);
     if(app->dispatcher && app->view) view_dispatcher_remove_view(app->dispatcher, 0U);
@@ -1939,9 +2269,19 @@ int32_t dndinitiative_app(void* context) {
     view_dispatcher_switch_to_view(app->dispatcher, 0U);
     view_dispatcher_run(app->dispatcher);
     bool return_to_dnd = app->return_to_dnd;
+    bool return_to_combat = app->return_to_combat;
+    bool launch_bestiary = app->pending_launch_bestiary != 0U;
+    char bestiary_args[INIT_NAME_LEN + 32U];
+    dndinitiative_copy(bestiary_args, sizeof(bestiary_args), app->pending_bestiary_args);
     dndinitiative_free(app);
-    if(return_to_dnd)
-        (void)dnd_handoff_launch_if_present(
-            DNDOLPHINS_FAP_PATH, DND_PROFILE_RETURN_FOCUS_INITIATIVE);
+    if(launch_bestiary) {
+        if(!dnd_handoff_launch_if_present(DNDBESTIARY_FAP_PATH, bestiary_args)) return -1;
+    } else if(return_to_dnd) {
+        if(return_to_combat)
+            (void)dnd_handoff_launch_if_present(DNDCOMBAT_FAP_PATH, NULL);
+        else
+            (void)dnd_handoff_launch_if_present(
+                DNDOLPHINS_FAP_PATH, DND_PROFILE_RETURN_FOCUS_INITIATIVE);
+    }
     return 0;
 }

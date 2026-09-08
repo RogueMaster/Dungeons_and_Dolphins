@@ -73,7 +73,7 @@ These were previously roadmap/testing notes. They remain useful engineering cont
 
 These were once roadmap items but were removed because they describe implementation strategy or testing rather than user features. They can still guide expansion work when the relevant subsystem changes.
 
-- Evaluate a standalone Combat FAP only if measured Loader/runtime memory pressure justifies it. Do not split Combat merely to make source organization look cleaner.
+- DNDCombat is now a standalone FAP because Loader/runtime isolation justified the split. Preserve that ownership boundary; do not fold Combat back into DNDolphins merely for source convenience.
 - If transient full-character compatibility adapters become a measured memory problem, add narrower collection/profile APIs that carry only the fields needed by Inventory, Spellbook or Adventure instead of changing the canonical character schema.
 - Improve ammunition and container workflows by reusing existing Item state transactionally before inventing new persisted state.
 - Favor declarative campaign and monster content over executable scripting, and keep long-text/accessibility improvements compatible with bounded readers.
@@ -95,7 +95,7 @@ Do not reintroduce these exact screens merely because older source/history menti
 - Adventure **Campaign Diagnostics** was removed because the screen was broken and did not provide useful normal-play value.
 - Adventure **Installed Pack Controls** was removed because the control screen was broken. Normal campaign-pack loading remains useful; any future Pack Library/Controls feature should be a redesigned user workflow, not restoration of the old screen.
 - Bestiary **Monster Pack Controls** was removed because it did nothing useful. Pack loading remains separate from that retired menu item.
-- Bestiary **Pack Diagnostics** remains available and belongs at the end of the Bestiary menu rather than interrupting browse/encounter workflows.
+- Bestiary **Pack Diagnostics** belongs at the end of the Bestiary menu and is visible only when the shared DNDolphins **Debug** setting is On; DNDBestiary loads only the minimal two-byte Debug/Homebrew projection. Homebrew Off must exclude Custom Pack monsters from selection/generation while preserving user-created Custom monsters and saved data.
 
 ## Roadmap ideas removed because they already exist or overlap current behavior
 
@@ -154,7 +154,7 @@ For any feature that touches multiple FAPs, define one owner for the authoritati
 
 ## Completed scalable-collection work and future guardrails
 
-The former 4.19.0c WIP is historical. Version **3.6** is the active release line and carries forward the audited scalable collections plus the reviewed grant/catalog work. Do not restart from an older ZIP or infer current behavior from pre-3.6 grant notes.
+The former 4.19.0c WIP is historical. Version **4.19.1** is the active release line and carries forward the audited scalable collections plus the reviewed grant/catalog work. Do not restart from an older ZIP or infer current behavior from pre-3.6 grant notes.
 
 Item, Spell and Feature logical indexes/counts are 16-bit; resident pages remain eight records. Combat retains eight filtered logical indexes and five formatted rows. Keep filtering and storage reads outside Canvas callbacks. A 32-offset seek table accelerates the first 256 owned records; later pages stream safely without allocating a larger index. Language/proficiency windows stream their sidecars using a 96-byte buffer and 128-byte line. Their asset catalogs use 256-byte reads and a 24-name selection page; this is not a catalog-total ceiling.
 
@@ -170,11 +170,11 @@ The former roadmap training entry is now implemented as catalog-backed lists. It
 
 ## Current memory-audit context
 
-`MEMORY_AUDIT.md` is authoritative for 3.6. Older pre-3.6 app-size and grant-size tables were removed from this file because they became easy to mistake for current measurements. The current 32-bit regression proxy reports `DndDolphinsApp` **4,888 B**, `DndCharacter` **2,920 B**, `DndGrant` **180 B**, and SHD restore context **2,029 B**. The Language and Proficiency eight-row caches now share one union because the two pages are mutually exclusive, saving **376 B** of fixed DNDolphins app state.
+`MEMORY_AUDIT.md` is authoritative for the current 4.19.1 memory state. Older pre-3.6 app-size and grant-size tables were removed from this file because they became easy to mistake for current measurements. The current regenerated 32-bit regression proxy reports the common `DndDolphinsApp` state at **3,416 B** (down from 4,676 B; 26.9% less fixed state), `DndCharacter` **3,148 B**, `DndGrant` **180 B**, and SHD restore context **2,029 B**. Language and Proficiency owned rows remain lazy rather than resident; the shared allocation now tracks its row kind and is recreated when switching between those differently sized record types.
 
-The highest-priority OOM discriminator is *when* the error happens. Before Home, prioritize FAP Loader/code residency and contiguous app/framework allocations. During Grant Review, prioritize grant `realloc` overlap and fragmentation. Combat's Item/Spell pages are already bounded; a future `DNDCombat` split is justified primarily to remove Combat executable/read-only code from DNDolphins' always-resident FAP image, not because Combat currently materializes whole catalogs.
+The highest-priority OOM discriminator is *when* the error happens. Before DNDolphins Home, prioritize FAP Loader/code residency and contiguous app/framework allocations. During Grant Review, prioritize DNDGrants grant `realloc` overlap and fragmentation. DNDCombat is now isolated as a standalone FAP; its Item/Spell attack pages remain bounded eight-record windows with independent totals.
 
-If `DNDCombat` is implemented, preserve active-profile handoff, keep DNDInitiative separate, use a narrow Combat projection, stream the existing Item/Spell sidecars, and transactionally persist only combat-mutated character/resource fields. Do not duplicate Inventory or Spellbook ownership.
+DNDCombat must preserve active-profile handoff, keep DNDInitiative separate, stream the existing Item/Spell sidecars, and transactionally persist only combat-mutated character/resource fields. **Jump to Initiative** returns to DNDCombat only for Combat-originated Initiative sessions. Do not duplicate Inventory or Spellbook ownership.
 
 ## 3.6 grant/catalog implementation notes
 
@@ -185,19 +185,10 @@ If `DNDCombat` is implemented, preserve active-profile handoff, keep DNDInitiati
 - Magic Known/knowable/free-granted totals are refreshed on screen entry and cached for drawing. Normal class-capacity selections are excluded from the free-granted count.
 - DNDInventory exclusively owns starting equipment and requires a Review inventory grant confirmation; DNDolphins metadata is audited to reject `item=` grants.
 - The Item catalog has 682 rows with non-empty Source fields. Ravenloft sources are split between CoS and VRGtR; structured catalog rows display compact Source tags.
-- Release-gate coverage is 103 species, 36 backgrounds, 13 classes, 139 subclasses and 33 feats. Both independent spell catalogs contain 482 names and every fixed spell grant must exist in both.
-- Grant metadata is physically scope-separated: `metadata/options.txt` is SRD-only (1,575 total / 616 grant-bearing rows) and complete `options_All.txt` retains all 3,637 / 2,380 rows. `Catalog: All` directly selects the complete metadata file and is unavailable if it is missing. The complete file must preserve every SRD metadata row byte-for-byte at the field level.
+- Release-gate coverage is 103 species, 36 backgrounds, 13 classes, 139 subclasses and 33 feats. Both complete spell catalogs contain 485 names (355 in the SRD-facing catalog) and every fixed spell grant must exist in both.
+- Grant metadata is physically scope-separated: `metadata/options.txt` is SRD-only (1,575 total / 616 grant-bearing rows) and complete `options_All.txt` retains all 3,642 / 2,382 rows. `Catalog: All` directly selects the complete metadata file and is unavailable if it is missing. The complete file must preserve every SRD metadata row byte-for-byte at the field level.
 - The built-in Class/Subclass/Species/Background/Feat name arrays are missing-asset SRD picker fallbacks only. Recognized class Hit Die/spellcasting mappings are separate runtime rules and should not be removed just because catalog names are externalized.
-- Current host stack regression data does not justify changing the manifest reservations. DNDolphins remains 6 KB; the changed grant scanner's strict host frame is 1,776 B. A fresh ARM/device high-water measurement is still required before claiming target stack usage.
 
-
-## 3.6 formatting release gate
-
-- Flipper app releases should run `ufbt format` before packaging. uFBT/FBT formatting is ClangFormat using the firmware `.clang-format` specification.
-- The 3.6 runtime environment did not include the `ufbt` executable or standalone `clang-format`; the installed Clang formatting engine exposed through `clangd` was therefore run against the official Flipper `.clang-format` specification for every one of the 61 application C/H files.
-- First pass changed 44 files (8,068 formatter edits); the immediate second pass changed 0 files / 0 edits, establishing formatter idempotence.
-- After formatting, the full strict/ASan/UBSan host suite passed, followed by 20/20 additional Character regression runs.
-- `.clang-format` remains intentionally ignored and is not a project-owned source file; use the SDK/toolchain version selected for the intended firmware when performing a target-side `ufbt format`/`ufbt lint` gate.
 
 ## Documentation visibility policy
 
@@ -209,3 +200,8 @@ Internal non-SRD catalog/provenance names, source-specific examples, compatibili
 - Spellbook already supports `Any`, `Cantrip`, and level `1` through `9` filtering; host regression coverage now protects this behavior.
 - Artificer uses known cantrips and prepared level-1+ spells. Tinker's Magic grants Mending independently of the normal cantrip allowance. The complete spell catalog extends Artificer associations only in `spells_All.txt`, and the Mending/Tinker's Magic progression grants exist only in `options_All.txt`.
 - Shared SRD spell rows remain authoritative in `spells.txt`; the complete file may extend only their class-association field. The release audit rejects changes to level, school, ritual flag, source, name, or loss of any base class association.
+
+## 3.6.7 Full Bug Audit
+
+Release-candidate audit additionally checked all 11 FAP manifests, production source ownership, unsafe C string APIs, conditional menu indexes, cross-FAP launch/return ownership, bounded collection/search behavior, backup/clone transaction boundaries, Initiative/Bestiary participant ownership, and 128x64 menu visibility. Concrete fixes are recorded in CHANGELOG.md.
+

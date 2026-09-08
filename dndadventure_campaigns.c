@@ -373,6 +373,44 @@ static bool dndadventure_campaigns_active_path(
     return length > 0 && (size_t)length < size;
 }
 
+static bool dndadventure_campaigns_recover_file(
+    Storage* storage,
+    const char* path,
+    const char* backup) {
+    if(storage_file_exists(storage, path)) return true;
+    if(!storage_file_exists(storage, backup)) return true;
+    return storage_common_rename(storage, backup, path) == FSE_OK;
+}
+
+static bool dndadventure_campaigns_publish_file(
+    Storage* storage,
+    const char* temporary,
+    const char* path,
+    const char* backup) {
+    if(!dndadventure_campaigns_recover_file(storage, path, backup)) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    bool had_live = storage_file_exists(storage, path);
+    if(had_live) {
+        if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK) {
+            storage_common_remove(storage, temporary);
+            return false;
+        }
+        if(storage_common_rename(storage, path, backup) != FSE_OK) {
+            storage_common_remove(storage, temporary);
+            return false;
+        }
+    }
+    if(storage_common_rename(storage, temporary, path) != FSE_OK) {
+        if(had_live) (void)storage_common_rename(storage, backup, path);
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(had_live) storage_common_remove(storage, backup);
+    return true;
+}
+
 bool dndadventure_campaigns_active_load(
     Storage* storage,
     uint32_t profile_id,
@@ -380,8 +418,11 @@ bool dndadventure_campaigns_active_load(
     size_t campaign_id_size) {
     if(!storage || !campaign_id || campaign_id_size == 0U) return false;
     campaign_id[0] = '\0';
-    char path[DND_FS_PATH_LEN];
-    if(!dndadventure_campaigns_active_path(path, sizeof(path), profile_id, "txt")) return false;
+    char path[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN];
+    if(!dndadventure_campaigns_active_path(path, sizeof(path), profile_id, "txt") ||
+       !dndadventure_campaigns_active_path(backup, sizeof(backup), profile_id, "bak") ||
+       !dndadventure_campaigns_recover_file(storage, path, backup))
+        return false;
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     if(!storage_file_open(file, path, FSAM_READ, FSOM_OPEN_EXISTING)) {
@@ -413,19 +454,26 @@ bool dndadventure_campaigns_active_save(
     if(!storage || !campaign_id || !dndadventure_campaigns_id_safe(campaign_id)) return false;
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
-    char path[DND_FS_PATH_LEN];
-    if(!dndadventure_campaigns_active_path(path, sizeof(path), profile_id, "txt")) return false;
+    char path[DND_FS_PATH_LEN], temporary[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN];
+    if(!dndadventure_campaigns_active_path(path, sizeof(path), profile_id, "txt") ||
+       !dndadventure_campaigns_active_path(temporary, sizeof(temporary), profile_id, "tmp") ||
+       !dndadventure_campaigns_active_path(backup, sizeof(backup), profile_id, "bak"))
+        return false;
     File* file = storage_file_alloc(storage);
     if(!file) return false;
     char line[96];
     int length = snprintf(line, sizeof(line), "Campaign=%s\n", campaign_id);
     bool ok = length > 0 && (size_t)length < sizeof(line) &&
-              storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+              storage_file_open(file, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
               storage_file_write(file, line, (size_t)length) == (size_t)length &&
               storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    return ok;
+    if(!ok) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    return dndadventure_campaigns_publish_file(storage, temporary, path, backup);
 }
 
 bool dndadventure_campaigns_progress_save(
@@ -436,12 +484,17 @@ bool dndadventure_campaigns_progress_save(
     if(!storage || !campaign || !progress) return false;
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
-    char path[DND_FS_PATH_LEN], line[128];
-    if(!dndadventure_campaigns_progress_path(path, sizeof(path), profile_id, campaign->id, "txt"))
+    char path[DND_FS_PATH_LEN], temporary[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN], line[128];
+    if(!dndadventure_campaigns_progress_path(
+           path, sizeof(path), profile_id, campaign->id, "txt") ||
+       !dndadventure_campaigns_progress_path(
+           temporary, sizeof(temporary), profile_id, campaign->id, "tmp") ||
+       !dndadventure_campaigns_progress_path(
+           backup, sizeof(backup), profile_id, campaign->id, "bak"))
         return false;
     File* file = storage_file_alloc(storage);
     if(!file) return false;
-    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool ok = storage_file_open(file, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
 #define CAMPAIGN_WRITE(...)                                                  \
     do {                                                                     \
         int length = snprintf(line, sizeof(line), __VA_ARGS__);              \
@@ -459,8 +512,15 @@ bool dndadventure_campaigns_progress_save(
     if(ok) ok = storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    if(!ok) return false;
-    return dndadventure_campaigns_active_save(storage, profile_id, campaign->id);
+    if(!ok) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(!dndadventure_campaigns_active_save(storage, profile_id, campaign->id)) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    return dndadventure_campaigns_publish_file(storage, temporary, path, backup);
 }
 
 bool dndadventure_campaigns_progress_load(
@@ -468,13 +528,18 @@ bool dndadventure_campaigns_progress_load(
     uint32_t profile_id,
     const DndAdventureCampaignSummary* campaign,
     DndAdventureCampaignProgress* progress) {
+    if(!storage || !campaign || !progress) return false;
     memset(progress, 0, sizeof(*progress));
     dndadventure_campaigns_copy(progress->campaign, sizeof(progress->campaign), campaign->id);
     dndadventure_campaigns_copy(progress->scene, sizeof(progress->scene), campaign->entry_scene);
     dndadventure_campaigns_copy(
         progress->checkpoint, sizeof(progress->checkpoint), campaign->entry_scene);
-    char path[DND_FS_PATH_LEN];
-    if(!dndadventure_campaigns_progress_path(path, sizeof(path), profile_id, campaign->id, "txt"))
+    char path[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN];
+    if(!dndadventure_campaigns_progress_path(
+           path, sizeof(path), profile_id, campaign->id, "txt") ||
+       !dndadventure_campaigns_progress_path(
+           backup, sizeof(backup), profile_id, campaign->id, "bak") ||
+       !dndadventure_campaigns_recover_file(storage, path, backup))
         return false;
     File* file = storage_file_alloc(storage);
     if(!file) return false;

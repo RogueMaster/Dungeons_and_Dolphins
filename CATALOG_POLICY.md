@@ -25,7 +25,7 @@ The bundled rules catalogs are validated against the project's SRD data set. **H
 
 `character_assets/metadata/options.txt` is the SRD grant/progression view with **1,575 metadata rows / 616 grant-bearing rows**. Feat/feature dependency rows required by valid SRD choices remain present even when the dependency is not itself a top-level picker entry.
 
-The small built-in Class/Subclass/Species/Background/Feat arrays in `dndolphins.c` are emergency SRD picker fallbacks only when an asset is missing. They are not appended to a valid catalog. Class Hit Die and spellcasting defaults are separate runtime rule mappings keyed by class name.
+The small built-in Class/Subclass/Species/Background/Feat arrays in `dnd_app_core.c` are emergency SRD picker fallbacks only when an asset is missing. They are not appended to a valid catalog. Class Hit Die and spellcasting defaults are separate runtime rule mappings keyed by class name.
 
 Release compliance does not rely on source labels alone. Fixed SRD grant payloads are cross-referenced against the SRD spell, feat, language, skill, save, proficiency, size, resistance, sense and speed vocabularies; **475 fixed SRD payloads** currently pass this gate. Compiled picker fallbacks must exactly match their SRD catalog files.
 

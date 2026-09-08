@@ -12,10 +12,14 @@
 #define CAMPAIGN_PACK_READ_BUFFER 256U
 
 #define CAMPAIGN_REGISTRY       APP_DATA_PATH("packs/campaign_registry.txt")
+#define CAMPAIGN_REGISTRY_TEMP  APP_DATA_PATH("packs/campaign_registry.tmp")
+#define CAMPAIGN_REGISTRY_BACKUP APP_DATA_PATH("packs/campaign_registry.bak")
 #define CAMPAIGN_INBOX_MANIFEST APP_DATA_PATH("packs/campaign_inbox/manifest.txt")
 #define CAMPAIGN_INBOX_INDEX    APP_DATA_PATH("packs/campaign_inbox/index.txt")
 #define CAMPAIGN_INBOX_CONTENT  APP_DATA_PATH("packs/campaign_inbox/scenes.txt")
 #define CAMPAIGN_ENABLED_INDEX  APP_DATA_PATH("campaigns/enabled_index.txt")
+#define CAMPAIGN_ENABLED_TEMP   APP_DATA_PATH("campaigns/enabled_index.tmp")
+#define CAMPAIGN_ENABLED_BACKUP APP_DATA_PATH("campaigns/enabled_index.bak")
 #define CAMPAIGN_PACKAGED_INDEX APP_ASSETS_PATH("campaigns/index.txt")
 #define CAMPAIGN_CUSTOM_INDEX   APP_DATA_PATH("campaigns/custom_index.txt")
 
@@ -37,6 +41,30 @@ typedef struct {
 
 static CampaignPackRecord* dndadventure_campaign_packs_records_alloc(void) {
     return calloc(CAMPAIGN_PACK_MAX_RECORDS, sizeof(CampaignPackRecord));
+}
+
+static bool dndadventure_campaign_packs_publish(
+    Storage* storage,
+    const char* temporary,
+    const char* destination,
+    const char* backup) {
+    if(storage_file_exists(storage, backup) &&
+       storage_common_remove(storage, backup) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    bool had_live = storage_file_exists(storage, destination);
+    if(had_live && storage_common_rename(storage, destination, backup) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    if(storage_common_rename(storage, temporary, destination) == FSE_OK) {
+        if(had_live) storage_common_remove(storage, backup);
+        return true;
+    }
+    if(had_live) (void)storage_common_rename(storage, backup, destination);
+    storage_common_remove(storage, temporary);
+    return false;
 }
 
 static void dndadventure_campaign_packs_copy(char* output, size_t size, const char* value) {
@@ -170,9 +198,10 @@ static bool dndadventure_campaign_packs_write_registry(
     uint16_t count) {
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, APP_DATA_PATH("packs"));
+    storage_common_remove(storage, CAMPAIGN_REGISTRY_TEMP);
     File* file = storage_file_alloc(storage);
     if(!file) return false;
-    bool ok = storage_file_open(file, CAMPAIGN_REGISTRY, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool ok = storage_file_open(file, CAMPAIGN_REGISTRY_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     static const char header[] = "# DNDAdventureCampaignRegistry=1\n# id|name|enabled\n";
     if(ok) ok = storage_file_write(file, header, sizeof(header) - 1U) == sizeof(header) - 1U;
     char line[128];
@@ -190,7 +219,12 @@ static bool dndadventure_campaign_packs_write_registry(
     if(ok) ok = storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    return ok;
+    if(!ok) {
+        storage_common_remove(storage, CAMPAIGN_REGISTRY_TEMP);
+        return false;
+    }
+    return dndadventure_campaign_packs_publish(
+        storage, CAMPAIGN_REGISTRY_TEMP, CAMPAIGN_REGISTRY, CAMPAIGN_REGISTRY_BACKUP);
 }
 
 static bool dndadventure_campaign_packs_installed_paths(
@@ -210,6 +244,10 @@ static bool dndadventure_campaign_packs_copy_file(
     const char* source,
     const char* destination) {
     if(!dnd_fs_ensure_parent_dir(storage, destination)) return false;
+    char temporary[DND_FS_PATH_LEN];
+    int length = snprintf(temporary, sizeof(temporary), "%s.install.tmp", destination);
+    if(length <= 0 || (size_t)length >= sizeof(temporary)) return false;
+    storage_common_remove(storage, temporary);
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
     if(!input || !output) {
@@ -218,7 +256,7 @@ static bool dndadventure_campaign_packs_copy_file(
         return false;
     }
     bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
-              storage_file_open(output, destination, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+              storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[256];
     while(ok) {
         size_t count = storage_file_read(input, buffer, sizeof(buffer));
@@ -230,8 +268,11 @@ static bool dndadventure_campaign_packs_copy_file(
     storage_file_close(output);
     storage_file_free(input);
     storage_file_free(output);
-    /* Never delete campaign files. A failed copy remains available for manual recovery. */
-    return ok;
+    if(!ok || storage_common_rename(storage, temporary, destination) != FSE_OK) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    return true;
 }
 
 static bool dndadventure_campaign_packs_file_contains_id(
@@ -373,7 +414,8 @@ static bool dndadventure_campaign_packs_rebuild_from_records(
     storage_common_mkdir(storage, APP_DATA_PATH("campaigns"));
     File* output = storage_file_alloc(storage);
     if(!output) return false;
-    bool ok = storage_file_open(output, CAMPAIGN_ENABLED_INDEX, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    storage_common_remove(storage, CAMPAIGN_ENABLED_TEMP);
+    bool ok = storage_file_open(output, CAMPAIGN_ENABLED_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     static const char header[] = "# CampaignPack=1\n";
     if(ok) ok = storage_file_write(output, header, sizeof(header) - 1U) == sizeof(header) - 1U;
     for(uint16_t i = 0U; ok && i < count; ++i) {
@@ -411,7 +453,12 @@ static bool dndadventure_campaign_packs_rebuild_from_records(
     if(ok) ok = storage_file_sync(output);
     storage_file_close(output);
     storage_file_free(output);
-    return ok;
+    if(!ok) {
+        storage_common_remove(storage, CAMPAIGN_ENABLED_TEMP);
+        return false;
+    }
+    return dndadventure_campaign_packs_publish(
+        storage, CAMPAIGN_ENABLED_TEMP, CAMPAIGN_ENABLED_INDEX, CAMPAIGN_ENABLED_BACKUP);
 }
 
 bool dndadventure_campaign_packs_rebuild_enabled(Storage* storage) {
@@ -548,20 +595,35 @@ bool dndadventure_campaign_packs_install_inbox(Storage* storage, char* status, s
     }
     if(!dndadventure_campaign_packs_copy_file(storage, CAMPAIGN_INBOX_INDEX, index_path) ||
        !dndadventure_campaign_packs_copy_file(storage, CAMPAIGN_INBOX_CONTENT, content_path)) {
-        /* Preserve anything already copied; Adventure never deletes campaign content. */
-        dndadventure_campaign_packs_status(status, status_size, "Pack copy failed; files kept");
+        /* These installed files did not exist before this transaction and the inbox
+           remains authoritative, so removing a partial copy makes retry safe. */
+        storage_common_remove(storage, index_path);
+        storage_common_remove(storage, content_path);
+        dndadventure_campaign_packs_status(status, status_size, "Pack copy failed; retry safe");
         goto done;
     }
 
+    uint16_t previous_count = count;
     CampaignPackRecord* record = &records[count++];
     memset(record, 0, sizeof(*record));
     dndadventure_campaign_packs_copy(record->summary.id, sizeof(record->summary.id), manifest.id);
     dndadventure_campaign_packs_copy(
         record->summary.name, sizeof(record->summary.name), manifest.name);
     record->summary.enabled = 1U;
-    if(!dndadventure_campaign_packs_write_registry(storage, records, count) ||
-       !dndadventure_campaign_packs_rebuild_from_records(storage, records, count)) {
-        dndadventure_campaign_packs_status(status, status_size, "Pack install write failed");
+    if(!dndadventure_campaign_packs_write_registry(storage, records, count)) {
+        storage_common_remove(storage, index_path);
+        storage_common_remove(storage, content_path);
+        dndadventure_campaign_packs_status(status, status_size, "Pack registry write failed");
+        goto done;
+    }
+    if(!dndadventure_campaign_packs_rebuild_from_records(storage, records, count)) {
+        /* Roll the registry back to the pre-install record set. The newly installed
+           files are duplicates of the still-present inbox payload and can be removed. */
+        (void)dndadventure_campaign_packs_write_registry(storage, records, previous_count);
+        (void)dndadventure_campaign_packs_rebuild_from_records(storage, records, previous_count);
+        storage_common_remove(storage, index_path);
+        storage_common_remove(storage, content_path);
+        dndadventure_campaign_packs_status(status, status_size, "Pack enable write failed; rolled back");
         goto done;
     }
     dndadventure_campaign_packs_status(status, status_size, "Pack installed/enabled");

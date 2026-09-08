@@ -21,7 +21,7 @@
 #define DND_MAX_CLASSES           4U
 #define DND_RESIDENT_RECORD_LIMIT 8U
 #define DND_MAX_GRANTS            24U
-#define DND_MAX_ATTACK_TEMPLATES  8U
+#define DND_MAX_ATTACK_TEMPLATES  10U
 
 #define DND_SKILL_COUNT   18U
 #define DND_ABILITY_COUNT 6U
@@ -95,10 +95,13 @@ typedef enum {
 } DndResourceFormula;
 
 typedef enum {
-    DndAttackTemplateUnarmed,
-    DndAttackTemplateSpellAttack,
-    DndAttackTemplateSavingThrow,
-    DndAttackTemplateCustom,
+    /* Preserve the original numeric values 0-3 for save compatibility. */
+    DndAttackTemplateUnarmed = 0,
+    DndAttackTemplateSpellAttack = 1,
+    DndAttackTemplateSavingThrow = 2,
+    DndAttackTemplateCustom = 3,
+    DndAttackTemplateGrapple = 4,
+    DndAttackTemplateShove = 5,
     DndAttackTemplateTypeCount,
 } DndAttackTemplateType;
 
@@ -166,6 +169,7 @@ typedef struct {
     char source[DND_SHORT_LEN];
     char school[DND_SHORT_LEN];
     uint8_t grant_source;
+    uint8_t favorite;
     char grant_name[DND_SHORT_LEN];
 } DndSpell;
 

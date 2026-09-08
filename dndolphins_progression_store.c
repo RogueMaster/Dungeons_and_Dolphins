@@ -303,14 +303,21 @@ static bool dndolphins_progression_store_features_create(
     dndolphins_progression_store_feature_path(path, sizeof(path), profile);
     File* file = storage_file_alloc(storage);
     if(!file) return false;
-    bool ok = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
-              dndolphins_progression_store_write_raw(file, DND_FEATURES_HEADER);
+    bool opened = storage_file_open(file, path, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+    bool ok = opened && dndolphins_progression_store_write_raw(file, DND_FEATURES_HEADER);
     for(uint8_t i = 0U; ok && i < count; ++i)
         ok = dndolphins_progression_store_write_feature(file, &features[i]);
     if(ok) ok = storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    return ok && storage_file_exists(storage, path);
+    if(!ok) {
+        /* The caller reaches this helper only when the Feature sidecar did not
+           exist. Remove a partial file created by this failed attempt, but do
+           not remove a pre-existing non-file path that blocked open(). */
+        if(opened) (void)storage_common_remove(storage, path);
+        return false;
+    }
+    return storage_file_exists(storage, path);
 }
 
 bool dndolphins_progression_store_features_count(
@@ -865,6 +872,16 @@ static bool dndolphins_progression_store_copy_one(
     const char* source,
     const char* destination) {
     if(!storage_file_exists(storage, source)) return true;
+
+    char temporary[DND_PROGRESS_PATH_LEN];
+    char backup[DND_PROGRESS_PATH_LEN];
+    int tn = snprintf(temporary, sizeof(temporary), "%s.ptmp", destination);
+    int bn = snprintf(backup, sizeof(backup), "%s.pbak", destination);
+    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) ||
+       (size_t)bn >= sizeof(backup))
+        return false;
+    storage_common_remove(storage, temporary);
+
     File* input = storage_file_alloc(storage);
     File* output = storage_file_alloc(storage);
     if(!input || !output) {
@@ -873,19 +890,24 @@ static bool dndolphins_progression_store_copy_one(
         return false;
     }
     bool ok = storage_file_open(input, source, FSAM_READ, FSOM_OPEN_EXISTING) &&
-              storage_file_open(output, destination, FSAM_WRITE, FSOM_CREATE_ALWAYS);
+              storage_file_open(output, temporary, FSAM_WRITE, FSOM_CREATE_ALWAYS);
     uint8_t buffer[256];
     while(ok) {
         size_t count = storage_file_read(input, buffer, sizeof(buffer));
         if(!count) break;
         ok = storage_file_write(output, buffer, count) == count;
     }
+    if(ok) ok = storage_file_get_error(input) == FSE_OK;
     if(ok) ok = storage_file_sync(output);
     storage_file_close(input);
     storage_file_close(output);
     storage_file_free(input);
     storage_file_free(output);
-    return ok;
+    if(!ok) {
+        storage_common_remove(storage, temporary);
+        return false;
+    }
+    return dndolphins_progression_store_publish(storage, temporary, destination, backup);
 }
 
 bool dndolphins_progression_store_copy_sidecars(

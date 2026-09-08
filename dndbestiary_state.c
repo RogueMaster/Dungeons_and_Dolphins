@@ -23,6 +23,7 @@
 #define ENCOUNTERS_ARCHIVE_PATH APP_DATA_PATH("bestiary/encounters_archive.txt")
 #define ENCOUNTERS_ARCHIVE_TEMP APP_DATA_PATH("bestiary/encounters_archive.tmp")
 #define PARTY_SETTINGS_PATH APP_DATA_PATH("bestiary/party_settings.txt")
+#define PARTY_SETTINGS_TEMP APP_DATA_PATH("bestiary/party_settings.tmp")
 
 typedef struct {
     File* file;
@@ -229,15 +230,20 @@ bool dndbestiary_state_party_settings_save(
     if(!storage || party_level < 1U || party_level > 20U || party_size < 1U || party_size > 12U)
         return false;
     if(!dnd_fs_ensure_parent_dir(storage, PARTY_SETTINGS_PATH)) return false;
+    storage_common_remove(storage, PARTY_SETTINGS_TEMP);
     File* file = storage_file_alloc(storage);
     if(!file) return false;
-    bool ok = storage_file_open(file, PARTY_SETTINGS_PATH, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
+    bool ok = storage_file_open(file, PARTY_SETTINGS_TEMP, FSAM_WRITE, FSOM_CREATE_ALWAYS) &&
               dndbestiary_state_write_named_u32(file, "PartyLevel", party_level) &&
               dndbestiary_state_write_named_u32(file, "PartySize", party_size) &&
               storage_file_sync(file);
     storage_file_close(file);
     storage_file_free(file);
-    return ok;
+    if(!ok) {
+        storage_common_remove(storage, PARTY_SETTINGS_TEMP);
+        return false;
+    }
+    return dndbestiary_state_publish(storage, PARTY_SETTINGS_TEMP, PARTY_SETTINGS_PATH);
 }
 
 static uint16_t dndbestiary_state_id_count(Storage* storage, const char* path, uint16_t maximum) {
