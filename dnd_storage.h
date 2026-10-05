@@ -13,7 +13,7 @@ typedef struct {
 #define DND_STORAGE_PROFILE_CACHE_SIZE    8U
 #define DND_STORAGE_COLLECTION_CACHE_SIZE 8U
 #define DND_STORAGE_COLLECTION_PAGE_COUNT 32U
-#define DND_INVENTORY_BAG_NAME_LEN       24U
+#define DND_INVENTORY_BAG_NAME_LEN        24U
 
 typedef struct {
     uint32_t active_profile;
@@ -67,24 +67,49 @@ bool dnd_storage_visit_spells(
    invGroup_<id>.txt; additional bags use inv<safeBagName>_<id>.txt. Bag lists
    are streamed from filenames/header metadata rather than retained in RAM. */
 bool dnd_storage_inventory_bag_at(
-    Storage* storage, uint32_t profile, uint8_t index, char* name, size_t size);
+    Storage* storage,
+    uint32_t profile,
+    uint8_t index,
+    char* name,
+    size_t size);
 uint8_t dnd_storage_inventory_bag_count(Storage* storage, uint32_t profile);
 bool dnd_storage_inventory_bag_create(Storage* storage, uint32_t profile, const char* name);
 bool dnd_storage_inventory_bag_delete(Storage* storage, uint32_t profile, const char* name);
 bool dnd_storage_visit_items_bag(
-    Storage* storage, uint32_t profile, const char* bag, DndDolphinsItemRecordVisitor visitor,
-    void* context, uint16_t* total_count);
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    DndDolphinsItemRecordVisitor visitor,
+    void* context,
+    uint16_t* total_count);
 bool dnd_storage_load_items_window_indexed_bag(
-    Storage* storage, uint32_t profile, const char* bag, uint16_t start, DndCharacter* character,
-    uint16_t* total_count, uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    uint16_t start,
+    DndCharacter* character,
+    uint16_t* total_count,
+    uint32_t page_offsets[DND_STORAGE_COLLECTION_PAGE_COUNT],
     uint8_t* valid_pages);
 bool dnd_storage_items_exist_bag(Storage* storage, uint32_t profile, const char* bag);
 bool dnd_storage_save_items_window_bag(
-    Storage* storage, uint32_t profile, const char* bag, uint16_t start, const DndCharacter* character);
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    uint16_t start,
+    const DndCharacter* character);
 bool dnd_storage_append_item_bag(
-    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, const DndItem* item);
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    const DndCharacter* owner,
+    const DndItem* item);
 bool dnd_storage_delete_item_bag(
-    Storage* storage, uint32_t profile, const char* bag, const DndCharacter* owner, uint16_t index);
+    Storage* storage,
+    uint32_t profile,
+    const char* bag,
+    const DndCharacter* owner,
+    uint16_t index);
 bool dnd_storage_move_items_bag_selected(
     Storage* storage,
     uint32_t profile,
@@ -242,10 +267,7 @@ bool dnd_storage_load_profile(
     DndSaveData* data,
     bool* recovered_backup);
 bool dnd_storage_save_profile(Storage* storage, uint32_t profile, const DndSaveData* data);
-bool dnd_storage_save_profile_updated(
-    Storage* storage,
-    uint32_t profile,
-    const DndSaveData* data);
+bool dnd_storage_save_profile_updated(Storage* storage, uint32_t profile, const DndSaveData* data);
 bool dnd_storage_save_profile_known_updated(
     Storage* storage,
     const DndProfileEntry* current_entry,
@@ -264,11 +286,7 @@ uint8_t dnd_storage_list_shd_levels(
     uint32_t profile,
     uint8_t* levels,
     uint8_t capacity);
-bool dnd_storage_restore_shd(
-    Storage* storage,
-    uint32_t profile,
-    uint8_t level,
-    DndSaveData* data);
+bool dnd_storage_restore_shd(Storage* storage, uint32_t profile, uint8_t level, DndSaveData* data);
 bool dnd_storage_restore_shd_path(
     Storage* storage,
     uint32_t profile,

@@ -22,8 +22,8 @@
 #define ENCOUNTERS_TEMP         APP_DATA_PATH("bestiary/encounters.tmp")
 #define ENCOUNTERS_ARCHIVE_PATH APP_DATA_PATH("bestiary/encounters_archive.txt")
 #define ENCOUNTERS_ARCHIVE_TEMP APP_DATA_PATH("bestiary/encounters_archive.tmp")
-#define PARTY_SETTINGS_PATH APP_DATA_PATH("bestiary/party_settings.txt")
-#define PARTY_SETTINGS_TEMP APP_DATA_PATH("bestiary/party_settings.tmp")
+#define PARTY_SETTINGS_PATH     APP_DATA_PATH("bestiary/party_settings.txt")
+#define PARTY_SETTINGS_TEMP     APP_DATA_PATH("bestiary/party_settings.tmp")
 
 typedef struct {
     File* file;
@@ -490,8 +490,7 @@ static uint16_t dndbestiary_state_load_filters(
 
 uint16_t dndbestiary_state_filter_count(Storage* storage) {
     if(!storage) return 0U;
-    DndBestiaryFilterPreset* filters =
-        calloc(STATE_MAX_FILTERS, sizeof(DndBestiaryFilterPreset));
+    DndBestiaryFilterPreset* filters = calloc(STATE_MAX_FILTERS, sizeof(DndBestiaryFilterPreset));
     if(!filters) return 0U;
     uint16_t count = dndbestiary_state_load_filters(storage, filters);
     free(filters);
@@ -503,8 +502,7 @@ bool dndbestiary_state_filter_at(
     uint16_t wanted,
     DndBestiaryFilterPreset* output) {
     if(!storage || !output || wanted >= STATE_MAX_FILTERS) return false;
-    DndBestiaryFilterPreset* filters =
-        calloc(STATE_MAX_FILTERS, sizeof(DndBestiaryFilterPreset));
+    DndBestiaryFilterPreset* filters = calloc(STATE_MAX_FILTERS, sizeof(DndBestiaryFilterPreset));
     if(!filters) return false;
     uint16_t count = dndbestiary_state_load_filters(storage, filters);
     bool found = wanted < count;
@@ -827,10 +825,7 @@ uint16_t dndbestiary_state_encounter_count(Storage* storage) {
     return storage ? dndbestiary_state_encounter_count_path(storage, ENCOUNTERS_PATH) : 0U;
 }
 
-bool dndbestiary_state_encounter_at(
-    Storage* storage,
-    uint16_t wanted,
-    DndSavedEncounter* output) {
+bool dndbestiary_state_encounter_at(Storage* storage, uint16_t wanted, DndSavedEncounter* output) {
     return storage && output &&
            dndbestiary_state_encounter_at_path(storage, ENCOUNTERS_PATH, wanted, output);
 }

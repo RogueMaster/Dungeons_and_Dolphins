@@ -36,7 +36,7 @@ Current user-facing feature coverage for the eleven Dungeons & Dolphins FAPs.
 
 ## DNDCombat
 
-- [x] Standalone 25-action Combat menu with weapon attacks, attack-roll Spell Attacks, **Combat Utility Spells**, Rituals, attack templates, HP/rest/Hit Die recovery and combat-state controls.
+- [x] Standalone 26-action Combat menu with weapon attacks, attack-roll Spell Attacks, **Combat Utility Spells**, Rituals, attack templates, HP/rest/Hit Die recovery and combat-state controls.
 - [x] Attack/utility spell lists use bounded eight-record windows with independent `uint16_t` totals; host regression reaches weapon #300 and spell #300, so menu count is not an attack cap.
 - [x] Spell Combat rows show the resolved source-class casting ability/attack modifier, e.g. `(WIS/+5)`. Attack Templates keeps **Unarmed Strike / Grapple / Shove** adjacent; Unarmed Strike uses `1 + ability modifier` damage and Grapple/Shove use the SRD save-DC calculation without removing editable custom templates.
 - [x] **Jump to Initiative** launches DNDInitiative with an explicit Combat source handoff; Short Back returns to DNDCombat only for that launch source.
@@ -170,7 +170,7 @@ Current user-facing feature coverage for the eleven Dungeons & Dolphins FAPs.
 - [x] Spellbook single-owner page allocation preserves Known/Prepared/Ritual/Always Prepared/free-cast associations through add/delete/sort/reload; manual additions are not limited by spells-known allowances.
 - [x] Spellbook rows show a right-aligned three-letter class or actual Origin/Feat/grant source tag (`WIZ`, `HIG`, `MAG`, etc.).
 - [x] Bounded Combat weapon/spell/ritual index windows, indexed Feature pages, and `Spellbook` / `Features` headers with `PgX<>`.
-- [x] **DNDCombat** is a standalone FAP with 25 Combat actions, **Jump to Initiative**, source-aware Initiative return, and streamed attack totals validated beyond the menu count (300 weapons / 300 spells in host regression).
+- [x] **DNDCombat** is a standalone FAP with 26 Combat actions, **Jump to Initiative**, source-aware Initiative return, and streamed attack totals validated beyond the menu count (300 weapons / 300 spells in host regression).
 - [x] Scalable Languages and typed Proficiencies lists with add/replace/delete; a lazy four-record owned-list page and eight-row streamed catalog page reduce RAM while totals remain unbounded (300-record host regression); Proficiencies defaults to Allowed with Hold OK for All.
 - [x] Primary-class saving-throw proficiencies are staged as reviewed starting grants; no additional starting pair is silently granted from multiclassing.
 - [x] Get Elevated Off/420, default 420; full random bundles, deferred until normal equipment exists, immediate active-character grants on Off-to-420. The 18 420 catalog rows are gated only by Homebrew, not Get Elevated.
@@ -189,3 +189,12 @@ Current user-facing feature coverage for the eleven Dungeons & Dolphins FAPs.
 
 - [x] DNDSpellbook Favorite state + DNDCombat Favorite Spells reuse existing cast path.
 - [x] Standalone DNDBackup & Restore FAP owns user-facing SHD bundle export/restore; DNDolphins only launches it.
+
+## Refactor integration validation
+
+- [x] Shared-core Hub, Combat and Grants builds reject redundant declarations with `-Wredundant-decls -Werror`.
+- [x] Common input and profile/collection/Settings paths tolerate absent optional runtimes.
+- [x] Language/Proficiency first-use and row-kind switching reacquire released cache state and recover from allocation failure.
+- [x] Catalog OK/Back preserves return state before releasing the Catalog descriptor.
+- [x] Favorite Spells builds its bounded index on entry and returns through the casting workflow.
+- [x] Selected Hub Feats are saved before DNDGrants reviews dependent grants.

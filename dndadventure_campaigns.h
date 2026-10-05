@@ -6,9 +6,9 @@
 #include <stdint.h>
 #include <storage/storage.h>
 
-#define DNDADVENTURE_PACK_VERSION 1U
-#define DNDADVENTURE_APP_VERSION  301U
-#define DNDADVENTURE_CAMPAIGN_ID_LEN       32U
+#define DNDADVENTURE_PACK_VERSION    1U
+#define DNDADVENTURE_APP_VERSION     301U
+#define DNDADVENTURE_CAMPAIGN_ID_LEN 32U
 
 typedef struct {
     char id[DNDADVENTURE_CAMPAIGN_ID_LEN];
@@ -42,8 +42,14 @@ typedef struct {
 } DndAdventureCampaignDiagnostics;
 
 uint16_t dndadventure_campaigns_count(Storage* storage);
-bool dndadventure_campaigns_at(Storage* storage, uint16_t index, DndAdventureCampaignSummary* output);
-bool dndadventure_campaigns_find(Storage* storage, const char* id, DndAdventureCampaignSummary* output);
+bool dndadventure_campaigns_at(
+    Storage* storage,
+    uint16_t index,
+    DndAdventureCampaignSummary* output);
+bool dndadventure_campaigns_find(
+    Storage* storage,
+    const char* id,
+    DndAdventureCampaignSummary* output);
 bool dndadventure_campaigns_scene_path(
     Storage* storage,
     const DndAdventureCampaignSummary* campaign,

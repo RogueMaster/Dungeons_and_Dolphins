@@ -17,14 +17,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define INIT_MAX           24U
-#define INIT_NAME_LEN      32U
-#define INIT_CONDITION_LEN 64U
-#define INIT_PATH_LEN      128U
-#define INIT_FILE_PATH     APP_DATA_PATH("ch_%lu.%s")
-#define INIT_HISTORY_ROOT  APP_DATA_PATH("history")
-#define INIT_HISTORY_MAX   24U
-#define INIT_HISTORY_LINE_LEN 48U
+#define INIT_MAX                24U
+#define INIT_NAME_LEN           32U
+#define INIT_CONDITION_LEN      64U
+#define INIT_PATH_LEN           128U
+#define INIT_FILE_PATH          APP_DATA_PATH("ch_%lu.%s")
+#define INIT_HISTORY_ROOT       APP_DATA_PATH("history")
+#define INIT_HISTORY_MAX        24U
+#define INIT_HISTORY_LINE_LEN   48U
 #define INIT_HISTORY_DETAIL_MAX 16U
 
 typedef struct {
@@ -929,11 +929,9 @@ static bool dndinitiative_history_load_list(InitiativeApp* app) {
             continue;
         uint8_t insert = app->history_count;
         if(insert < INIT_HISTORY_MAX) {
-            while(insert &&
-                  strcmp(app->history_files[insert - 1U], filename) < 0) {
+            while(insert && strcmp(app->history_files[insert - 1U], filename) < 0) {
                 if(insert < INIT_HISTORY_MAX)
-                    memcpy(app->history_files[insert],
-                           app->history_files[insert - 1U], 64U);
+                    memcpy(app->history_files[insert], app->history_files[insert - 1U], 64U);
                 --insert;
             }
             dndinitiative_copy(app->history_files[insert], 64U, filename);
@@ -941,8 +939,7 @@ static bool dndinitiative_history_load_list(InitiativeApp* app) {
         } else if(strcmp(filename, app->history_files[INIT_HISTORY_MAX - 1U]) > 0) {
             insert = INIT_HISTORY_MAX - 1U;
             while(insert && strcmp(app->history_files[insert - 1U], filename) < 0) {
-                memcpy(app->history_files[insert],
-                       app->history_files[insert - 1U], 64U);
+                memcpy(app->history_files[insert], app->history_files[insert - 1U], 64U);
                 --insert;
             }
             dndinitiative_copy(app->history_files[insert], 64U, filename);
@@ -968,34 +965,37 @@ static bool dndinitiative_history_read_line(File* file, char* out, size_t size) 
     return saw;
 }
 
-static void dndinitiative_history_format_member(
-    char* out, size_t size, const char* line) {
+static void dndinitiative_history_format_member(char* out, size_t size, const char* line) {
     char copy[192];
     dndinitiative_copy(copy, sizeof(copy), line);
     char* kind = copy;
     char* name = strchr(kind, '|');
-    if(!name) { dndinitiative_copy(out, size, line); return; }
+    if(!name) {
+        dndinitiative_copy(out, size, line);
+        return;
+    }
     *name++ = '\0';
     char* hp = strchr(name, '|');
-    if(!hp) { dndinitiative_copy(out, size, line); return; }
+    if(!hp) {
+        dndinitiative_copy(out, size, line);
+        return;
+    }
     *hp++ = '\0';
     char* hpmax = strchr(hp, '|');
-    if(!hpmax) { dndinitiative_copy(out, size, line); return; }
+    if(!hpmax) {
+        dndinitiative_copy(out, size, line);
+        return;
+    }
     *hpmax++ = '\0';
     char* ac = strchr(hpmax, '|');
-    if(!ac) { dndinitiative_copy(out, size, line); return; }
+    if(!ac) {
+        dndinitiative_copy(out, size, line);
+        return;
+    }
     *ac++ = '\0';
     char* cond = strchr(ac, '|');
     if(cond) *cond++ = '\0';
-    snprintf(
-        out,
-        size,
-        "%c %.17s HP%s/%s AC%s",
-        kind[0] == 'P' ? 'P' : 'O',
-        name,
-        hp,
-        hpmax,
-        ac);
+    snprintf(out, size, "%c %.17s HP%s/%s AC%s", kind[0] == 'P' ? 'P' : 'O', name, hp, hpmax, ac);
 }
 
 static bool dndinitiative_history_load_detail(InitiativeApp* app, uint8_t index) {
@@ -1005,8 +1005,7 @@ static bool dndinitiative_history_load_detail(InitiativeApp* app, uint8_t index)
     app->history_line_count = 0U;
     if(!app->history_lines) return false;
     char path[INIT_PATH_LEN];
-    if(!dnd_fs_child_path(
-           path, sizeof(path), INIT_HISTORY_ROOT, NULL, app->history_files[index]))
+    if(!dnd_fs_child_path(path, sizeof(path), INIT_HISTORY_ROOT, NULL, app->history_files[index]))
         return false;
     File* file = storage_file_alloc(app->storage);
     if(!file) return false;
@@ -1033,7 +1032,8 @@ static bool dndinitiative_history_load_detail(InitiativeApp* app, uint8_t index)
     return ok;
 }
 
-static bool dndinitiative_launch_monster_tools(InitiativeApp* app, const InitiativeMember* member) {
+static bool
+    dndinitiative_launch_monster_tools(InitiativeApp* app, const InitiativeMember* member) {
     if(!app || !member || !member->name[0] || dndinitiative_member_is_party(app, member))
         return false;
     int n = snprintf(
@@ -1918,7 +1918,7 @@ static bool dndinitiative_input(InputEvent* event, void* context) {
                 if(!app->round) app->round = 1U;
             }
             dndinitiative_focus_combat_member(app, app->current_turn);
-                    dndinitiative_save(app);
+            dndinitiative_save(app);
         }
     } else {
         InitiativeMember* member = app->edit_combat ? &app->combat[app->selection] :
@@ -2186,10 +2186,8 @@ static bool dndinitiative_navigation(void* context) {
 static InitiativeApp* dndinitiative_alloc(const char* args) {
     InitiativeApp* app = calloc(1U, sizeof(InitiativeApp));
     if(!app) return NULL;
-    app->return_to_combat =
-        args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_COMBAT) == 0 ? 1U : 0U;
-    bool from_bestiary =
-        args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_BESTIARY) == 0;
+    app->return_to_combat = args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_COMBAT) == 0 ? 1U : 0U;
+    bool from_bestiary = args && strcmp(args, DND_INITIATIVE_LAUNCH_FROM_BESTIARY) == 0;
     app->gui = furi_record_open(RECORD_GUI);
     app->storage = furi_record_open(RECORD_STORAGE);
     if(!app->gui || !app->storage) goto fail;
@@ -2198,8 +2196,8 @@ static InitiativeApp* dndinitiative_alloc(const char* args) {
     app->have_character = dnd_profile_ref_exists(app->storage, app->character_id) ? 1U : 0U;
     if(app->have_character) {
         dndinitiative_load(app);
-        bool imported_bestiary =
-            args && strchr(args, ';') && !from_bestiary && !app->return_to_combat;
+        bool imported_bestiary = args && strchr(args, ';') && !from_bestiary &&
+                                 !app->return_to_combat;
         if(imported_bestiary) dndinitiative_import_args(app, args);
         bool refreshed_main = dndinitiative_refresh_main_character(app);
         if(refreshed_main || imported_bestiary) dndinitiative_save(app);

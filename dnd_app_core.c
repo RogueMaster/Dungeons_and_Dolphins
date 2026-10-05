@@ -18,10 +18,10 @@
 #define DNDOLPHINS_LONG_BACK_EVENT        0xD121U
 #define DNDOLPHINS_AUTOSAVE_EVENT         0xD122U
 #define DNDOLPHINS_DEFERRED_ACTION_EVENT  0xD123U
-#define DNDOLPHINS_RELEASE_INPUT_EVENT     0xD124U
+#define DNDOLPHINS_RELEASE_INPUT_EVENT    0xD124U
 #define DNDOLPHINS_UI_TICK_MS             100U
 #define DNDOLPHINS_MAX_CATALOG_ENTRIES    24U
-#define DNDOLPHINS_CHARACTER_CATALOG_PAGE  8U
+#define DNDOLPHINS_CHARACTER_CATALOG_PAGE 8U
 #define DNDOLPHINS_MAX_SPELL_ATTACK_ROLLS 12U
 
 typedef enum {
@@ -567,15 +567,14 @@ static bool dndolphins_refresh_ritual_spell_index(DndDolphinsApp* app);
 static bool dndolphins_refresh_combat_weapon_index(DndDolphinsApp* app);
 static void dndolphins_release_text_input(DndDolphinsApp* app);
 static void dndolphins_release_number_input(DndDolphinsApp* app);
-static void dndolphins_prepare_combat_spell_rows(DndDolphinsApp* app, DndCombatSpellMode spell_mode);
+static void
+    dndolphins_prepare_combat_spell_rows(DndDolphinsApp* app, DndCombatSpellMode spell_mode);
 static DndScreen dndolphins_combat_spell_return_screen(const DndDolphinsApp* app);
 static void dndolphins_prepare_combat_weapon_rows(DndDolphinsApp* app);
 
 static void dndolphins_text_done(void* context);
 static void dndolphins_roll_generic(DndDolphinsApp* app);
 static void dndolphins_handle_long_back(DndDolphinsApp* app);
-static void dndolphins_release_text_input(DndDolphinsApp* app);
-static void dndolphins_release_number_input(DndDolphinsApp* app);
 static void dndolphins_quiesce_async(DndDolphinsApp* app);
 static bool dndolphins_flush_save(DndDolphinsApp* app, bool report);
 static void dndolphins_run_deferred_action(DndDolphinsApp* app);
@@ -1296,7 +1295,8 @@ static void dndolphins_page_offsets_release(uint32_t** offsets, uint8_t* valid_p
 static bool dndolphins_load_features_page(DndDolphinsApp* app, uint16_t start) {
     if(!dndolphins_collection_cache_runtime_alloc(app)) return false;
     if(!app->active_profile_loaded) return false;
-    if(!dndolphins_page_offsets_ensure(&app->collection_cache->features_page_offsets, DND_PROGRESS_PAGE_COUNT))
+    if(!dndolphins_page_offsets_ensure(
+           &app->collection_cache->features_page_offsets, DND_PROGRESS_PAGE_COUNT))
         return false;
     uint16_t total = app->features_total;
     if(!dndolphins_progression_store_features_load_window_indexed(
@@ -1344,7 +1344,8 @@ static bool dndolphins_feature_cache_ensure(DndDolphinsApp* app, uint16_t logica
     if(!app->features_loaded && !dndolphins_load_features(app)) return false;
     if(logical_index >= app->features_total) return false;
     if(logical_index >= app->collection_cache->features_cache_start &&
-       logical_index < app->collection_cache->features_cache_start + app->data.character.feature_count)
+       logical_index <
+           app->collection_cache->features_cache_start + app->data.character.feature_count)
         return true;
     if(!dndolphins_save_features_if_changed(app)) return false;
     dnd_data_reserve_features_exact(&app->data.character, 0U);
@@ -1369,7 +1370,8 @@ static DndFeature*
 
 static DndFeature*
     dndolphins_feature_at_cached(DndDolphinsApp* app, uint16_t logical_index, uint8_t* local_out) {
-    if(!app->features_loaded || logical_index < app->collection_cache->features_cache_start) return NULL;
+    if(!app->features_loaded || logical_index < app->collection_cache->features_cache_start)
+        return NULL;
     uint16_t local = logical_index - app->collection_cache->features_cache_start;
     if(local >= app->data.character.feature_count) return NULL;
     if(local_out) *local_out = local;
@@ -1380,7 +1382,8 @@ static bool dndolphins_release_features(DndDolphinsApp* app) {
     if(!app || !app->collection_cache) return !app || !app->features_loaded;
     if(!app->features_loaded) {
         dndolphins_page_offsets_release(
-            &app->collection_cache->features_page_offsets, &app->collection_cache->features_offset_valid_pages);
+            &app->collection_cache->features_page_offsets,
+            &app->collection_cache->features_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
         return true;
     }
@@ -1391,7 +1394,8 @@ static bool dndolphins_release_features(DndDolphinsApp* app) {
         app->features_loaded = 0U;
         app->collection_cache->features_cache_start = 0U;
         dndolphins_page_offsets_release(
-            &app->collection_cache->features_page_offsets, &app->collection_cache->features_offset_valid_pages);
+            &app->collection_cache->features_page_offsets,
+            &app->collection_cache->features_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
     }
     return saved;
@@ -1425,7 +1429,8 @@ static bool dndolphins_load_spellbook_page(DndDolphinsApp* app, uint16_t start) 
 static bool dndolphins_load_items_page(DndDolphinsApp* app, uint16_t start) {
     if(!dndolphins_collection_cache_runtime_alloc(app)) return false;
     if(!app->active_profile_loaded) return false;
-    if(!dndolphins_page_offsets_ensure(&app->collection_cache->items_page_offsets, DND_STORAGE_COLLECTION_PAGE_COUNT))
+    if(!dndolphins_page_offsets_ensure(
+           &app->collection_cache->items_page_offsets, DND_STORAGE_COLLECTION_PAGE_COUNT))
         return false;
     uint16_t total = app->items_total;
     if(!dnd_storage_load_items_window_indexed(
@@ -1505,7 +1510,8 @@ static bool dndolphins_spell_cache_ensure(DndDolphinsApp* app, uint16_t logical_
     if(!app->spellbook_loaded && !dndolphins_load_spellbook(app)) return false;
     if(logical_index >= app->spellbook_total) return false;
     if(logical_index >= app->collection_cache->spellbook_cache_start &&
-       logical_index < app->collection_cache->spellbook_cache_start + app->data.character.spell_count)
+       logical_index <
+           app->collection_cache->spellbook_cache_start + app->data.character.spell_count)
         return true;
     if(!dndolphins_save_spellbook_if_changed(app)) return false;
     dnd_data_clear_spells(&app->data.character);
@@ -1557,8 +1563,10 @@ static DndItem*
 
 static DndSpell*
     dndolphins_spell_cached_at(DndDolphinsApp* app, uint16_t logical_index, uint8_t* local_out) {
-    if(!app || !app->spellbook_loaded || logical_index < app->collection_cache->spellbook_cache_start ||
-       logical_index >= app->collection_cache->spellbook_cache_start + app->data.character.spell_count)
+    if(!app || !app->spellbook_loaded ||
+       logical_index < app->collection_cache->spellbook_cache_start ||
+       logical_index >=
+           app->collection_cache->spellbook_cache_start + app->data.character.spell_count)
         return NULL;
     uint8_t local = dndolphins_spell_local_index(app, logical_index);
     if(local >= app->data.character.spell_count) return NULL;
@@ -1612,7 +1620,6 @@ static void dndolphins_record_list_scroll_sidecar(DndDolphinsApp* app, uint16_t 
     app->scroll = scroll;
 }
 
-
 static void dndolphins_character_collection_release(DndDolphinsApp* app) {
     if(!app || !app->collection_cache) return;
     free(app->collection_cache->character_collection_page);
@@ -1626,16 +1633,22 @@ static void dndolphins_character_collection_release(DndDolphinsApp* app) {
 }
 
 static bool dndolphins_character_collection_ensure(DndDolphinsApp* app, DndListKind kind) {
-    if(!dndolphins_collection_cache_runtime_alloc(app)) return false;
     if(!app || (kind != DndListLanguages && kind != DndListProficiencies)) return false;
-    if(app->collection_cache->character_collection_page && app->collection_cache->character_collection_kind_valid &&
+    if(app->collection_cache && app->collection_cache->character_collection_page &&
+       app->collection_cache->character_collection_kind_valid &&
        app->collection_cache->character_collection_kind == kind)
         return true;
     dndolphins_character_collection_release(app);
+    /* Releasing the final page also releases its cache descriptor. */
+    if(!dndolphins_collection_cache_runtime_alloc(app)) return false;
     const size_t row_size = kind == DndListLanguages ? sizeof(char[DND_CATALOG_NAME_LEN]) :
                                                        sizeof(DndCharacterProficiency);
-    app->collection_cache->character_collection_page = calloc(DND_CHARACTER_COLLECTION_WINDOW, row_size);
-    if(!app->collection_cache->character_collection_page) return false;
+    app->collection_cache->character_collection_page =
+        calloc(DND_CHARACTER_COLLECTION_WINDOW, row_size);
+    if(!app->collection_cache->character_collection_page) {
+        dndolphins_collection_cache_runtime_release_if_idle(app);
+        return false;
+    }
     app->collection_cache->character_collection_kind = kind;
     app->collection_cache->character_collection_kind_valid = true;
     return true;
@@ -1645,7 +1658,7 @@ static bool dndolphins_load_language_page(DndDolphinsApp* app, uint16_t start) {
     if(!dndolphins_character_collection_ensure(app, DndListLanguages)) return false;
     uint16_t total = app->language_total;
     uint8_t count = 0U;
-    char (*languages)[DND_CATALOG_NAME_LEN] = app->collection_cache->character_collection_page;
+    char(*languages)[DND_CATALOG_NAME_LEN] = app->collection_cache->character_collection_page;
     if(!dnd_character_languages_load_window(
            app->storage, app->active_profile, start, languages, &count, &total))
         return false;
@@ -1672,9 +1685,14 @@ static bool dndolphins_load_proficiency_page(DndDolphinsApp* app, uint16_t start
 }
 
 static bool dndolphins_language_cache_ensure(DndDolphinsApp* app, uint16_t logical) {
-    if(!app->collection_cache) return dndolphins_load_language_page(app, (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) * DND_CHARACTER_COLLECTION_WINDOW));
+    if(!app->collection_cache)
+        return dndolphins_load_language_page(
+            app,
+            (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) *
+                       DND_CHARACTER_COLLECTION_WINDOW));
     if(logical < app->collection_cache->language_cache_start ||
-       logical >= (uint16_t)app->collection_cache->language_cache_start + app->collection_cache->language_page_count) {
+       logical >= (uint16_t)app->collection_cache->language_cache_start +
+                      app->collection_cache->language_page_count) {
         uint16_t start = (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) *
                                     DND_CHARACTER_COLLECTION_WINDOW);
         return dndolphins_load_language_page(app, start);
@@ -1683,9 +1701,14 @@ static bool dndolphins_language_cache_ensure(DndDolphinsApp* app, uint16_t logic
 }
 
 static bool dndolphins_proficiency_cache_ensure(DndDolphinsApp* app, uint16_t logical) {
-    if(!app->collection_cache) return dndolphins_load_proficiency_page(app, (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) * DND_CHARACTER_COLLECTION_WINDOW));
+    if(!app->collection_cache)
+        return dndolphins_load_proficiency_page(
+            app,
+            (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) *
+                       DND_CHARACTER_COLLECTION_WINDOW));
     if(logical < app->collection_cache->proficiency_cache_start ||
-       logical >= (uint16_t)app->collection_cache->proficiency_cache_start + app->collection_cache->proficiency_page_count) {
+       logical >= (uint16_t)app->collection_cache->proficiency_cache_start +
+                      app->collection_cache->proficiency_page_count) {
         uint16_t start = (uint16_t)((logical / DND_CHARACTER_COLLECTION_WINDOW) *
                                     DND_CHARACTER_COLLECTION_WINDOW);
         return dndolphins_load_proficiency_page(app, start);
@@ -1697,10 +1720,11 @@ static const char* dndolphins_language_at_cached(DndDolphinsApp* app, uint16_t l
     if(!app->collection_cache) return NULL;
     if(logical < app->collection_cache->language_cache_start) return NULL;
     uint16_t local = logical - app->collection_cache->language_cache_start;
-    if(!app->collection_cache->character_collection_page || !app->collection_cache->character_collection_kind_valid ||
+    if(!app->collection_cache->character_collection_page ||
+       !app->collection_cache->character_collection_kind_valid ||
        app->collection_cache->character_collection_kind != DndListLanguages)
         return NULL;
-    char (*languages)[DND_CATALOG_NAME_LEN] = app->collection_cache->character_collection_page;
+    char(*languages)[DND_CATALOG_NAME_LEN] = app->collection_cache->character_collection_page;
     return local < app->collection_cache->language_page_count ? languages[local] : NULL;
 }
 
@@ -1709,7 +1733,8 @@ static const DndCharacterProficiency*
     if(!app->collection_cache) return NULL;
     if(logical < app->collection_cache->proficiency_cache_start) return NULL;
     uint16_t local = logical - app->collection_cache->proficiency_cache_start;
-    if(!app->collection_cache->character_collection_page || !app->collection_cache->character_collection_kind_valid ||
+    if(!app->collection_cache->character_collection_page ||
+       !app->collection_cache->character_collection_kind_valid ||
        app->collection_cache->character_collection_kind != DndListProficiencies)
         return NULL;
     DndCharacterProficiency* proficiencies = app->collection_cache->character_collection_page;
@@ -1730,11 +1755,10 @@ static bool dndolphins_record_list_prepare_sidecar(DndDolphinsApp* app) {
     if(total) {
         uint16_t logical = app->selection ? app->selection - 1U : 0U;
         if(logical >= total) logical = total - 1U;
-        bool ok = app->list_kind == DndListFeatures ?
-                      dndolphins_feature_cache_ensure(app, logical) :
-                  app->list_kind == DndListLanguages ?
-                      dndolphins_language_cache_ensure(app, logical) :
-                      dndolphins_proficiency_cache_ensure(app, logical);
+        bool ok =
+            app->list_kind == DndListFeatures  ? dndolphins_feature_cache_ensure(app, logical) :
+            app->list_kind == DndListLanguages ? dndolphins_language_cache_ensure(app, logical) :
+                                                 dndolphins_proficiency_cache_ensure(app, logical);
         if(!ok) return false;
     }
     dndolphins_record_list_scroll_sidecar(app, total);
@@ -1745,7 +1769,7 @@ static void dndolphins_record_list_focus(DndDolphinsApp* app, uint16_t logical_i
     uint16_t total = app->list_kind == DndListFeatures      ? app->features_total :
                      app->list_kind == DndListLanguages     ? app->language_total :
                      app->list_kind == DndListProficiencies ? app->proficiency_total :
-                                                                 0U;
+                                                              0U;
     if(!total) {
         app->selection = 0U;
         app->scroll = 0U;
@@ -1762,7 +1786,10 @@ static bool dndolphins_spell_class_counts_cached(DndDolphinsApp* app) {
     if(!app->collection_cache->spell_class_counts_valid) {
         uint16_t total = 0U;
         if(!dndolphins_spells_class_counts(
-               app->storage, app->active_profile, &app->collection_cache->spell_class_counts, &total))
+               app->storage,
+               app->active_profile,
+               &app->collection_cache->spell_class_counts,
+               &total))
             return false;
         app->spellbook_total = total;
         app->collection_cache->spell_class_counts_valid = 1U;
@@ -1771,13 +1798,15 @@ static bool dndolphins_spell_class_counts_cached(DndDolphinsApp* app) {
 }
 
 static uint8_t dndolphins_class_prepared_count_cached(DndDolphinsApp* app, uint8_t class_index) {
-    return app->collection_cache && app->collection_cache->spell_class_counts_valid && class_index < DND_MAX_CLASSES ?
+    return app->collection_cache && app->collection_cache->spell_class_counts_valid &&
+                   class_index < DND_MAX_CLASSES ?
                app->collection_cache->spell_class_counts.prepared[class_index] :
                0U;
 }
 
 static uint8_t dndolphins_class_known_count_cached(DndDolphinsApp* app, uint8_t class_index) {
-    return app->collection_cache && app->collection_cache->spell_class_counts_valid && class_index < DND_MAX_CLASSES ?
+    return app->collection_cache && app->collection_cache->spell_class_counts_valid &&
+                   class_index < DND_MAX_CLASSES ?
                app->collection_cache->spell_class_counts.known[class_index] :
                0U;
 }
@@ -1786,7 +1815,8 @@ static bool dndolphins_release_spellbook(DndDolphinsApp* app) {
     if(!app || !app->collection_cache) return !app || !app->spellbook_loaded;
     if(!app->spellbook_loaded) {
         dndolphins_page_offsets_release(
-            &app->collection_cache->spellbook_page_offsets, &app->collection_cache->spellbook_offset_valid_pages);
+            &app->collection_cache->spellbook_page_offsets,
+            &app->collection_cache->spellbook_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
         return true;
     }
@@ -1796,7 +1826,8 @@ static bool dndolphins_release_spellbook(DndDolphinsApp* app) {
         app->spellbook_loaded = 0U;
         app->collection_cache->spellbook_cache_start = 0U;
         dndolphins_page_offsets_release(
-            &app->collection_cache->spellbook_page_offsets, &app->collection_cache->spellbook_offset_valid_pages);
+            &app->collection_cache->spellbook_page_offsets,
+            &app->collection_cache->spellbook_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
     }
     return saved;
@@ -1806,7 +1837,8 @@ static bool dndolphins_release_items(DndDolphinsApp* app) {
     if(!app || !app->collection_cache) return !app || !app->items_loaded;
     if(!app->items_loaded) {
         dndolphins_page_offsets_release(
-            &app->collection_cache->items_page_offsets, &app->collection_cache->items_offset_valid_pages);
+            &app->collection_cache->items_page_offsets,
+            &app->collection_cache->items_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
         return true;
     }
@@ -1816,7 +1848,8 @@ static bool dndolphins_release_items(DndDolphinsApp* app) {
         app->items_loaded = 0U;
         app->collection_cache->items_cache_start = 0U;
         dndolphins_page_offsets_release(
-            &app->collection_cache->items_page_offsets, &app->collection_cache->items_offset_valid_pages);
+            &app->collection_cache->items_page_offsets,
+            &app->collection_cache->items_offset_valid_pages);
         dndolphins_collection_cache_runtime_release_if_idle(app);
     }
     return saved;
@@ -1858,20 +1891,18 @@ static bool dndolphins_save_now(DndDolphinsApp* app, bool report) {
     bool result = true;
     bool main_write_failed = false;
     if(main_changed) {
-        bool active_found = app->active_entry_valid &&
-                            app->active_entry.id == app->active_profile;
-        result = active_found ? dnd_storage_save_profile_known_updated(
-                                    app->storage, &app->active_entry, &app->data) :
-                                dnd_storage_save_profile_updated(
-                                    app->storage, app->active_profile, &app->data);
+        bool active_found = app->active_entry_valid && app->active_entry.id == app->active_profile;
+        result =
+            active_found ?
+                dnd_storage_save_profile_known_updated(
+                    app->storage, &app->active_entry, &app->data) :
+                dnd_storage_save_profile_updated(app->storage, app->active_profile, &app->data);
         main_write_failed = !result;
         if(result) {
             app->active_entry.id = app->active_profile;
             app->active_entry.level = dnd_rules_core_total_level(&app->data.character);
             dndolphins_copy(
-                app->active_entry.name,
-                sizeof(app->active_entry.name),
-                app->data.character.name);
+                app->active_entry.name, sizeof(app->active_entry.name), app->data.character.name);
             app->active_entry_valid = 1U;
             if(app->profile_browser) {
                 for(uint8_t i = 0U; i < app->profile_browser->cache_count; ++i) {
@@ -1999,9 +2030,9 @@ static const DndProfileEntry*
 static const DndProfileEntry*
     dndolphins_profile_entry_cached_at(const DndDolphinsApp* app, uint16_t list_index) {
     if(!app || !app->profile_browser || list_index >= app->profile_browser->count ||
-       !app->profile_browser->cache_count ||
-       list_index < app->profile_browser->cache_start ||
-       list_index >= (uint16_t)(app->profile_browser->cache_start + app->profile_browser->cache_count))
+       !app->profile_browser->cache_count || list_index < app->profile_browser->cache_start ||
+       list_index >=
+           (uint16_t)(app->profile_browser->cache_start + app->profile_browser->cache_count))
         return NULL;
     return &app->profile_browser->entries[list_index - app->profile_browser->cache_start];
 }
@@ -2055,8 +2086,8 @@ static bool dndolphins_profile_browser_save(DndDolphinsApp* app) {
 static bool dndolphins_screen_uses_spellbook(const DndDolphinsApp* app, DndScreen screen) {
     UNUSED(app);
 #if defined(DND_BUILD_COMBAT)
-    return screen == DndScreenSpellAttacks || screen == DndScreenUtilitySpells ||
-           screen == DndScreenRituals ||
+    return screen == DndScreenSpellAttacks || screen == DndScreenFavoriteSpells ||
+           screen == DndScreenUtilitySpells || screen == DndScreenRituals ||
            screen == DndScreenSpellCast || screen == DndScreenSpellResult;
 #else
     UNUSED(screen);
@@ -2067,7 +2098,8 @@ static bool dndolphins_screen_uses_spellbook(const DndDolphinsApp* app, DndScree
 static bool dndolphins_screen_uses_items(const DndDolphinsApp* app, DndScreen screen) {
     UNUSED(app);
 #if defined(DND_BUILD_COMBAT)
-    return screen == DndScreenAttackList || screen == DndScreenAttackResult;
+    return screen == DndScreenAttackList || screen == DndScreenAmmoChoice ||
+           screen == DndScreenAttackResult;
 #else
     UNUSED(screen);
     return false;
@@ -2086,20 +2118,22 @@ static bool dndolphins_screen_uses_features(const DndDolphinsApp* app, DndScreen
 
 static bool dndolphins_screen_uses_roll(DndScreen screen) {
 #if defined(DND_BUILD_COMBAT)
-    return screen == DndScreenCombat || screen == DndScreenSpellAttacks ||
-           screen == DndScreenFavoriteSpells || screen == DndScreenUtilitySpells ||
-           screen == DndScreenRituals || screen == DndScreenSpellCast ||
-           screen == DndScreenSpellResult || screen == DndScreenAttackTemplates ||
-           screen == DndScreenAttackTemplateEdit || screen == DndScreenAttackList ||
-           screen == DndScreenAmmoChoice || screen == DndScreenAttackResult ||
-           screen == DndScreenDice || screen == DndScreenDiceResult;
+    return screen == DndScreenCombat || screen == DndScreenMagic ||
+           screen == DndScreenSpellAttacks || screen == DndScreenFavoriteSpells ||
+           screen == DndScreenUtilitySpells || screen == DndScreenRituals ||
+           screen == DndScreenSpellCast || screen == DndScreenSpellResult ||
+           screen == DndScreenAttackTemplates || screen == DndScreenAttackTemplateEdit ||
+           screen == DndScreenAttackList || screen == DndScreenAmmoChoice ||
+           screen == DndScreenAttackResult || screen == DndScreenDice ||
+           screen == DndScreenDiceResult;
 #else
-    return screen == DndScreenAbilities || screen == DndScreenSkills ||
-           screen == DndScreenDice || screen == DndScreenDiceResult;
+    return screen == DndScreenAbilities || screen == DndScreenSkills || screen == DndScreenDice ||
+           screen == DndScreenDiceResult;
 #endif
 }
 
-static bool dndolphins_screen_uses_spell_class_counts(const DndDolphinsApp* app, DndScreen screen) {
+static bool
+    dndolphins_screen_uses_spell_class_counts(const DndDolphinsApp* app, DndScreen screen) {
 #if defined(DND_BUILD_COMBAT)
     UNUSED(app);
     return screen == DndScreenMagic;
@@ -2111,19 +2145,19 @@ static bool dndolphins_screen_uses_spell_class_counts(const DndDolphinsApp* app,
 static void dndolphins_enter_screen(DndDolphinsApp* app, DndScreen screen) {
     DndScreen previous = app->screen;
     const bool next_uses_roll = dndolphins_screen_uses_roll(screen);
-    const bool next_uses_spell_class_counts = dndolphins_screen_uses_spell_class_counts(app, screen);
+    const bool next_uses_spell_class_counts =
+        dndolphins_screen_uses_spell_class_counts(app, screen);
     if(next_uses_roll && !dndolphins_roll_runtime_alloc(app)) {
         dndolphins_set_status(app, "Roll memory unavailable");
         return;
     }
-    bool previous_profile_screen =
-        previous == DndScreenProfiles || previous == DndScreenProfileActions;
+    bool previous_profile_screen = previous == DndScreenProfiles ||
+                                   previous == DndScreenProfileActions;
     bool next_profile_screen = screen == DndScreenProfiles || screen == DndScreenProfileActions;
     bool profile_browser_failed = false;
     if(next_profile_screen && !app->profile_browser)
         profile_browser_failed = !dndolphins_profile_browser_refresh(app);
-    if(previous_profile_screen && !next_profile_screen)
-        dndolphins_profile_browser_release(app);
+    if(previous_profile_screen && !next_profile_screen) dndolphins_profile_browser_release(app);
     if(previous == DndScreenHome && screen != DndScreenHome)
         app->home_return_selection = app->selection;
     /* Catalog state is screen-owned. Free the descriptor and its page before
@@ -2135,14 +2169,16 @@ static void dndolphins_enter_screen(DndDolphinsApp* app, DndScreen screen) {
     bool needs_spellbook = dndolphins_screen_uses_spellbook(app, screen);
     bool needs_items = dndolphins_screen_uses_items(app, screen);
     bool needs_features = dndolphins_screen_uses_features(app, screen);
-    bool character_collection_kind =
-        app->list_kind == DndListLanguages || app->list_kind == DndListProficiencies;
+    bool character_collection_kind = app->list_kind == DndListLanguages ||
+                                     app->list_kind == DndListProficiencies;
     bool previous_character_collection = character_collection_kind &&
-        (previous == DndScreenRecordList || previous == DndScreenRecordDetail ||
-         previous == DndScreenCatalog);
+                                         (previous == DndScreenRecordList ||
+                                          previous == DndScreenRecordDetail ||
+                                          previous == DndScreenCatalog);
     bool next_character_collection = character_collection_kind &&
-        (screen == DndScreenRecordList || screen == DndScreenRecordDetail ||
-         screen == DndScreenCatalog);
+                                     (screen == DndScreenRecordList ||
+                                      screen == DndScreenRecordDetail ||
+                                      screen == DndScreenCatalog);
     if(previous_character_collection && !next_character_collection)
         dndolphins_character_collection_release(app);
     if(!next_uses_roll && app->roll) dndolphins_roll_runtime_free(app);
@@ -2189,6 +2225,8 @@ static void dndolphins_enter_screen(DndDolphinsApp* app, DndScreen screen) {
 #if defined(DND_BUILD_COMBAT)
     if(screen == DndScreenSpellAttacks && !dndolphins_refresh_combat_spell_index(app))
         collection_failed = true;
+    if(screen == DndScreenFavoriteSpells && !dndolphins_refresh_favorite_spell_index(app))
+        collection_failed = true;
     if(screen == DndScreenUtilitySpells && !dndolphins_refresh_utility_spell_index(app))
         collection_failed = true;
     if(screen == DndScreenRituals && !dndolphins_refresh_ritual_spell_index(app))
@@ -2198,8 +2236,7 @@ static void dndolphins_enter_screen(DndDolphinsApp* app, DndScreen screen) {
 #endif
 #if !defined(DND_BUILD_COMBAT)
     if(screen == DndScreenCharacter) {
-        if(!dnd_character_languages_count(
-               app->storage, app->active_profile, &app->language_total))
+        if(!dnd_character_languages_count(app->storage, app->active_profile, &app->language_total))
             collection_failed = true;
         if(!dnd_character_proficiencies_count(
                app->storage, app->active_profile, &app->proficiency_total))
@@ -2231,10 +2268,9 @@ static void dndolphins_enter_screen(DndDolphinsApp* app, DndScreen screen) {
         if(count) (void)dnd_storage_profiles_window(app->storage, app->profile_browser, 0U);
     }
 #if defined(DND_BUILD_COMBAT)
-    if(app->settings.debug &&
-       (screen == DndScreenCombat || screen == DndScreenSpellAttacks ||
-        screen == DndScreenUtilitySpells || screen == DndScreenRituals ||
-        screen == DndScreenAttackList))
+    if(app->settings.debug && (screen == DndScreenCombat || screen == DndScreenSpellAttacks ||
+                               screen == DndScreenUtilitySpells || screen == DndScreenRituals ||
+                               screen == DndScreenAttackList))
         FURI_LOG_I(
             TAG,
             "Heap screen=%u free=%lu",
@@ -2277,10 +2313,7 @@ static void dndolphins_switch_profile(DndDolphinsApp* app, uint32_t profile) {
     app->spellbook_total = 0U;
     app->items_total = 0U;
     app->features_total = 0U;
-    app->collection_cache->spellbook_cache_start = 0U;
-    app->collection_cache->items_cache_start = 0U;
-    app->collection_cache->features_cache_start = 0U;
-    app->collection_cache->spell_class_counts_valid = 0U;
+    dndolphins_collection_cache_runtime_free(app);
     uint32_t previous_profile = app->active_profile;
     app->active_profile = profile;
 #if defined(DND_BUILD_COMBAT)
@@ -2307,7 +2340,7 @@ static void dndolphins_switch_profile(DndDolphinsApp* app, uint32_t profile) {
             dnd_storage_recover_profile_backup(app->storage, previous_profile, &app->data);
         app->storage_unsaved = 0U;
         dndolphins_active_entry_cache_from_browser(app);
-    app->saved_fingerprint = dndolphins_data_fingerprint(&app->data);
+        app->saved_fingerprint = dndolphins_data_fingerprint(&app->data);
         dndolphins_enter_screen(app, DndScreenHome);
         dndolphins_set_status(app, "Profile preserved - load failed");
         return;
@@ -2344,14 +2377,11 @@ static void dndolphins_create_profile(DndDolphinsApp* app) {
     app->spellbook_total = 0U;
     app->items_total = 0U;
     app->features_total = 0U;
-    app->collection_cache->spellbook_cache_start = 0U;
-    app->collection_cache->items_cache_start = 0U;
-    app->collection_cache->features_cache_start = 0U;
-    app->collection_cache->spell_class_counts_valid = 0U;
+    dndolphins_collection_cache_runtime_free(app);
     uint32_t profile = dnd_storage_profiles_next_id(app->profile_browser);
-    if(profile == UINT32_MAX &&
-       ((app->profile_browser->reserved_id_seen && app->profile_browser->highest_reserved_id == UINT32_MAX) ||
-        dndolphins_profile_exists(app, UINT32_MAX))) {
+    if(profile == UINT32_MAX && ((app->profile_browser->reserved_id_seen &&
+                                  app->profile_browser->highest_reserved_id == UINT32_MAX) ||
+                                 dndolphins_profile_exists(app, UINT32_MAX))) {
         dndolphins_set_status(app, "Profile IDs exhausted");
         return;
     }
@@ -2401,10 +2431,7 @@ static void dndolphins_create_profile(DndDolphinsApp* app) {
     app->spellbook_total = 0U;
     app->items_total = 0U;
     app->features_total = 0U;
-    app->collection_cache->spellbook_cache_start = 0U;
-    app->collection_cache->items_cache_start = 0U;
-    app->collection_cache->features_cache_start = 0U;
-    app->collection_cache->spell_class_counts_valid = 0U;
+    dndolphins_collection_cache_runtime_free(app);
     bool metadata_saved = dndolphins_profile_browser_refresh(app);
     dndolphins_profile_include_active(app);
     metadata_saved = metadata_saved && dndolphins_profile_browser_save(app);
@@ -2440,10 +2467,7 @@ static bool dndolphins_delete_profile(DndDolphinsApp* app, uint32_t profile) {
         app->spellbook_total = 0U;
         app->items_total = 0U;
         app->features_total = 0U;
-        app->collection_cache->spellbook_cache_start = 0U;
-        app->collection_cache->items_cache_start = 0U;
-        app->collection_cache->features_cache_start = 0U;
-        if(app->collection_cache) app->collection_cache->spell_class_counts_valid = 0U;
+        dndolphins_collection_cache_runtime_free(app);
         app->active_profile_loaded = 0U;
     }
 
@@ -2513,7 +2537,8 @@ static bool dndolphins_begin_arcane_recovery(DndDolphinsApp* app) {
     app->combat->arcane_recovery_active = 1U;
     app->combat->arcane_recovery_budget = (wizard_level + 1U) / 2U;
     app->combat->arcane_recovery_spent = 0U;
-    memset(app->combat->arcane_recovery_restored, 0, sizeof(app->combat->arcane_recovery_restored));
+    memset(
+        app->combat->arcane_recovery_restored, 0, sizeof(app->combat->arcane_recovery_restored));
     dndolphins_enter_screen(app, DndScreenMagic);
     app->selection = 6U;
     app->scroll = 2U;
@@ -2589,9 +2614,8 @@ static void dndolphins_configure_class_defaults(DndClassLevel* level) {
     else if(mask & (DndClassMaskFighter | DndClassMaskPaladin | DndClassMaskRanger))
         level->hit_die = 10U;
     else if(
-        mask &
-        (DndClassMaskBard | DndClassMaskCleric | DndClassMaskDruid | DndClassMaskMonk |
-         DndClassMaskRogue | DndClassMaskWarlock | DndClassMaskArtificer))
+        mask & (DndClassMaskBard | DndClassMaskCleric | DndClassMaskDruid | DndClassMaskMonk |
+                DndClassMaskRogue | DndClassMaskWarlock | DndClassMaskArtificer))
         level->hit_die = 8U;
     else
         level->hit_die = 6U;
@@ -2607,27 +2631,19 @@ static uint8_t dndolphins_primary_class_save_mask(const char* class_name) {
         return SAVE_PAIR(DndAbilityConstitution, DndAbilityIntelligence);
     if(!strcmp(class_name, "Barbarian"))
         return SAVE_PAIR(DndAbilityStrength, DndAbilityConstitution);
-    if(!strcmp(class_name, "Bard"))
-        return SAVE_PAIR(DndAbilityDexterity, DndAbilityCharisma);
+    if(!strcmp(class_name, "Bard")) return SAVE_PAIR(DndAbilityDexterity, DndAbilityCharisma);
     if(!strcmp(class_name, "Cleric")) return SAVE_PAIR(DndAbilityWisdom, DndAbilityCharisma);
-    if(!strcmp(class_name, "Druid"))
-        return SAVE_PAIR(DndAbilityIntelligence, DndAbilityWisdom);
+    if(!strcmp(class_name, "Druid")) return SAVE_PAIR(DndAbilityIntelligence, DndAbilityWisdom);
     if(!strcmp(class_name, "Fighter"))
         return SAVE_PAIR(DndAbilityStrength, DndAbilityConstitution);
-    if(!strcmp(class_name, "Monk"))
-        return SAVE_PAIR(DndAbilityStrength, DndAbilityDexterity);
-    if(!strcmp(class_name, "Paladin"))
-        return SAVE_PAIR(DndAbilityWisdom, DndAbilityCharisma);
-    if(!strcmp(class_name, "Ranger"))
-        return SAVE_PAIR(DndAbilityStrength, DndAbilityDexterity);
-    if(!strcmp(class_name, "Rogue"))
-        return SAVE_PAIR(DndAbilityDexterity, DndAbilityIntelligence);
+    if(!strcmp(class_name, "Monk")) return SAVE_PAIR(DndAbilityStrength, DndAbilityDexterity);
+    if(!strcmp(class_name, "Paladin")) return SAVE_PAIR(DndAbilityWisdom, DndAbilityCharisma);
+    if(!strcmp(class_name, "Ranger")) return SAVE_PAIR(DndAbilityStrength, DndAbilityDexterity);
+    if(!strcmp(class_name, "Rogue")) return SAVE_PAIR(DndAbilityDexterity, DndAbilityIntelligence);
     if(!strcmp(class_name, "Sorcerer"))
         return SAVE_PAIR(DndAbilityConstitution, DndAbilityCharisma);
-    if(!strcmp(class_name, "Warlock"))
-        return SAVE_PAIR(DndAbilityWisdom, DndAbilityCharisma);
-    if(!strcmp(class_name, "Wizard"))
-        return SAVE_PAIR(DndAbilityIntelligence, DndAbilityWisdom);
+    if(!strcmp(class_name, "Warlock")) return SAVE_PAIR(DndAbilityWisdom, DndAbilityCharisma);
+    if(!strcmp(class_name, "Wizard")) return SAVE_PAIR(DndAbilityIntelligence, DndAbilityWisdom);
 #undef SAVE_PAIR
     return 0U;
 }
@@ -2956,10 +2972,9 @@ static bool dndolphins_catalog_add_metadata(
     uint16_t class_mask,
     bool has_metadata) {
 #if defined(DND_BUILD_GRANTS)
-    if((app->catalog->kind == DndCatalogSkills ||
-        app->catalog->kind == DndCatalogSkillTools) &&
-       app->grant_review->grant_choice_active && app->grant_review->grant_choice_index < app->data.character.grant_count &&
-       level == 4U &&
+    if((app->catalog->kind == DndCatalogSkills || app->catalog->kind == DndCatalogSkillTools) &&
+       app->grant_review->grant_choice_active &&
+       app->grant_review->grant_choice_index < app->data.character.grant_count && level == 4U &&
        !dndolphins_class_skill_choice_allowed(
            &app->data.character.grants[app->grant_review->grant_choice_index], name))
         return true;
@@ -2980,12 +2995,12 @@ static bool dndolphins_catalog_add_metadata(
     }
     if(app->catalog->kind == DndCatalogLanguages && app->grant_review->grant_choice_active) {
         bool owned = false;
-        if(!dnd_character_languages_contains(
-               app->storage, app->active_profile, name, &owned) ||
+        if(!dnd_character_languages_contains(app->storage, app->active_profile, name, &owned) ||
            owned)
             return true;
         if(app->grant_review->grant_choice_index < app->data.character.grant_count) {
-            const DndGrant* grant = &app->data.character.grants[app->grant_review->grant_choice_index];
+            const DndGrant* grant =
+                &app->data.character.grants[app->grant_review->grant_choice_index];
             static const char* const standard_languages[] = {
                 "Common",
                 "Common Sign Language",
@@ -3156,7 +3171,8 @@ static bool dndolphins_catalog_add_metadata(
 }
 
 static bool dndolphins_catalog_page_complete(const DndDolphinsApp* app) {
-    return app->catalog->scan_count > app->catalog->page_start + dndolphins_catalog_page_limit(app);
+    return app->catalog->scan_count >
+           app->catalog->page_start + dndolphins_catalog_page_limit(app);
 }
 
 static bool dndolphins_catalog_add(DndDolphinsApp* app, const char* name) {
@@ -3271,7 +3287,7 @@ static void dndolphins_catalog_add_builtins(DndDolphinsApp* app, DndCatalogKind 
 }
 
 static DndGrant* dndolphins_active_choice_grant(DndDolphinsApp* app) {
-    if(!app || !app->grant_review->grant_choice_active ||
+    if(!app || !app->grant_review || !app->grant_review->grant_choice_active ||
        app->grant_review->grant_choice_index >= app->data.character.grant_count)
         return NULL;
     return &app->data.character.grants[app->grant_review->grant_choice_index];
@@ -3396,9 +3412,11 @@ static void dndolphins_catalog_process_line(DndDolphinsApp* app, char* line) {
         uint16_t mask = dndolphins_class_mask_from_list(classes);
         if(app->catalog->kind == DndCatalogSkillTools && type != 3U) return;
 #if defined(DND_BUILD_GRANTS)
-        if(app->catalog->kind == DndCatalogProficiencies && app->grant_review->grant_choice_active &&
+        if(app->catalog->kind == DndCatalogProficiencies &&
+           app->grant_review->grant_choice_active &&
            app->grant_review->grant_choice_index < app->data.character.grant_count) {
-            const char* payload = app->data.character.grants[app->grant_review->grant_choice_index].grant_value;
+            const char* payload =
+                app->data.character.grants[app->grant_review->grant_choice_index].grant_value;
             uint8_t required_type = !strncmp(payload, "armor=", 6U)  ? 1U :
                                     !strncmp(payload, "weapon=", 7U) ? 2U :
                                     !strncmp(payload, "tool=", 5U)   ? 3U :
@@ -3528,8 +3546,7 @@ static void dndolphins_level_choice_id(
 static bool dndolphins_level_choice_done(DndDolphinsApp* app, uint8_t class_index, uint8_t level) {
     char id[DND_SHORT_LEN];
     dndolphins_level_choice_id(id, sizeof(id), &app->data.character, class_index, level);
-    return dndolphins_progression_store_applied_exists(
-        app->storage, app->active_profile, id);
+    return dndolphins_progression_store_applied_exists(app->storage, app->active_profile, id);
 }
 
 static bool dndolphins_begin_next_level_choice(DndDolphinsApp* app) {
@@ -3592,8 +3609,7 @@ static bool dndolphins_complete_level_choice(DndDolphinsApp* app, const char* re
     char id[DND_SHORT_LEN];
     dndolphins_level_choice_id(
         id, sizeof(id), c, app->level_choice_class_index, app->level_choice_level);
-    return dndolphins_progression_store_mark_applied(
-        app->storage, app->active_profile, id);
+    return dndolphins_progression_store_mark_applied(app->storage, app->active_profile, id);
 }
 
 typedef struct {
@@ -3627,11 +3643,7 @@ static bool dndolphins_spell_stable_id_exists(DndDolphinsApp* app, const char* s
     if(!app || !stable_id || !stable_id[0]) return false;
     DndDolphinsSpellStableIdLookup lookup = {.stable_id = stable_id, .found = false};
     if(!dnd_storage_visit_spells(
-           app->storage,
-           app->active_profile,
-           dndolphins_spell_stable_id_visitor,
-           &lookup,
-           NULL))
+           app->storage, app->active_profile, dndolphins_spell_stable_id_visitor, &lookup, NULL))
         return false;
     return lookup.found;
 }
@@ -3772,8 +3784,7 @@ static uint8_t dndolphins_stage_grants_up_to_owned(
             }
             line[position] = '\0';
             position = 0U;
-            if(!line[0] || line[0] == '#' || character->grant_count >= DND_MAX_GRANTS)
-                continue;
+            if(!line[0] || line[0] == '#' || character->grant_count >= DND_MAX_GRANTS) continue;
             char* fields[8];
             if(dndolphins_split_metadata(line, fields) != 8U ||
                dndolphins_grant_source_from_text(fields[2]) != source_type ||
@@ -3785,8 +3796,7 @@ static uint8_t dndolphins_stage_grants_up_to_owned(
             uint32_t level_gained = 0U;
             if(!dndolphins_parse_u32_strict(fields[5], UINT8_MAX, &level_gained)) continue;
             if(level_gained > maximum_level) continue;
-            if(source_type == DndGrantClassFeature ||
-               source_type == DndGrantSubclassFeature) {
+            if(source_type == DndGrantClassFeature || source_type == DndGrantSubclassFeature) {
                 uint8_t class_index =
                     owner_class_index < character->class_count ? owner_class_index : 0U;
                 if(level_gained == 0U || level_gained > character->classes[class_index].level)
@@ -3810,7 +3820,7 @@ static uint8_t dndolphins_stage_grants_up_to_owned(
             dndolphins_copy(grant->prerequisites, sizeof(grant->prerequisites), fields[4]);
             dndolphins_copy(grant->grant_value, sizeof(grant->grant_value), fields[7]);
             grant->source_type = source_type;
-            grant->class_index = source_type == DndGrantSpecies          ? 0U :
+            grant->class_index = source_type == DndGrantSpecies             ? 0U :
                                  owner_class_index < character->class_count ? owner_class_index :
                                                                               0U;
             grant->level_gained = source_type == DndGrantFeat && level_gained == 0U &&
@@ -3857,13 +3867,14 @@ static void dndolphins_stage_or_defer_feat_dependencies(
        been released, so Apply All remains O(one metadata pass) rather than
        O(grants x metadata). Catalog/level-choice feat selections outside a grant
        review still resolve their one owner immediately. */
-    if(app->screen == DndScreenGrantReview || app->grant_review->batches) {
+    if(app->grant_review && (app->screen == DndScreenGrantReview || app->grant_review->batches)) {
         app->grant_review->dependency_scan_needed = 1U;
         /* If a dependency pass is already paused beyond byte zero, a newly
            acquired feature may own a feat row that occurred before the saved
            cursor. Finish the current forward pass, then make one clean rescan
            generation. This is bounded by dependency depth, never by draw/tick. */
-        if(app->grant_review->dependency_metadata_offset) app->grant_review->dependency_rescan_needed = 1U;
+        if(app->grant_review->dependency_metadata_offset)
+            app->grant_review->dependency_rescan_needed = 1U;
         return;
     }
     (void)dndolphins_stage_grants_up_to_owned(
@@ -3984,8 +3995,7 @@ static void dndolphins_apply_grant(DndDolphinsApp* app, DndGrant* grant) {
             }
         }
     } else if(strcmp(payload, "language") == 0) {
-        applied =
-            dnd_character_languages_append(app->storage, app->active_profile, value);
+        applied = dnd_character_languages_append(app->storage, app->active_profile, value);
         if(applied)
             (void)dnd_character_languages_count(
                 app->storage, app->active_profile, &app->language_total);
@@ -3996,8 +4006,8 @@ static void dndolphins_apply_grant(DndDolphinsApp* app, DndGrant* grant) {
         const char* type = !strcmp(payload, "tool")  ? "Tool" :
                            !strcmp(payload, "armor") ? "Armor" :
                                                        "Weapon";
-        applied = dnd_character_proficiencies_append(
-            app->storage, app->active_profile, type, value);
+        applied =
+            dnd_character_proficiencies_append(app->storage, app->active_profile, type, value);
         if(applied)
             (void)dnd_character_proficiencies_count(
                 app->storage, app->active_profile, &app->proficiency_total);
@@ -4043,8 +4053,7 @@ static void dndolphins_apply_grant(DndDolphinsApp* app, DndGrant* grant) {
         dndolphins_copy(item.name, sizeof(item.name), value);
         item.quantity = 1;
         item.container_index = -1;
-        applied =
-            dnd_storage_append_item(app->storage, app->active_profile, character, &item);
+        applied = dnd_storage_append_item(app->storage, app->active_profile, character, &item);
         if(applied) ++app->items_total;
     } else if(
         strcmp(payload, "feature") == 0 || strcmp(payload, "feat_long") == 0 ||
@@ -4310,10 +4319,7 @@ static bool dndolphins_stage_owned_feat_dependencies(
         File* file = storage_file_alloc(app->storage);
         if(!file) return false;
         if(!storage_file_open(
-               file,
-               dndolphins_active_metadata_path(app),
-               FSAM_READ,
-               FSOM_OPEN_EXISTING)) {
+               file, dndolphins_active_metadata_path(app), FSAM_READ, FSOM_OPEN_EXISTING)) {
             storage_file_free(file);
             return false;
         }
@@ -4562,8 +4568,7 @@ static bool dndolphins_advance_grant_review_if_complete(DndDolphinsApp* app) {
 }
 
 static void dndolphins_schedule_deferred_action(DndDolphinsApp* app, DndDeferredAction action) {
-    if(!app || action == DndDeferredActionNone ||
-       app->deferred_action != DndDeferredActionNone)
+    if(!app || action == DndDeferredActionNone || app->deferred_action != DndDeferredActionNone)
         return;
     app->deferred_action = action;
     app->deferred_action_wait_ticks = 1U;
@@ -4669,10 +4674,9 @@ static void dndolphins_open_catalog(
     }
     app->catalog->kind = kind;
     app->catalog->target = target;
-    app->catalog->page_size =
-        (kind == DndCatalogLanguages || kind == DndCatalogProficiencies) ?
-            DNDOLPHINS_CHARACTER_CATALOG_PAGE :
-            DNDOLPHINS_MAX_CATALOG_ENTRIES;
+    app->catalog->page_size = (kind == DndCatalogLanguages || kind == DndCatalogProficiencies) ?
+                                  DNDOLPHINS_CHARACTER_CATALOG_PAGE :
+                                  DNDOLPHINS_MAX_CATALOG_ENTRIES;
     app->return_screen = app->screen;
     app->catalog->return_selection = app->selection;
     app->catalog->show_all = 0U;
@@ -4841,11 +4845,12 @@ static uint16_t dndolphins_weapon_count(DndDolphinsApp* app) {
 }
 
 static uint16_t dndolphins_weapon_index(DndDolphinsApp* app, uint16_t weapon_number) {
-    if(!app->combat->combat_weapon_indices || weapon_number >= app->combat->combat_weapon_count) return UINT16_MAX;
+    if(!app->combat->combat_weapon_indices || weapon_number >= app->combat->combat_weapon_count)
+        return UINT16_MAX;
     if(weapon_number < app->combat->combat_weapon_start ||
        weapon_number - app->combat->combat_weapon_start >= app->combat->combat_weapon_capacity) {
-        uint16_t start =
-            (weapon_number / DND_STORAGE_COLLECTION_CACHE_SIZE) * DND_STORAGE_COLLECTION_CACHE_SIZE;
+        uint16_t start = (weapon_number / DND_STORAGE_COLLECTION_CACHE_SIZE) *
+                         DND_STORAGE_COLLECTION_CACHE_SIZE;
         if(!dndolphins_weapon_combat_items_collect_weapon_indices(
                app->storage,
                app->active_profile,
@@ -4954,12 +4959,7 @@ static void dndolphins_begin_text(
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, header);
     text_input_set_result_callback(
-        app->text_input,
-        dndolphins_text_done,
-        app,
-        app->edit_buffer,
-        DND_DETAIL_LEN,
-        false);
+        app->text_input, dndolphins_text_done, app, app->edit_buffer, DND_DETAIL_LEN, false);
     view_dispatcher_switch_to_view(app->dispatcher, DndViewTextInput);
 }
 
@@ -5240,7 +5240,11 @@ static const char* dndolphins_home_item_at(uint16_t index) {
 
 #if defined(DND_BUILD_HUB)
 static void dndolphins_draw_home_graphical(Canvas* canvas, DndDolphinsApp* app) {
-    enum { Columns = 4U, Rows = 2U, PageSize = Columns * Rows };
+    enum {
+        Columns = 4U,
+        Rows = 2U,
+        PageSize = Columns * Rows
+    };
     static const int32_t x_positions[Columns] = {4, 36, 68, 100};
     static const int32_t y_positions[Rows] = {12, 39};
 
@@ -5322,7 +5326,6 @@ static void dndolphins_draw_profile_actions(Canvas* canvas, DndDolphinsApp* app)
         dndolphins_profile_actions,
         sizeof(dndolphins_profile_actions) / sizeof(dndolphins_profile_actions[0]));
 }
-
 
 static void dndolphins_draw_settings(Canvas* canvas, DndDolphinsApp* app) {
     char rows[6][48];
@@ -5442,8 +5445,7 @@ static void dndolphins_draw_abilities(Canvas* canvas, DndDolphinsApp* app) {
     const char* row_ptrs[DND_ABILITY_COUNT];
     for(uint8_t i = 0U; i < DND_ABILITY_COUNT; ++i) {
         row_ptrs[i] = rows[i];
-        int16_t check_modifier =
-            dnd_rules_core_ability_modifier(character->ability_scores[i]);
+        int16_t check_modifier = dnd_rules_core_ability_modifier(character->ability_scores[i]);
         int16_t save_modifier = dnd_rules_core_saving_throw_modifier(character, i);
         if(app->roll->ability_roll_target == 0U) {
             snprintf(
@@ -5719,8 +5721,7 @@ static bool dndolphins_apply_grant_choice_selection(DndDolphinsApp* app, const c
     bool applied = false;
     switch(app->grant_review->grant_choice_kind) {
     case DndGrantChoiceLanguage:
-        applied =
-            dnd_character_languages_append(app->storage, app->active_profile, selected);
+        applied = dnd_character_languages_append(app->storage, app->active_profile, selected);
         if(applied) {
             (void)dnd_character_languages_count(
                 app->storage, app->active_profile, &app->language_total);
@@ -5775,8 +5776,8 @@ static bool dndolphins_apply_grant_choice_selection(DndDolphinsApp* app, const c
             applied = false;
             break;
         }
-        applied = dnd_character_proficiencies_append(
-            app->storage, app->active_profile, type, selected);
+        applied =
+            dnd_character_proficiencies_append(app->storage, app->active_profile, type, selected);
         if(applied) {
             (void)dnd_character_proficiencies_count(
                 app->storage, app->active_profile, &app->proficiency_total);
@@ -5909,7 +5910,7 @@ static void dndolphins_draw_grant_review(Canvas* canvas, DndDolphinsApp* app) {
             const DndGrant* grant = &c->grants[row_index - 1U];
             char mark = grant->status == DndGrantApplied ? 'A' :
                         grant->status == DndGrantSkipped ? 'S' :
-                                                              '?';
+                                                           '?';
             DndGrantChoiceKind choice = dndolphins_grant_choice_kind(grant);
             if(choice != DndGrantChoiceNone && grant->status == DndGrantPending) {
                 if(choice == DndGrantChoiceSpell)
@@ -5951,8 +5952,10 @@ static void dndolphins_draw_grant_diagnostics(Canvas* canvas, DndDolphinsApp* ap
     uint8_t applied = 0U, pending = 0U, skipped = 0U, choices = 0U;
     for(uint8_t i = 0U; i < c->grant_count; ++i) {
         const DndGrant* grant = &c->grants[i];
-        if(grant->status == DndGrantApplied) ++applied;
-        else if(grant->status == DndGrantSkipped) ++skipped;
+        if(grant->status == DndGrantApplied)
+            ++applied;
+        else if(grant->status == DndGrantSkipped)
+            ++skipped;
         else {
             ++pending;
             if(dndolphins_grant_choice_kind(grant) != DndGrantChoiceNone) ++choices;
@@ -5968,8 +5971,9 @@ static void dndolphins_draw_grant_diagnostics(Canvas* canvas, DndDolphinsApp* ap
         const DndGrant* g = &c->grants[app->selection];
         const char* reason = g->status == DndGrantApplied ? "Applied" :
                              g->status == DndGrantSkipped ? "Skipped/manual review" :
-                             dndolphins_grant_choice_kind(g) != DndGrantChoiceNone ? "Pending choice" :
-                                                                                     "Pending apply";
+                             dndolphins_grant_choice_kind(g) != DndGrantChoiceNone ?
+                                                            "Pending choice" :
+                                                            "Pending apply";
         snprintf(rows[4], sizeof(rows[4]), "%.16s: %s", g->option_name, reason);
     } else {
         dndolphins_copy(rows[4], sizeof(rows[4]), "Up/Down inspect grants");
@@ -6060,9 +6064,9 @@ static void dndolphins_draw_asi_ability(Canvas* canvas, DndDolphinsApp* app) {
     }
     dndolphins_draw_header(
         canvas,
-        app->level_choice_mode == 1U                               ? "ASI +2: choose ability" :
+        app->level_choice_mode == 1U                        ? "ASI +2: choose ability" :
         app->level_choice_first_ability < DND_ABILITY_COUNT ? "ASI +1: second ability" :
-                                                                     "ASI +1: first ability",
+                                                              "ASI +1: first ability",
         app->status);
     dndolphins_draw_menu_rows(canvas, app, ptrs, DND_ABILITY_COUNT);
 }
@@ -6094,7 +6098,7 @@ static void dndolphins_draw_grant_edit(Canvas* canvas, DndDolphinsApp* app) {
         "Status: %s",
         grant->status == DndGrantApplied ? "Applied" :
         grant->status == DndGrantSkipped ? "Skipped" :
-                                              "Pending");
+                                           "Pending");
     const char* rows[] = {
         stable_id,
         source,
@@ -6126,16 +6130,14 @@ static int8_t dndolphins_unarmed_attack_modifier(
     return (int8_t)dndolphins_clamp_i16(value, -30, 30);
 }
 
-static int16_t dndolphins_unarmed_damage(
-    const DndCharacter* character,
-    const DndAttackTemplate* attack) {
+static int16_t
+    dndolphins_unarmed_damage(const DndCharacter* character, const DndAttackTemplate* attack) {
     int16_t value = 1 + dndolphins_attack_template_ability_modifier(character, attack);
     return value > 0 ? value : 0;
 }
 
-static uint8_t dndolphins_unarmed_save_dc(
-    const DndCharacter* character,
-    const DndAttackTemplate* attack) {
+static uint8_t
+    dndolphins_unarmed_save_dc(const DndCharacter* character, const DndAttackTemplate* attack) {
     int16_t value = 8 + dndolphins_attack_template_ability_modifier(character, attack) +
                     dnd_rules_core_proficiency_bonus(character);
     return (uint8_t)dndolphins_clamp_i16(value, 0, 30);
@@ -6252,8 +6254,7 @@ static void dndolphins_draw_attack_template_edit(Canvas* canvas, DndDolphinsApp*
 static uint16_t dndolphins_class_knowable_spell_count(
     const DndClassLevel* class_level,
     uint16_t granted_count) {
-    if(!class_level || class_level->spellcasting_mode == DndSpellcastingNone)
-        return granted_count;
+    if(!class_level || class_level->spellcasting_mode == DndSpellcastingNone) return granted_count;
     uint16_t base = class_level->cantrip_limit;
     if(!strcmp(class_level->name, "Wizard"))
         base += class_level->spellbook_size;
@@ -6270,7 +6271,7 @@ static void dndolphins_spell_totals(
     if(known) *known = 0U;
     if(knowable) *knowable = 0U;
     if(granted) *granted = 0U;
-    if(!app || !app->collection_cache->spell_class_counts_valid) return;
+    if(!app || !app->collection_cache || !app->collection_cache->spell_class_counts_valid) return;
     for(uint8_t i = 0U; i < app->data.character.class_count; ++i) {
         uint16_t class_known = app->collection_cache->spell_class_counts.known[i];
         uint16_t class_granted = app->collection_cache->spell_class_counts.granted[i];
@@ -6338,7 +6339,9 @@ static void dndolphins_draw_magic(Canvas* canvas, DndDolphinsApp* app) {
             character->spell_slots_max[level]);
     }
     dndolphins_draw_header(
-        canvas, app->combat->arcane_recovery_active ? "Magic: Arcane Recovery" : "Magic", app->status);
+        canvas,
+        app->combat->arcane_recovery_active ? "Magic: Arcane Recovery" : "Magic",
+        app->status);
     dndolphins_draw_menu_rows(canvas, app, row_ptrs, 16U);
 }
 
@@ -6386,7 +6389,7 @@ static void dndolphins_draw_record_list(Canvas* canvas, DndDolphinsApp* app) {
                 "%s",
                 app->list_kind == DndListLanguages     ? "+ New Language" :
                 app->list_kind == DndListProficiencies ? "+ New Proficiency" :
-                                                            "+ Add New");
+                                                         "+ Add New");
         else
             dndolphins_format_list_entry(app, index - 1U, row, sizeof(row));
         if(app->action_ack_active && app->action_ack_screen == (uint8_t)app->screen &&
@@ -6683,7 +6686,8 @@ static void dndolphins_draw_dice(Canvas* canvas, DndDolphinsApp* app) {
     snprintf(rows[0], sizeof(rows[0]), "Dice count: %u", app->roll->dice_count);
     snprintf(rows[1], sizeof(rows[1]), "Die: d%u", app->roll->dice_sides);
     snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", app->roll->dice_modifier);
-    snprintf(rows[3], sizeof(rows[3]), "Mode: %s", dndolphins_roll_mode_names[app->roll->roll_mode]);
+    snprintf(
+        rows[3], sizeof(rows[3]), "Mode: %s", dndolphins_roll_mode_names[app->roll->roll_mode]);
     if(app->roll->dice_roll_value_count && app->roll->dice_guidance) {
         snprintf(
             rows[4],
@@ -6705,7 +6709,10 @@ static void dndolphins_draw_dice(Canvas* canvas, DndDolphinsApp* app) {
     } else {
         snprintf(rows[4], sizeof(rows[4]), "Roll now");
     }
-    dndolphins_draw_header(canvas, app->roll->quick_roll_active ? app->roll->quick_roll_label : "Dice Roller", app->status);
+    dndolphins_draw_header(
+        canvas,
+        app->roll->quick_roll_active ? app->roll->quick_roll_label : "Dice Roller",
+        app->status);
     dndolphins_draw_menu_rows(canvas, app, row_ptrs, 5U);
 }
 
@@ -6748,15 +6755,22 @@ static void dndolphins_draw_dice_result(Canvas* canvas, DndDolphinsApp* app) {
     } else if(app->roll->dice_second) {
         uint8_t chosen =
             app->roll->roll_mode == DndRollAdvantage ?
-                (app->roll->dice_first > app->roll->dice_second ? app->roll->dice_first : app->roll->dice_second) :
-                (app->roll->dice_first < app->roll->dice_second ? app->roll->dice_first : app->roll->dice_second);
+                (app->roll->dice_first > app->roll->dice_second ? app->roll->dice_first :
+                                                                  app->roll->dice_second) :
+                (app->roll->dice_first < app->roll->dice_second ? app->roll->dice_first :
+                                                                  app->roll->dice_second);
         snprintf(
             title,
             sizeof(title),
             "%s d20 - total %d",
             app->roll->roll_mode == DndRollAdvantage ? "Advantage" : "Disadvantage",
             app->roll->dice_result);
-        snprintf(rows[0], sizeof(rows[0]), "Rolls: %u, %u", app->roll->dice_first, app->roll->dice_second);
+        snprintf(
+            rows[0],
+            sizeof(rows[0]),
+            "Rolls: %u, %u",
+            app->roll->dice_first,
+            app->roll->dice_second);
         snprintf(rows[1], sizeof(rows[1]), "Dice sum: %u", app->roll->dice_roll_sum);
         snprintf(rows[2], sizeof(rows[2]), "Chosen: %u", chosen);
         snprintf(rows[3], sizeof(rows[3]), "Modifier: %+d", app->roll->dice_modifier);
@@ -6782,7 +6796,8 @@ static void dndolphins_draw_dice_result(Canvas* canvas, DndDolphinsApp* app) {
                 remaining > 4U ? 4U : remaining);
         }
     } else {
-        snprintf(title, sizeof(title), "d%u total %d", app->roll->dice_sides, app->roll->dice_result);
+        snprintf(
+            title, sizeof(title), "d%u total %d", app->roll->dice_sides, app->roll->dice_result);
         snprintf(rows[0], sizeof(rows[0]), "Roll: %u", app->roll->dice_first);
         snprintf(rows[1], sizeof(rows[1]), "Dice sum: %u", app->roll->dice_roll_sum);
         snprintf(rows[2], sizeof(rows[2]), "Modifier: %+d", app->roll->dice_modifier);
@@ -6868,7 +6883,10 @@ static bool dndolphins_favorite_spell_index_visitor(
     uint8_t free_casts_current,
     uint8_t free_casts_max,
     void* context) {
-    (void)known; (void)always_prepared; (void)free_casts_current; (void)free_casts_max;
+    (void)known;
+    (void)always_prepared;
+    (void)free_casts_current;
+    (void)free_casts_max;
     DndFavoriteSpellIndexContext* scan = context;
     if(!scan || !spell || !spell->favorite) return true;
     if(scan->count >= scan->start && scan->count - scan->start < scan->capacity)
@@ -6878,7 +6896,11 @@ static bool dndolphins_favorite_spell_index_visitor(
 }
 
 static bool dndolphins_collect_favorite_spell_indices(
-    DndDolphinsApp* app, uint16_t start, uint16_t* indices, uint16_t capacity, uint16_t* count) {
+    DndDolphinsApp* app,
+    uint16_t start,
+    uint16_t* indices,
+    uint16_t capacity,
+    uint16_t* count) {
     DndFavoriteSpellIndexContext context = {
         .indices = indices,
         .start = start,
@@ -6887,8 +6909,11 @@ static bool dndolphins_collect_favorite_spell_indices(
     };
     uint16_t total = 0U;
     bool ok = dnd_storage_visit_spells(
-        app->storage, app->active_profile,
-        dndolphins_favorite_spell_index_visitor, &context, &total);
+        app->storage,
+        app->active_profile,
+        dndolphins_favorite_spell_index_visitor,
+        &context,
+        &total);
     *count = context.count;
     app->spellbook_total = total;
     return ok;
@@ -6898,28 +6923,47 @@ static bool dndolphins_load_combat_spell_indices(DndDolphinsApp* app, uint16_t s
     bool ok = false;
     if(app->combat->combat_spell_mode == DndCombatSpellModeFavorites)
         ok = dndolphins_collect_favorite_spell_indices(
-            app, start, app->combat->combat_spell_indices, app->combat->combat_spell_capacity, &app->combat->combat_spell_count);
+            app,
+            start,
+            app->combat->combat_spell_indices,
+            app->combat->combat_spell_capacity,
+            &app->combat->combat_spell_count);
     else if(app->combat->combat_spell_mode == DndCombatSpellModeRituals)
         ok = dndolphins_spells_collect_ritual_indices(
-            app->storage, app->active_profile, &app->data.character, start,
-            app->combat->combat_spell_indices, app->combat->combat_spell_capacity, &app->combat->combat_spell_count,
+            app->storage,
+            app->active_profile,
+            &app->data.character,
+            start,
+            app->combat->combat_spell_indices,
+            app->combat->combat_spell_capacity,
+            &app->combat->combat_spell_count,
             &app->spellbook_total);
     else if(app->combat->combat_spell_mode == DndCombatSpellModeUtility)
         ok = dndolphins_spells_collect_utility_indices(
-            app->storage, app->active_profile, &app->data.character, start,
-            app->combat->combat_spell_indices, app->combat->combat_spell_capacity, &app->combat->combat_spell_count,
+            app->storage,
+            app->active_profile,
+            &app->data.character,
+            start,
+            app->combat->combat_spell_indices,
+            app->combat->combat_spell_capacity,
+            &app->combat->combat_spell_count,
             &app->spellbook_total);
     else
         ok = dndolphins_spells_collect_combat_indices(
-            app->storage, app->active_profile, &app->data.character, start,
-            app->combat->combat_spell_indices, app->combat->combat_spell_capacity, &app->combat->combat_spell_count,
+            app->storage,
+            app->active_profile,
+            &app->data.character,
+            start,
+            app->combat->combat_spell_indices,
+            app->combat->combat_spell_capacity,
+            &app->combat->combat_spell_count,
             &app->spellbook_total);
     if(ok) app->combat->combat_spell_start = start;
     return ok;
 }
 
-static bool dndolphins_refresh_spell_index_common(
-    DndDolphinsApp* app, DndCombatSpellMode spell_mode) {
+static bool
+    dndolphins_refresh_spell_index_common(DndDolphinsApp* app, DndCombatSpellMode spell_mode) {
     if(!app->combat->combat_spell_indices) {
         app->combat->combat_spell_capacity = DND_STORAGE_COLLECTION_CACHE_SIZE;
         app->combat->combat_spell_indices = malloc(
@@ -6949,11 +6993,12 @@ static uint16_t dndolphins_combat_spell_count(DndDolphinsApp* app) {
 }
 
 static uint16_t dndolphins_combat_spell_index(DndDolphinsApp* app, uint16_t display_index) {
-    if(!app->combat->combat_spell_indices || display_index >= app->combat->combat_spell_count) return UINT16_MAX;
+    if(!app->combat->combat_spell_indices || display_index >= app->combat->combat_spell_count)
+        return UINT16_MAX;
     if(display_index < app->combat->combat_spell_start ||
        display_index - app->combat->combat_spell_start >= app->combat->combat_spell_capacity) {
-        uint16_t start =
-            (display_index / DND_STORAGE_COLLECTION_CACHE_SIZE) * DND_STORAGE_COLLECTION_CACHE_SIZE;
+        uint16_t start = (display_index / DND_STORAGE_COLLECTION_CACHE_SIZE) *
+                         DND_STORAGE_COLLECTION_CACHE_SIZE;
         if(!dndolphins_load_combat_spell_indices(app, start)) return UINT16_MAX;
     }
     return app->combat->combat_spell_indices[display_index - app->combat->combat_spell_start];
@@ -6966,7 +7011,8 @@ static char* dndolphins_combat_spell_row(DndDolphinsApp* app, uint8_t visible) {
            ((size_t)visible * DNDOLPHINS_COMBAT_ROW_LEN);
 }
 
-static void dndolphins_prepare_combat_spell_rows(DndDolphinsApp* app, DndCombatSpellMode spell_mode) {
+static void
+    dndolphins_prepare_combat_spell_rows(DndDolphinsApp* app, DndCombatSpellMode spell_mode) {
     if(!app || !app->combat->combat_spell_indices) return;
     for(uint8_t visible = 0U; visible < DNDOLPHINS_COMBAT_VISIBLE_ROWS; ++visible) {
         char* row = dndolphins_combat_spell_row(app, visible);
@@ -7028,8 +7074,7 @@ static void dndolphins_prepare_combat_spell_rows(DndDolphinsApp* app, DndCombatS
                     damage.primary_die);
         }
         char casting_suffix[16];
-        int8_t spell_modifier =
-            dndolphins_spells_attack_modifier_for(&app->data.character, spell);
+        int8_t spell_modifier = dndolphins_spells_attack_modifier_for(&app->data.character, spell);
         snprintf(
             casting_suffix,
             sizeof(casting_suffix),
@@ -7149,8 +7194,7 @@ static bool
         return true;
     }
     case DndSpellCastSlot:
-        if(option->level >= DND_SLOT_COUNT ||
-           !character->spell_slots_current[option->level])
+        if(option->level >= DND_SLOT_COUNT || !character->spell_slots_current[option->level])
             return false;
         --character->spell_slots_current[option->level];
         return true;
@@ -7231,8 +7275,10 @@ static void dndolphins_cast_spell(DndDolphinsApp* app, const DndSpellCastOption*
     app->combat->spell_cast_secondary_dice = 0U;
     app->combat->spell_cast_secondary_die = 0U;
     app->combat->spell_cast_attack_roll_count = 0U;
-    memset(app->combat->spell_cast_attack_natural, 0, sizeof(app->combat->spell_cast_attack_natural));
-    memset(app->combat->spell_cast_attack_damage, 0, sizeof(app->combat->spell_cast_attack_damage));
+    memset(
+        app->combat->spell_cast_attack_natural, 0, sizeof(app->combat->spell_cast_attack_natural));
+    memset(
+        app->combat->spell_cast_attack_damage, 0, sizeof(app->combat->spell_cast_attack_damage));
 
     uint8_t ability = dndolphins_spell_casting_ability(app, app->combat->spell_attack_index);
     int8_t ability_modifier = dnd_rules_core_ability_modifier(character->ability_scores[ability]);
@@ -7312,7 +7358,8 @@ static void dndolphins_cast_spell(DndDolphinsApp* app, const DndSpellCastOption*
             if(damage.secondary_dice && damage.secondary_die)
                 app->combat->spell_cast_secondary_total =
                     (int16_t)dnd_rules_core_roll_dice(damage.secondary_dice, damage.secondary_die);
-            app->combat->spell_cast_damage_total = app->combat->spell_cast_primary_total + damage.flat_bonus;
+            app->combat->spell_cast_damage_total =
+                app->combat->spell_cast_primary_total + damage.flat_bonus;
             if(!damage.secondary_relation)
                 app->combat->spell_cast_damage_total +=
                     app->combat->spell_cast_secondary_total + damage.secondary_flat_bonus;
@@ -7358,7 +7405,11 @@ static void dndolphins_draw_favorite_spells(Canvas* canvas, DndDolphinsApp* app)
         uint16_t display_index = app->scroll + visible;
         if(display_index >= count) break;
         const char* row = dndolphins_combat_spell_row(app, visible);
-        dndolphins_draw_row(canvas, visible, display_index == app->selection, row && row[0] ? row : "Spell unavailable");
+        dndolphins_draw_row(
+            canvas,
+            visible,
+            display_index == app->selection,
+            row && row[0] ? row : "Spell unavailable");
     }
 }
 
@@ -7374,7 +7425,9 @@ static void dndolphins_draw_utility_spells(Canvas* canvas, DndDolphinsApp* app) 
         if(display_index >= count) break;
         const char* row = dndolphins_combat_spell_row(app, visible);
         dndolphins_draw_row(
-            canvas, visible, display_index == app->selection,
+            canvas,
+            visible,
+            display_index == app->selection,
             row && row[0] ? row : "Spell unavailable");
     }
 }
@@ -7501,7 +7554,11 @@ static void dndolphins_draw_spell_result(Canvas* canvas, DndDolphinsApp* app) {
                 app->combat->spell_cast_attack_roll_count);
         else
             snprintf(
-                row, sizeof(row), "%s | %u attacks", resource, app->combat->spell_cast_attack_roll_count);
+                row,
+                sizeof(row),
+                "%s | %u attacks",
+                resource,
+                app->combat->spell_cast_attack_roll_count);
         dndolphins_draw_row(canvas, 0U, false, row);
 
         int8_t attack_modifier =
@@ -7526,7 +7583,8 @@ static void dndolphins_draw_spell_result(Canvas* canvas, DndDolphinsApp* app) {
 
     if(app->combat->spell_cast_resolution != DndSpellResolutionAttack &&
        app->combat->spell_cast_attack_roll_count > 1U) {
-        const char* resource = dndolphins_spell_cast_resource_name(app->combat->spell_cast_resource);
+        const char* resource =
+            dndolphins_spell_cast_resource_name(app->combat->spell_cast_resource);
         if(app->combat->spell_cast_level)
             snprintf(
                 row,
@@ -7537,7 +7595,11 @@ static void dndolphins_draw_spell_result(Canvas* canvas, DndDolphinsApp* app) {
                 app->combat->spell_cast_attack_roll_count);
         else
             snprintf(
-                row, sizeof(row), "%s | %u rolls", resource, app->combat->spell_cast_attack_roll_count);
+                row,
+                sizeof(row),
+                "%s | %u rolls",
+                resource,
+                app->combat->spell_cast_attack_roll_count);
         dndolphins_draw_row(canvas, 0U, false, row);
         for(uint8_t visible = 0U; visible < 4U; ++visible) {
             uint8_t index = (uint8_t)(app->scroll + visible);
@@ -7686,7 +7748,8 @@ static void dndolphins_draw_spell_result(Canvas* canvas, DndDolphinsApp* app) {
         if(app->combat->spell_cast_derived_effect == DndSpellDerivedHealHalfPrimary) {
             snprintf(row, sizeof(row), "Heal: %d", app->combat->spell_cast_damage_total / 2);
         } else if(app->combat->spell_cast_derived_effect == DndSpellDerivedHealDoublePrimary) {
-            snprintf(row, sizeof(row), "Heal target: %d", app->combat->spell_cast_damage_total * 2);
+            snprintf(
+                row, sizeof(row), "Heal target: %d", app->combat->spell_cast_damage_total * 2);
         } else if(app->combat->spell_cast_resolution == DndSpellResolutionHealing) {
             snprintf(row, sizeof(row), "Healing total: %d", app->combat->spell_cast_damage_total);
         } else if(app->combat->spell_cast_resolution == DndSpellResolutionTemporaryHP) {
@@ -7705,7 +7768,8 @@ static void dndolphins_draw_spell_result(Canvas* canvas, DndDolphinsApp* app) {
 static void dndolphins_draw_attack_list(Canvas* canvas, DndDolphinsApp* app) {
     uint16_t count = dndolphins_weapon_count(app);
     char title[32];
-    snprintf(title, sizeof(title), "Attacks: %s", dndolphins_roll_mode_names[app->roll->roll_mode]);
+    snprintf(
+        title, sizeof(title), "Attacks: %s", dndolphins_roll_mode_names[app->roll->roll_mode]);
     dndolphins_draw_header(canvas, title, app->status);
     if(count == 0U) {
         dndolphins_draw_row(canvas, 0U, false, "No weapon items");
@@ -7787,7 +7851,8 @@ static void dndolphins_draw_attack_result(Canvas* canvas, DndDolphinsApp* app) {
             app->combat->damage_roll.weapon_roll_count + app->combat->damage_roll.extra_roll_count;
         if(roll_count > 1U) {
             uint8_t page_count = (roll_count + 15U) / 16U;
-            if(app->combat->damage_roll_page >= page_count) app->combat->damage_roll_page = page_count - 1U;
+            if(app->combat->damage_roll_page >= page_count)
+                app->combat->damage_roll_page = page_count - 1U;
             char damage_title[48];
             snprintf(
                 damage_title,
@@ -7827,7 +7892,10 @@ static void dndolphins_draw_attack_result(Canvas* canvas, DndDolphinsApp* app) {
             dndolphins_draw_row(canvas, 4U, false, row);
         } else {
             snprintf(
-                row, sizeof(row), "%s damage", app->combat->damage_roll.critical ? "Critical" : "Normal");
+                row,
+                sizeof(row),
+                "%s damage",
+                app->combat->damage_roll.critical ? "Critical" : "Normal");
             dndolphins_draw_row(canvas, 0U, false, row);
             snprintf(row, sizeof(row), "Weapon dice: %d", app->combat->damage_roll.weapon_total);
             dndolphins_draw_row(canvas, 1U, false, row);
@@ -7864,14 +7932,20 @@ static void dndolphins_draw_animated_die(
 
 static void dndolphins_draw_dice_animation(Canvas* canvas, DndDolphinsApp* app) {
     char title[40];
-    snprintf(title, sizeof(title), "Rolling %ud%u...", app->roll->dice_anim_count, app->roll->dice_anim_sides);
+    snprintf(
+        title,
+        sizeof(title),
+        "Rolling %ud%u...",
+        app->roll->dice_anim_count,
+        app->roll->dice_anim_sides);
     dndolphins_draw_header(canvas, title, NULL);
     uint8_t visible_dice = app->roll->dice_anim_count > 1U ? 3U : 1U;
     for(uint8_t i = 0U; i < visible_dice; ++i) {
         int32_t x = visible_dice == 1U ? 64 : 22 + (i * 42);
-        uint8_t face = (uint8_t)(((app->roll->dice_anim_frame * 7U) + (i * 5U) + app->roll->dice_anim_sides) %
-                                 app->roll->dice_anim_sides) +
-                       1U;
+        uint8_t face =
+            (uint8_t)(((app->roll->dice_anim_frame * 7U) + (i * 5U) + app->roll->dice_anim_sides) %
+                      app->roll->dice_anim_sides) +
+            1U;
         dndolphins_draw_animated_die(canvas, x, 34, app->roll->dice_anim_frame + i, face);
     }
     canvas_draw_frame(canvas, 14, 55, 100, 5);
@@ -7996,22 +8070,25 @@ static void dndolphins_draw_callback(Canvas* canvas, void* model) {
     }
 }
 
-static void
-    dndolphins_open_list(DndDolphinsApp* app, DndListKind kind, DndScreen return_screen) {
+static void dndolphins_open_list(DndDolphinsApp* app, DndListKind kind, DndScreen return_screen) {
     dndolphins_release_text_input(app);
     dndolphins_release_number_input(app);
     app->list_kind = kind;
     app->record_list_return_screen = return_screen;
     if(kind == DndListLanguages) {
         app->language_total = 0U;
-        app->collection_cache->language_page_count = 0U;
-        app->collection_cache->language_cache_start = 0U;
+        if(app->collection_cache) {
+            app->collection_cache->language_page_count = 0U;
+            app->collection_cache->language_cache_start = 0U;
+        }
         if(!dndolphins_load_language_page(app, 0U))
             dndolphins_set_status(app, "Language read failed");
     } else if(kind == DndListProficiencies) {
         app->proficiency_total = 0U;
-        app->collection_cache->proficiency_page_count = 0U;
-        app->collection_cache->proficiency_cache_start = 0U;
+        if(app->collection_cache) {
+            app->collection_cache->proficiency_page_count = 0U;
+            app->collection_cache->proficiency_cache_start = 0U;
+        }
         if(!dndolphins_load_proficiency_page(app, 0U))
             dndolphins_set_status(app, "Proficiency read failed");
     }
@@ -8108,8 +8185,7 @@ static void dndolphins_delete_record(DndDolphinsApp* app) {
             dndolphins_set_status(app, "Feature update failed");
             return;
         }
-        if(!dnd_storage_remap_spell_classes(
-               app->storage, app->active_profile, character, index)) {
+        if(!dnd_storage_remap_spell_classes(app->storage, app->active_profile, character, index)) {
             dndolphins_set_status(app, "Spellbook update failed");
             return;
         }
@@ -8182,7 +8258,7 @@ static void dndolphins_delete_record(DndDolphinsApp* app) {
     uint16_t remaining = app->list_kind == DndListFeatures      ? app->features_total :
                          app->list_kind == DndListLanguages     ? app->language_total :
                          app->list_kind == DndListProficiencies ? app->proficiency_total :
-                                                                     0U;
+                                                                  0U;
     if(remaining) {
         uint16_t target = index < remaining ? index : remaining - 1U;
         dndolphins_record_list_focus(app, target);
@@ -8548,15 +8624,15 @@ static void dndolphins_handle_profile_actions(DndDolphinsApp* app, const InputEv
             if(profile != app->active_profile)
                 dndolphins_set_status(app, "Switch before rename");
             else
-                dndolphins_begin_text(app, DndEditCharacterName, "Character name", app->data.character.name);
+                dndolphins_begin_text(
+                    app, DndEditCharacterName, "Character name", app->data.character.name);
         } else if(app->selection == 2U) {
             uint32_t destination = dnd_storage_profiles_next_id(app->profile_browser);
             bool duplicated =
                 (profile != app->active_profile || dndolphins_flush_save(app, false)) &&
                 !(destination == UINT32_MAX && dndolphins_profile_exists(app, UINT32_MAX)) &&
                 dnd_storage_duplicate_profile(app->storage, profile, destination) &&
-                dndolphins_profile_browser_refresh(app) &&
-                dndolphins_profile_browser_save(app);
+                dndolphins_profile_browser_refresh(app) && dndolphins_profile_browser_save(app);
             dndolphins_profile_actions_to_list(app);
             dndolphins_set_status(app, duplicated ? "Character duplicated" : "Duplicate failed");
         } else if(app->selection == 3U) {
@@ -8629,17 +8705,17 @@ static void dndolphins_handle_settings(DndDolphinsApp* app, const InputEvent* ev
             return;
         }
         if(app->selection == 2U) {
-            bool ok = !app->settings.extra_items || !app->active_profile_loaded ||
-                      (dndolphins_save_items_if_changed(app) &&
-                       dnd_extra_items_grant(
-                           app->storage, app->active_profile, &app->data.character));
+            bool ok =
+                !app->settings.extra_items || !app->active_profile_loaded ||
+                (dndolphins_save_items_if_changed(app) &&
+                 dnd_extra_items_grant(app->storage, app->active_profile, &app->data.character));
             if(!ok) {
                 app->settings = previous;
                 (void)dnd_settings_save(app->storage, &previous);
                 dndolphins_set_status(app, "Get Elevated grant failed");
                 return;
             }
-            app->collection_cache->items_offset_valid_pages = 0U;
+            if(app->collection_cache) app->collection_cache->items_offset_valid_pages = 0U;
             if(app->items_loaded) (void)dndolphins_load_items_page(app, 0U);
             dndolphins_set_status(
                 app, app->settings.extra_items ? "Get Elevated: 420" : "Get Elevated: Off");
@@ -8698,10 +8774,7 @@ static void dndolphins_request_launch(DndDolphinsApp* app, DndPendingLaunch laun
 }
 
 #if defined(DND_BUILD_HUB)
-static void dndolphins_home_graphical_move(
-    DndDolphinsApp* app,
-    uint16_t count,
-    int key) {
+static void dndolphins_home_graphical_move(DndDolphinsApp* app, uint16_t count, int key) {
     if(!app || !count) return;
     uint16_t selected = app->selection < count ? app->selection : 0U;
     if(key == InputKeyLeft) {
@@ -8868,8 +8941,7 @@ static void dndolphins_handle_character(DndDolphinsApp* app, const InputEvent* e
             dndolphins_begin_text(
                 app, DndEditBackground, "Custom background", character->background);
         else
-            dndolphins_begin_text(
-                app, DndEditAlignment, "Custom alignment", character->alignment);
+            dndolphins_begin_text(app, DndEditAlignment, "Custom alignment", character->alignment);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         switch(app->selection) {
         case 0:
@@ -8879,8 +8951,7 @@ static void dndolphins_handle_character(DndDolphinsApp* app, const InputEvent* e
             dndolphins_begin_text(app, DndEditPlayerName, "Player name", character->player);
             break;
         case 2:
-            dndolphins_open_catalog(
-                app, DndCatalogSpecies, DndEditSpecies, character->species);
+            dndolphins_open_catalog(app, DndCatalogSpecies, DndEditSpecies, character->species);
             break;
         case 3:
             dndolphins_open_catalog(
@@ -9132,9 +9203,8 @@ static void dndolphins_handle_abilities(DndDolphinsApp* app, const InputEvent* e
             dndolphins_save(app, false);
             dndolphins_set_status(
                 app,
-                character->saving_throw_proficiency[index] ?
-                    "Save proficiency: Yes" :
-                    "Save proficiency: No");
+                character->saving_throw_proficiency[index] ? "Save proficiency: Yes" :
+                                                             "Save proficiency: No");
         } else {
             dndolphins_begin_number(
                 app,
@@ -9336,15 +9406,15 @@ static void dndolphins_handle_asi_ability(DndDolphinsApp* app, const InputEvent*
     }
 }
 
-static void dndolphins_handle_grant_diagnostics(
-    DndDolphinsApp* app, const InputEvent* event) {
+static void dndolphins_handle_grant_diagnostics(DndDolphinsApp* app, const InputEvent* event) {
     uint8_t count = app->data.character.grant_count ? app->data.character.grant_count : 1U;
     if(dndolphins_is_move_event(event) && event->key == InputKeyUp)
         dndolphins_menu_move(app, count, -1);
     else if(dndolphins_is_move_event(event) && event->key == InputKeyDown)
         dndolphins_menu_move(app, count, 1);
-    else if(event->type == InputTypeShort && event->key == InputKeyOk &&
-            app->data.character.grant_count) {
+    else if(
+        event->type == InputTypeShort && event->key == InputKeyOk &&
+        app->data.character.grant_count) {
         const DndGrant* g = &app->data.character.grants[app->selection];
         snprintf(
             app->status,
@@ -9415,14 +9485,12 @@ static void dndolphins_handle_grant_review(DndDolphinsApp* app, const InputEvent
                 dndolphins_save(app, false);
                 dndolphins_set_status(app, "Pending again");
             }
-        } else if(
-            app->settings.debug && app->selection == c->grant_count + 2U) {
+        } else if(app->settings.debug && app->selection == c->grant_count + 2U) {
             app->selection = 0U;
             app->scroll = 0U;
             dndolphins_enter_screen(app, DndScreenGrantDiagnostics);
         } else if(
-            app->selection == c->grant_count + 1U &&
-            c->grant_count < DND_MAX_GRANTS &&
+            app->selection == c->grant_count + 1U && c->grant_count < DND_MAX_GRANTS &&
             dnd_data_reserve_grants(c, c->grant_count + 1U)) {
             app->record_index = c->grant_count++;
             DndGrant* grant = &c->grants[app->record_index];
@@ -9484,8 +9552,7 @@ static void dndolphins_handle_grant_edit(DndDolphinsApp* app, const InputEvent* 
         dndolphins_save(app, false);
     } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection == 0U)
-            dndolphins_begin_text(
-                app, DndEditGrantStableId, "Stable grant ID", grant->stable_id);
+            dndolphins_begin_text(app, DndEditGrantStableId, "Stable grant ID", grant->stable_id);
         else if(app->selection == 1U)
             dndolphins_begin_text(app, DndEditGrantSource, "Source label", grant->source);
         else if(app->selection == 3U)
@@ -9557,9 +9624,7 @@ static void dndolphins_handle_attack_templates(DndDolphinsApp* app, const InputE
         event->type == InputTypeShort && event->key == InputKeyOk &&
         kind == DndAttackTemplateDisplayTemplate && template_index < c->attack_template_count) {
         DndAttackTemplate* attack = &c->attack_templates[template_index];
-        if(
-            attack->type == DndAttackTemplateGrapple ||
-            attack->type == DndAttackTemplateShove) {
+        if(attack->type == DndAttackTemplateGrapple || attack->type == DndAttackTemplateShove) {
             char status[48];
             snprintf(
                 status,
@@ -9646,17 +9711,14 @@ static void dndolphins_handle_attack_template_edit(DndDolphinsApp* app, const In
             dndolphins_begin_text(
                 app, DndEditAttackDamageType, "Damage type", attack->damage_type);
         else if(app->selection == 9U)
-            dndolphins_begin_text(
-                app, DndEditAttackMastery, "Mastery property", attack->mastery);
+            dndolphins_begin_text(app, DndEditAttackMastery, "Mastery property", attack->mastery);
         else if(app->selection == 12U)
-            dndolphins_begin_text(
-                app, DndEditAttackRiderType, "Rider type", attack->rider_type);
+            dndolphins_begin_text(app, DndEditAttackRiderType, "Rider type", attack->rider_type);
         else if(app->selection == 14U) {
             memmove(
                 &c->attack_templates[app->record_index],
                 &c->attack_templates[app->record_index + 1U],
-                (c->attack_template_count - app->record_index - 1U) *
-                    sizeof(DndAttackTemplate));
+                (c->attack_template_count - app->record_index - 1U) * sizeof(DndAttackTemplate));
             --c->attack_template_count;
             dndolphins_save(app, false);
             dndolphins_enter_screen(app, DndScreenAttackTemplates);
@@ -9682,7 +9744,8 @@ static void dndolphins_handle_magic(DndDolphinsApp* app, const InputEvent* event
             }
             uint8_t level = app->selection - 7U;
             if(delta > 0) {
-                uint8_t remaining = app->combat->arcane_recovery_budget - app->combat->arcane_recovery_spent;
+                uint8_t remaining =
+                    app->combat->arcane_recovery_budget - app->combat->arcane_recovery_spent;
                 if(level > remaining) {
                     dndolphins_set_status(app, "Not enough recovery");
                     return;
@@ -9779,13 +9842,17 @@ static void dndolphins_handle_magic(DndDolphinsApp* app, const InputEvent* event
             if(app->combat->arcane_recovery_active) {
                 app->combat->arcane_recovery_active = 0U;
                 dndolphins_set_status(
-                    app, app->combat->arcane_recovery_spent ? "Arcane Recovery used" : "Recovery skipped");
+                    app,
+                    app->combat->arcane_recovery_spent ? "Arcane Recovery used" :
+                                                         "Recovery skipped");
             } else if(character->arcane_recovery_used) {
                 dndolphins_set_status(app, "Recovery already used");
             } else {
                 dndolphins_set_status(app, "Finish a Short Rest first");
             }
-        } else if(!app->combat->arcane_recovery_active && app->selection >= 8U && app->selection <= 16U) {
+        } else if(
+            !app->combat->arcane_recovery_active && app->selection >= 8U &&
+            app->selection <= 16U) {
             uint8_t level = app->selection - 7U;
             dndolphins_begin_number(
                 app,
@@ -9839,8 +9906,7 @@ static void dndolphins_handle_record_list(DndDolphinsApp* app, const InputEvent*
             if(app->list_kind == DndListLanguages) {
                 dndolphins_open_catalog(app, DndCatalogLanguages, DndEditLanguageName, "");
             } else if(app->list_kind == DndListProficiencies) {
-                dndolphins_open_catalog(
-                    app, DndCatalogProficiencies, DndEditProficiencyName, "");
+                dndolphins_open_catalog(app, DndCatalogProficiencies, DndEditProficiencyName, "");
             } else if(!dndolphins_add_record(app)) {
                 bool full = app->list_kind == DndListClasses &&
                             (app->data.character.class_count >= DND_MAX_CLASSES ||
@@ -10006,10 +10072,7 @@ static void dndolphins_handle_record_detail_ok(DndDolphinsApp* app) {
                 app, DndCatalogClasses, DndEditClassName, character->classes[index].name);
         else if(field == 1U)
             dndolphins_open_catalog(
-                app,
-                DndCatalogSubclasses,
-                DndEditSubclass,
-                character->classes[index].subclass);
+                app, DndCatalogSubclasses, DndEditSubclass, character->classes[index].subclass);
         else if(field >= 2U && field <= 16U)
             dndolphins_adjust_record(app, 1);
         else
@@ -10038,8 +10101,7 @@ static void dndolphins_handle_record_detail_ok(DndDolphinsApp* app) {
     case DndListProficiencies:
         if(field < 2U) {
             app->collection_replace = true;
-            dndolphins_open_catalog(
-                app, DndCatalogProficiencies, DndEditProficiencyName, "");
+            dndolphins_open_catalog(app, DndCatalogProficiencies, DndEditProficiencyName, "");
         }
         if(field == 2U) dndolphins_delete_record(app);
         break;
@@ -10277,20 +10339,20 @@ static void dndolphins_apply_catalog_selection(DndDolphinsApp* app) {
         }
         break;
     case DndEditLanguageName: {
-        bool ok =
-            app->collection_replace ?
-                dnd_character_languages_replace(
-                    app->storage, app->active_profile, app->record_index, selected) :
-                dnd_character_languages_append(
-                    app->storage, app->active_profile, selected);
+        bool ok = app->collection_replace ?
+                      dnd_character_languages_replace(
+                          app->storage, app->active_profile, app->record_index, selected) :
+                      dnd_character_languages_append(app->storage, app->active_profile, selected);
         if(!ok) {
             dndolphins_set_status(app, "Language add failed");
             return;
         }
         (void)dnd_character_languages_count(
             app->storage, app->active_profile, &app->language_total);
-        app->collection_cache->language_page_count = 0U;
-        app->collection_cache->language_cache_start = 0U;
+        if(app->collection_cache) {
+            app->collection_cache->language_page_count = 0U;
+            app->collection_cache->language_cache_start = 0U;
+        }
         app->character_collections_changed = true;
         app->catalog->return_selection = app->collection_replace ? 0U : app->language_total;
         break;
@@ -10298,20 +10360,21 @@ static void dndolphins_apply_catalog_selection(DndDolphinsApp* app) {
     case DndEditProficiencyName: {
         uint8_t type_code = app->catalog->levels[app->selection];
         const char* type = dndolphins_proficiency_type_name(type_code);
-        bool ok =
-            app->collection_replace ?
-                dnd_character_proficiencies_replace(
-                    app->storage, app->active_profile, app->record_index, type, selected) :
-                dnd_character_proficiencies_append(
-                    app->storage, app->active_profile, type, selected);
+        bool ok = app->collection_replace ?
+                      dnd_character_proficiencies_replace(
+                          app->storage, app->active_profile, app->record_index, type, selected) :
+                      dnd_character_proficiencies_append(
+                          app->storage, app->active_profile, type, selected);
         if(!ok) {
             dndolphins_set_status(app, "Proficiency add failed");
             return;
         }
         (void)dnd_character_proficiencies_count(
             app->storage, app->active_profile, &app->proficiency_total);
-        app->collection_cache->proficiency_page_count = 0U;
-        app->collection_cache->proficiency_cache_start = 0U;
+        if(app->collection_cache) {
+            app->collection_cache->proficiency_page_count = 0U;
+            app->collection_cache->proficiency_cache_start = 0U;
+        }
         app->character_collections_changed = true;
         app->catalog->return_selection = app->collection_replace ? 1U : app->proficiency_total;
         break;
@@ -10326,9 +10389,26 @@ static void dndolphins_apply_catalog_selection(DndDolphinsApp* app) {
     default:
         return;
     }
+    if(save_features_after_catalog && !dndolphins_save_features_if_changed(app)) {
+        dndolphins_set_status(app, "Feature save failed");
+        return;
+    }
+    const uint16_t return_selection = app->catalog->return_selection;
     dndolphins_catalog_release(app);
-    if(save_features_after_catalog) (void)dndolphins_save_features_if_changed(app);
     if(grant_source < DndGrantSourceCount) dndolphins_release_staged_records(app);
+#if defined(DND_BUILD_HUB)
+    /* The saved Feature is the cross-FAP source of its dependent grants.
+       Review belongs to DNDGrants, whose scan includes owned Feats. */
+    dndolphins_save(app, false);
+    DndScreen destination = app->return_screen;
+    dndolphins_enter_screen(app, destination);
+    app->selection = return_selection;
+    if(app->selection >= 5U) app->scroll = app->selection - 4U;
+    if(grant_source < DndGrantSourceCount) {
+        dndolphins_request_launch(app, DndPendingLaunchGrantsLevel);
+        return;
+    }
+#else
     uint8_t staged = grant_source < DndGrantSourceCount ?
                          dndolphins_stage_grants(app, grant_source, selected) :
                          0U;
@@ -10341,8 +10421,9 @@ static void dndolphins_apply_catalog_selection(DndDolphinsApp* app) {
         return;
     }
     dndolphins_enter_screen(app, destination);
-    app->selection = app->catalog->return_selection;
+    app->selection = return_selection;
     if(app->selection >= 5U) app->scroll = app->selection - 4U;
+#endif
     dndolphins_set_status(app, "Catalog choice saved");
 }
 
@@ -10429,9 +10510,16 @@ static void dndolphins_handle_favorite_spells(DndDolphinsApp* app, const InputEv
         if(spell_index == UINT16_MAX) return;
         app->combat->spell_attack_index = spell_index;
         DndSpellCastOption options[DNDOLPHINS_MAX_SPELL_CAST_OPTIONS];
-        uint8_t option_count = dndolphins_build_spell_cast_options(app, spell_index, options, DNDOLPHINS_MAX_SPELL_CAST_OPTIONS);
-        if(!option_count) { dndolphins_set_status(app, "No casting resource"); return; }
-        if(option_count == 1U) { dndolphins_cast_spell(app, &options[0]); return; }
+        uint8_t option_count = dndolphins_build_spell_cast_options(
+            app, spell_index, options, DNDOLPHINS_MAX_SPELL_CAST_OPTIONS);
+        if(!option_count) {
+            dndolphins_set_status(app, "No casting resource");
+            return;
+        }
+        if(option_count == 1U) {
+            dndolphins_cast_spell(app, &options[0]);
+            return;
+        }
         dndolphins_enter_screen(app, DndScreenSpellCast);
     }
 }
@@ -10492,8 +10580,10 @@ static void dndolphins_handle_rituals(DndDolphinsApp* app, const InputEvent* eve
 }
 
 static DndScreen dndolphins_combat_spell_return_screen(const DndDolphinsApp* app) {
-    if(app && app->combat->combat_spell_mode == DndCombatSpellModeFavorites) return DndScreenFavoriteSpells;
-    if(app && app->combat->combat_spell_mode == DndCombatSpellModeUtility) return DndScreenUtilitySpells;
+    if(app && app->combat->combat_spell_mode == DndCombatSpellModeFavorites)
+        return DndScreenFavoriteSpells;
+    if(app && app->combat->combat_spell_mode == DndCombatSpellModeUtility)
+        return DndScreenUtilitySpells;
     if(app && app->combat->combat_spell_mode == DndCombatSpellModeRituals) return DndScreenRituals;
     return DndScreenSpellAttacks;
 }
@@ -10654,10 +10744,7 @@ static void dndolphins_handle_combat(DndDolphinsApp* app, const InputEvent* even
             }
             dndolphins_rules_character_short_rest(character);
             if(!dndolphins_progression_store_features_recharge(
-                   app->storage,
-                   app->active_profile,
-                   character,
-                   DndFeatureRechargeShortRest)) {
+                   app->storage, app->active_profile, character, DndFeatureRechargeShortRest)) {
                 dndolphins_set_status(app, "Feature recharge failed");
                 break;
             }
@@ -10700,15 +10787,11 @@ static void dndolphins_handle_combat(DndDolphinsApp* app, const InputEvent* even
             }
             dndolphins_rules_character_long_rest(character);
             if(!dndolphins_progression_store_features_recharge(
-                   app->storage,
-                   app->active_profile,
-                   character,
-                   DndFeatureRechargeLongRest)) {
+                   app->storage, app->active_profile, character, DndFeatureRechargeLongRest)) {
                 dndolphins_set_status(app, "Feature recharge failed");
                 break;
             }
-            if(!dnd_storage_reset_spell_free_casts(
-                   app->storage, app->active_profile, character)) {
+            if(!dnd_storage_reset_spell_free_casts(app->storage, app->active_profile, character)) {
                 dndolphins_set_status(app, "Spellbook update failed");
                 break;
             }
@@ -10731,8 +10814,7 @@ static void dndolphins_handle_combat(DndDolphinsApp* app, const InputEvent* even
                 app, DndEditTemporaryEffects, "Temporary effects", character->temporary_effects);
             break;
         case DndolphinsCombatResistances:
-            dndolphins_begin_text(
-                app, DndEditResistances, "Resistances", character->resistances);
+            dndolphins_begin_text(app, DndEditResistances, "Resistances", character->resistances);
             break;
         case DndolphinsCombatImmunities:
             dndolphins_begin_text(app, DndEditImmunities, "Immunities", character->immunities);
@@ -10771,7 +10853,8 @@ static void dndolphins_roll_generic(DndDolphinsApp* app) {
     app->roll->dice_roll_value_count = 0U;
     app->roll->dice_roll_sum = 0U;
     memset(app->roll->dice_roll_values, 0, sizeof(app->roll->dice_roll_values));
-    if(app->roll->roll_mode == DndRollGuidance && app->roll->dice_count == 1U && app->roll->dice_sides == 20U) {
+    if(app->roll->roll_mode == DndRollGuidance && app->roll->dice_count == 1U &&
+       app->roll->dice_sides == 20U) {
         app->roll->dice_first = (uint8_t)dnd_rules_core_roll_dice(1U, 20U);
         app->roll->dice_guidance = (uint8_t)dnd_rules_core_roll_dice(1U, 4U);
         app->roll->dice_roll_values[0] = app->roll->dice_first;
@@ -10780,7 +10863,8 @@ static void dndolphins_roll_generic(DndDolphinsApp* app) {
         app->roll->dice_roll_sum = app->roll->dice_first + app->roll->dice_guidance;
         app->roll->dice_result = (int16_t)app->roll->dice_roll_sum + app->roll->dice_modifier;
     } else if(
-        (app->roll->roll_mode == DndRollAdvantage || app->roll->roll_mode == DndRollDisadvantage) &&
+        (app->roll->roll_mode == DndRollAdvantage ||
+         app->roll->roll_mode == DndRollDisadvantage) &&
         app->roll->dice_count == 1U && app->roll->dice_sides == 20U) {
         app->roll->dice_first = (uint8_t)dnd_rules_core_roll_dice(1U, 20U);
         app->roll->dice_second = (uint8_t)dnd_rules_core_roll_dice(1U, 20U);
@@ -10790,13 +10874,18 @@ static void dndolphins_roll_generic(DndDolphinsApp* app) {
         app->roll->dice_roll_sum = app->roll->dice_first + app->roll->dice_second;
         uint8_t chosen =
             app->roll->roll_mode == DndRollAdvantage ?
-                (app->roll->dice_first > app->roll->dice_second ? app->roll->dice_first : app->roll->dice_second) :
-                (app->roll->dice_first < app->roll->dice_second ? app->roll->dice_first : app->roll->dice_second);
+                (app->roll->dice_first > app->roll->dice_second ? app->roll->dice_first :
+                                                                  app->roll->dice_second) :
+                (app->roll->dice_first < app->roll->dice_second ? app->roll->dice_first :
+                                                                  app->roll->dice_second);
         app->roll->dice_result = chosen + app->roll->dice_modifier;
     } else {
         app->roll->dice_roll_value_count = app->roll->dice_count;
         app->roll->dice_roll_sum = dndolphins_dice_roll_values(
-            app->roll->dice_count, app->roll->dice_sides, app->roll->dice_roll_values, sizeof(app->roll->dice_roll_values));
+            app->roll->dice_count,
+            app->roll->dice_sides,
+            app->roll->dice_roll_values,
+            sizeof(app->roll->dice_roll_values));
         if(app->roll->dice_count == 1U) app->roll->dice_first = app->roll->dice_roll_values[0];
         app->roll->dice_result = (int16_t)app->roll->dice_roll_sum + app->roll->dice_modifier;
     }
@@ -10814,13 +10903,15 @@ static void dndolphins_handle_dice(DndDolphinsApp* app, const InputEvent* event)
         (event->key == InputKeyLeft || event->key == InputKeyRight)) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         if(app->selection == 0U) {
-            app->roll->dice_count = (uint8_t)dndolphins_clamp_i16(app->roll->dice_count + delta, 1, 20);
+            app->roll->dice_count =
+                (uint8_t)dndolphins_clamp_i16(app->roll->dice_count + delta, 1, 20);
             if(app->roll->roll_mode != DndRollNormal) app->roll->roll_mode = DndRollNormal;
         } else if(app->selection == 1U) {
             app->roll->dice_sides = dndolphins_cycle_die(app->roll->dice_sides, delta, false);
             if(app->roll->roll_mode != DndRollNormal) app->roll->roll_mode = DndRollNormal;
         } else if(app->selection == 2U)
-            app->roll->dice_modifier = dndolphins_clamp_i16(app->roll->dice_modifier + delta, -99, 99);
+            app->roll->dice_modifier =
+                dndolphins_clamp_i16(app->roll->dice_modifier + delta, -99, 99);
         else if(app->selection == 3U) {
             int16_t mode = app->roll->roll_mode + delta;
             if(mode < 0) mode = DndRollGuidance;
@@ -10955,11 +11046,7 @@ static uint8_t dndolphins_find_loose_ammunition(
         .count = 0U,
     };
     if(!dnd_storage_visit_items(
-           app->storage,
-           app->active_profile,
-           dndolphins_ammunition_stack_visitor,
-           &lookup,
-           NULL))
+           app->storage, app->active_profile, dndolphins_ammunition_stack_visitor, &lookup, NULL))
         return 0U;
     return lookup.count > capacity ? capacity : lookup.count;
 }
@@ -11012,14 +11099,15 @@ static void dndolphins_roll_selected_attack(DndDolphinsApp* app) {
             dndolphins_save(app, false);
         } else {
             const char* group = dndolphins_weapon_ammunition_group(&weapon);
-            app->combat->ammo_choice_count = dndolphins_find_loose_ammunition(
-                app, group, app->combat->ammo_choice_indices, 8U);
+            app->combat->ammo_choice_count =
+                dndolphins_find_loose_ammunition(app, group, app->combat->ammo_choice_indices, 8U);
             if(!app->combat->ammo_choice_count) {
                 dndolphins_set_status(app, "No ammunition");
                 return;
             }
             if(app->combat->ammo_choice_count > 1U) {
-                dndolphins_copy(app->combat->ammo_choice_group, sizeof(app->combat->ammo_choice_group), group);
+                dndolphins_copy(
+                    app->combat->ammo_choice_group, sizeof(app->combat->ammo_choice_group), group);
                 dndolphins_enter_screen(app, DndScreenAmmoChoice);
                 return;
             }
@@ -11062,7 +11150,9 @@ static void dndolphins_handle_ammo_choice(DndDolphinsApp* app, const InputEvent*
     else if(event->type == InputTypeShort && event->key == InputKeyOk) {
         if(app->selection >= app->combat->ammo_choice_count) return;
         if(!dndolphins_consume_ammunition_index(
-               app, app->combat->attack_item_index, app->combat->ammo_choice_indices[app->selection])) {
+               app,
+               app->combat->attack_item_index,
+               app->combat->ammo_choice_indices[app->selection])) {
             dndolphins_set_status(app, "Ammo save failed");
             return;
         }
@@ -11080,7 +11170,8 @@ static void dndolphins_handle_attack_result(DndDolphinsApp* app, const InputEven
                 &app->data.character, item, app->combat->attack_roll.critical);
             app->combat->attack_phase = 1U;
             app->combat->damage_roll_page = 0U;
-            uint8_t count = app->combat->damage_roll.weapon_roll_count + app->combat->damage_roll.extra_roll_count;
+            uint8_t count = app->combat->damage_roll.weapon_roll_count +
+                            app->combat->damage_roll.extra_roll_count;
             if(count)
                 dndolphins_start_dice_animation(
                     app,
@@ -11092,7 +11183,8 @@ static void dndolphins_handle_attack_result(DndDolphinsApp* app, const InputEven
                 dndolphins_weapon_combat_roll_damage(&app->data.character, item, true);
             app->combat->attack_phase = 1U;
             app->combat->damage_roll_page = 0U;
-            uint8_t count = app->combat->damage_roll.weapon_roll_count + app->combat->damage_roll.extra_roll_count;
+            uint8_t count = app->combat->damage_roll.weapon_roll_count +
+                            app->combat->damage_roll.extra_roll_count;
             if(count)
                 dndolphins_start_dice_animation(
                     app,
@@ -11100,9 +11192,10 @@ static void dndolphins_handle_attack_result(DndDolphinsApp* app, const InputEven
                     item->use_versatile && item->versatile_die >= 2U ? item->versatile_die :
                                                                        item->damage_die);
         } else if(event->type == InputTypeShort && event->key == InputKeyUp) {
-            app->combat->attack_roll =
-                dndolphins_weapon_combat_roll_attack(&app->data.character, item, app->roll->roll_mode);
-            dndolphins_start_dice_animation(app, app->combat->attack_roll.second_die ? 2U : 1U, 20U);
+            app->combat->attack_roll = dndolphins_weapon_combat_roll_attack(
+                &app->data.character, item, app->roll->roll_mode);
+            dndolphins_start_dice_animation(
+                app, app->combat->attack_roll.second_die ? 2U : 1U, 20U);
         }
     } else {
         uint8_t roll_count =
@@ -11119,7 +11212,8 @@ static void dndolphins_handle_attack_result(DndDolphinsApp* app, const InputEven
             app->combat->damage_roll = dndolphins_weapon_combat_roll_damage(
                 &app->data.character, item, app->combat->damage_roll.critical);
             app->combat->damage_roll_page = 0U;
-            roll_count = app->combat->damage_roll.weapon_roll_count + app->combat->damage_roll.extra_roll_count;
+            roll_count = app->combat->damage_roll.weapon_roll_count +
+                         app->combat->damage_roll.extra_roll_count;
             if(roll_count)
                 dndolphins_start_dice_animation(
                     app,
@@ -11147,7 +11241,7 @@ static bool dndolphins_input_callback(InputEvent* event, void* context) {
         dndolphins_refresh(app);
         return true;
     }
-    if(app->roll->dice_animating) {
+    if(app->roll && app->roll->dice_animating) {
         if(event->type == InputTypeShort && event->key == InputKeyBack) {
             app->roll->dice_animating = 0U;
             app->marquee_elapsed_ms = 0U;
@@ -11339,12 +11433,13 @@ static DndDolphinsApp* dndolphins_app_alloc(void) {
        allocated at first use and released when their workflow ends. */
     if(!dndolphins_reserve_core_ui(app)) {
         FURI_LOG_E(
-            TAG, "Core UI allocation failed; free heap=%lu", (unsigned long)memmgr_get_free_heap());
+            TAG,
+            "Core UI allocation failed; free heap=%lu",
+            (unsigned long)memmgr_get_free_heap());
         goto fail;
     }
     if(app->settings.debug)
-        FURI_LOG_I(
-            TAG, "Heap after core UI free=%lu", (unsigned long)memmgr_get_free_heap());
+        FURI_LOG_I(TAG, "Heap after core UI free=%lu", (unsigned long)memmgr_get_free_heap());
     /* Relocate only legacy character ch*.txt files. Files are moved unchanged;
        the tolerant field-name loader interprets whatever recognized data exists.
        A failed relocation is treated conservatively as existing user data so a
@@ -11400,8 +11495,7 @@ static DndDolphinsApp* dndolphins_app_alloc(void) {
         dnd_data_set_defaults(&app->data);
         app->active_profile = 0U;
         app->active_profile_loaded = 1U;
-        character_ready =
-            dnd_storage_save_profile(app->storage, app->active_profile, &app->data);
+        character_ready = dnd_storage_save_profile(app->storage, app->active_profile, &app->data);
         dnd_data_clear_spells(&app->data.character);
         dnd_data_clear_items(&app->data.character);
         dnd_data_reserve_features_exact(&app->data.character, 0U);
@@ -11426,14 +11520,13 @@ static DndDolphinsApp* dndolphins_app_alloc(void) {
         if(spellcasting_repaired && !spell_slots_initialized)
             dndolphins_spells_recalculate_multiclass_slots(&app->data.character);
         if(spellcasting_repaired || spell_slots_initialized)
-            character_ready = character_ready &&
-                              dnd_storage_save_profile_updated(
-                                  app->storage, app->active_profile, &app->data);
+            character_ready =
+                character_ready &&
+                dnd_storage_save_profile_updated(app->storage, app->active_profile, &app->data);
     }
     if(app->active_profile_loaded) {
         bool active_included = dndolphins_profile_include_active(app);
-        metadata_saved = active_included &&
-                         dndolphins_profile_browser_save(app);
+        metadata_saved = active_included && dndolphins_profile_browser_save(app);
     }
     app->saved_fingerprint = dndolphins_data_fingerprint(&app->data);
     if(!character_ready || !metadata_saved) {
@@ -11543,22 +11636,25 @@ int32_t dnd_app_hub_run(void* context) {
 
     if(pending_launch != DndPendingLaunchNone) {
         const char* launch_path =
-            pending_launch == DndPendingLaunchJournal       ? DNDJOURNAL_FAP_PATH :
-            pending_launch == DndPendingLaunchAdventure     ? DNDADVENTURE_FAP_PATH :
-            pending_launch == DndPendingLaunchInitiative    ? DNDINITIATIVE_FAP_PATH :
-            pending_launch == DndPendingLaunchInventory     ? DNDINVENTORY_FAP_PATH :
+            pending_launch == DndPendingLaunchJournal    ? DNDJOURNAL_FAP_PATH :
+            pending_launch == DndPendingLaunchAdventure  ? DNDADVENTURE_FAP_PATH :
+            pending_launch == DndPendingLaunchInitiative ? DNDINITIATIVE_FAP_PATH :
+            pending_launch == DndPendingLaunchInventory  ? DNDINVENTORY_FAP_PATH :
             (pending_launch == DndPendingLaunchSpellbook ||
-             pending_launch == DndPendingLaunchSpellbookMagic) ? DNDSPELLBOOK_FAP_PATH :
-            pending_launch == DndPendingLaunchCombat        ? DNDCOMBAT_FAP_PATH :
+             pending_launch == DndPendingLaunchSpellbookMagic) ?
+                                                          DNDSPELLBOOK_FAP_PATH :
+            pending_launch == DndPendingLaunchCombat         ? DNDCOMBAT_FAP_PATH :
             pending_launch == DndPendingLaunchCharacterSheet ? DNDCHARACTERSHEET_FAP_PATH :
             pending_launch == DndPendingLaunchBackup         ? DNDBACKUP_FAP_PATH :
             (pending_launch == DndPendingLaunchGrantsInitial ||
-             pending_launch == DndPendingLaunchGrantsLevel) ? DNDGRANTS_FAP_PATH :
-                                                               DNDBESTIARY_FAP_PATH;
+             pending_launch == DndPendingLaunchGrantsLevel) ?
+                                                       DNDGRANTS_FAP_PATH :
+                                                       DNDBESTIARY_FAP_PATH;
         const char* args =
-            pending_launch == DndPendingLaunchGrantsInitial ? "initial" :
-            pending_launch == DndPendingLaunchGrantsLevel   ? "level" :
-            pending_launch == DndPendingLaunchSpellbookMagic ? DND_SPELLBOOK_LAUNCH_MAGIC : NULL;
+            pending_launch == DndPendingLaunchGrantsInitial  ? "initial" :
+            pending_launch == DndPendingLaunchGrantsLevel    ? "level" :
+            pending_launch == DndPendingLaunchSpellbookMagic ? DND_SPELLBOOK_LAUNCH_MAGIC :
+                                                               NULL;
         if(!dnd_handoff_launch(launch_path, args)) return -1;
     }
     return 0;
@@ -11585,7 +11681,8 @@ int32_t dnd_app_combat_run(void* context) {
     bool return_to_parent = app->return_to_parent != 0U;
     dndolphins_app_free(app);
     if(pending_launch == DndPendingLaunchInitiative)
-        return dnd_handoff_launch(DNDINITIATIVE_FAP_PATH, DND_INITIATIVE_LAUNCH_FROM_COMBAT) ? 0 : -1;
+        return dnd_handoff_launch(DNDINITIATIVE_FAP_PATH, DND_INITIATIVE_LAUNCH_FROM_COMBAT) ? 0 :
+                                                                                               -1;
     if(return_to_parent)
         (void)dnd_handoff_launch_if_present(DNDOLPHINS_FAP_PATH, DND_PROFILE_RETURN_FOCUS_COMBAT);
     return 0;
@@ -11600,7 +11697,8 @@ int32_t dnd_app_grants_run(void* context) {
         return -1;
     }
     if(app->settings.catalog_all)
-        app->catalog_all_available = dndolphins_catalog_all_files_available(app->storage) ? 1U : 0U;
+        app->catalog_all_available = dndolphins_catalog_all_files_available(app->storage) ? 1U :
+                                                                                            0U;
     if(!app->catalog_all_available) app->settings.catalog_all = 0U;
     app->return_screen = DndScreenGrantReview;
     app->deferred_action = (args && strcmp(args, "initial") == 0) ?

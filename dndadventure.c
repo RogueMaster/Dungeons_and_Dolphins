@@ -408,10 +408,7 @@ static bool dndadventure_write_milestone_journal(
     if(!app->character_loaded) return true;
     char directory[ADVENTURE_JOURNAL_PATH_LEN];
     int directory_length = snprintf(
-        directory,
-        sizeof(directory),
-        DND_JOURNAL_DATA_ROOT "/ch_%lu",
-        (unsigned long)app->profile);
+        directory, sizeof(directory), DND_JOURNAL_DATA_ROOT "/ch_%lu", (unsigned long)app->profile);
     if(directory_length <= 0 || (size_t)directory_length >= sizeof(directory)) return false;
     storage_common_mkdir(app->storage, DND_JOURNAL_DATA_ROOT);
     storage_common_mkdir(app->storage, directory);
@@ -545,17 +542,14 @@ static bool dndadventure_apply_choice(DndAdventureApp* app, const DndAdventureCh
             bool rolled_back = dndadventure_rollback_choice(app, &previous_progress);
             dndadventure_set_status(
                 app,
-                rolled_back ? "Journal write failed; retry" :
-                              "Journal/progress rollback failed");
+                rolled_back ? "Journal write failed; retry" : "Journal/progress rollback failed");
             return false;
         }
         if(!dndadventure_reward_item(app, choice->reward_item)) {
             if(milestone_path[0]) storage_common_remove(app->storage, milestone_path);
             bool rolled_back = dndadventure_rollback_choice(app, &previous_progress);
             dndadventure_set_status(
-                app,
-                rolled_back ? "Item reward failed; retry" :
-                              "Item/progress rollback failed");
+                app, rolled_back ? "Item reward failed; retry" : "Item/progress rollback failed");
             return false;
         }
     }
@@ -723,8 +717,8 @@ static void dndadventure_draw_scene(Canvas* canvas, DndAdventureApp* app) {
 static bool dndadventure_choice_has_reward_preview(const DndAdventureChoice* choice) {
     if(!choice) return false;
     return (choice->reward_item[0] && strcmp(choice->reward_item, "-")) ||
-           (choice->milestone[0] && strcmp(choice->milestone, "-")) ||
-           choice->quest_flag < 32U || choice->achievement < 32U;
+           (choice->milestone[0] && strcmp(choice->milestone, "-")) || choice->quest_flag < 32U ||
+           choice->achievement < 32U;
 }
 
 static void dndadventure_draw_reward_preview(Canvas* canvas, DndAdventureApp* app) {

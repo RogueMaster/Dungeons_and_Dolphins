@@ -17,12 +17,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DNDBACKUP_VIEW_MAIN 0U
-#define DNDBACKUP_VIEW_TEXT 1U
-#define DNDBACKUP_SETTINGS "/ext/apps_data/dndolphins/backup_restore.txt"
-#define DNDBACKUP_SETTINGS_TEMP "/ext/apps_data/dndolphins/backup_restore.tmp"
+#define DNDBACKUP_VIEW_MAIN       0U
+#define DNDBACKUP_VIEW_TEXT       1U
+#define DNDBACKUP_SETTINGS        "/ext/apps_data/dndolphins/backup_restore.txt"
+#define DNDBACKUP_SETTINGS_TEMP   "/ext/apps_data/dndolphins/backup_restore.tmp"
 #define DNDBACKUP_SETTINGS_BACKUP "/ext/apps_data/dndolphins/backup_restore.bak"
-#define DNDBACKUP_DEFAULT_DIR "/ext/apps_data/dndolphins/backups"
+#define DNDBACKUP_DEFAULT_DIR     "/ext/apps_data/dndolphins/backups"
 
 typedef enum {
     DndBackupEditNone,
@@ -78,8 +78,7 @@ static void dndbackup_load_settings(DndBackupApp* app) {
             if(ch != '\r') line[used++] = ch;
         }
         line[used] = '\0';
-        if(!strncmp(line, "BackupDir=", 10U) &&
-           dndbackup_valid_external_path(line + 10U))
+        if(!strncmp(line, "BackupDir=", 10U) && dndbackup_valid_external_path(line + 10U))
             dndbackup_copy(app->backup_dir, sizeof(app->backup_dir), line + 10U);
         storage_file_close(file);
     }
@@ -242,10 +241,7 @@ static bool dndbackup_browse_and_restore(DndBackupApp* app) {
     if(chosen) {
         DndSaveData* restored = calloc(1U, sizeof(DndSaveData));
         ok = restored && dnd_backup_storage_restore_bundle(
-                             app->storage,
-                             app->profile,
-                             furi_string_get_cstr(selected),
-                             restored);
+                             app->storage, app->profile, furi_string_get_cstr(selected), restored);
         if(ok) {
             DndProfileState profiles;
             memset(&profiles, 0, sizeof(profiles));
@@ -257,8 +253,7 @@ static bool dndbackup_browse_and_restore(DndBackupApp* app) {
             dnd_data_clear(restored);
             free(restored);
         }
-        dndbackup_set_status(
-            app, ok ? "SHD restore complete" : "Select core SHD file");
+        dndbackup_set_status(app, ok ? "SHD restore complete" : "Select core SHD file");
     }
     furi_string_free(selected);
     return chosen && ok;
@@ -337,7 +332,8 @@ static bool dndbackup_input(InputEvent* event, void* context) {
         } else if(app->selection == 4U) {
             uint32_t clone = UINT32_MAX;
             if(dndbackup_clone_active(app, &clone))
-                snprintf(app->status, sizeof(app->status), "Cloned as [%lu]", (unsigned long)clone);
+                snprintf(
+                    app->status, sizeof(app->status), "Cloned as [%lu]", (unsigned long)clone);
             else
                 dndbackup_set_status(app, "Clone failed");
         } else if(app->selection == 5U) {
@@ -351,8 +347,7 @@ static bool dndbackup_input(InputEvent* event, void* context) {
         }
     }
     if(app->selection < app->scroll) app->scroll = app->selection;
-    if(app->selection >= app->scroll + 5U)
-        app->scroll = (uint8_t)(app->selection - 4U);
+    if(app->selection >= app->scroll + 5U) app->scroll = (uint8_t)(app->selection - 4U);
     if(app->scroll > 2U) app->scroll = 2U;
     dndbackup_redraw(app);
     return true;
@@ -386,25 +381,24 @@ int32_t dndbackup_app(void* context) {
     view_dispatcher_switch_to_view(app->dispatcher, DNDBACKUP_VIEW_MAIN);
     view_dispatcher_run(app->dispatcher);
 
-cleanup:
-    {
-        bool return_to_parent = app->return_to_parent != 0U;
-        if(app->text_input) {
-            if(app->dispatcher) view_dispatcher_remove_view(app->dispatcher, DNDBACKUP_VIEW_TEXT);
-            text_input_free(app->text_input);
-        }
-        if(app->view) {
-            if(app->dispatcher) view_dispatcher_remove_view(app->dispatcher, DNDBACKUP_VIEW_MAIN);
-            view_free(app->view);
-        }
-        if(app->dispatcher) view_dispatcher_free(app->dispatcher);
-        if(app->dialogs) furi_record_close(RECORD_DIALOGS);
-        if(app->storage) furi_record_close(RECORD_STORAGE);
-        if(app->gui) furi_record_close(RECORD_GUI);
-        free(app);
-        if(return_to_parent)
-            (void)dnd_handoff_launch_if_present(
-                DNDOLPHINS_FAP_PATH, DND_PROFILE_RETURN_FOCUS_CHARACTER);
+cleanup: {
+    bool return_to_parent = app->return_to_parent != 0U;
+    if(app->text_input) {
+        if(app->dispatcher) view_dispatcher_remove_view(app->dispatcher, DNDBACKUP_VIEW_TEXT);
+        text_input_free(app->text_input);
     }
+    if(app->view) {
+        if(app->dispatcher) view_dispatcher_remove_view(app->dispatcher, DNDBACKUP_VIEW_MAIN);
+        view_free(app->view);
+    }
+    if(app->dispatcher) view_dispatcher_free(app->dispatcher);
+    if(app->dialogs) furi_record_close(RECORD_DIALOGS);
+    if(app->storage) furi_record_close(RECORD_STORAGE);
+    if(app->gui) furi_record_close(RECORD_GUI);
+    free(app);
+    if(return_to_parent)
+        (void)dnd_handoff_launch_if_present(
+            DNDOLPHINS_FAP_PATH, DND_PROFILE_RETURN_FOCUS_CHARACTER);
+}
     return 0;
 }

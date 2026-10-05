@@ -70,7 +70,7 @@ Each manifest lists only the source files needed by that build mode. DNDolphins 
 
 Grant review batches are bounded at 24 resident `DndGrant` records and now run in DNDGrants, so their allocation/reallocation pressure does not coexist with DNDolphins. Inventory starting-equipment grants remain Inventory-owned.
 
-Combat weapon/spell indexes use bounded eight-record windows with independent `uint16_t` totals. Spell Attacks owns attack-roll spells; Combat Utility Spells owns castable non-attack spells. They run in DNDCombat; the 25 Combat menu actions are not an attack count limit.
+Combat weapon/spell indexes use bounded eight-record windows with independent `uint16_t` totals. Spell Attacks owns attack-roll spells; Combat Utility Spells owns castable non-attack spells. They run in DNDCombat; the 26 Combat menu actions are not an attack count limit.
 
 DNDBestiary consumes only the shared Debug and Homebrew bytes from DNDolphins Settings at startup. Pack Diagnostics is debug-only. Homebrew controls custom-pack visibility/selection across browsing, generated/custom encounters and saved-encounter execution without changing the stable on-disk source token; user-created Custom monsters are independent.
 
@@ -83,3 +83,7 @@ DNDBestiary consumes only the shared Debug and Homebrew bytes from DNDolphins Se
 ## Backup / Restore ownership
 
 `dndbackup.c` owns the user-facing SHD backup folder and restore browser. `dnd_backup_storage.*` owns external bundle export/import/staging and is linked only into DNDBackup. `dnd_storage.c` retains the reusable internal SHD history/transactional restore primitives used for data integrity. `dnd_app_core.c` contains only the launcher; it does not call user-facing export/import/restore functions.
+
+## Refactor integration regression gate
+
+The current host harness compiles the core separately under each manifest build mode, tests real input/screen transitions, and measures optional-state release/retry. Catalog selection snapshots return state before teardown; selected Hub Feats persist before handing dependent review to DNDGrants. Favorite Spells owns its bounded index/page through casting and return; the Combat Roll runtime survives the Magic statistics screen for the session. The obsolete `.inc` and three wrapper files are absent from the corrected package.

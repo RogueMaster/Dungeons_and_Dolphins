@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DND_BACKUP_DATA_DIR "/ext/apps_data/dndolphins"
+#define DND_BACKUP_DATA_DIR         "/ext/apps_data/dndolphins"
 #define DND_BACKUP_MAX_BUNDLE_FILES 64U
 
 bool dnd_backup_storage_valid_directory(const char* path) {
@@ -81,14 +81,19 @@ static bool dnd_backup_copy_file(Storage* storage, const char* source, const cha
 static uint8_t dnd_backup_level(const DndCharacter* character) {
     if(!character) return 1U;
     uint16_t total = 0U;
-    for(uint8_t i = 0U; i < character->class_count; ++i) total += character->classes[i].level;
+    for(uint8_t i = 0U; i < character->class_count; ++i)
+        total += character->classes[i].level;
     if(total < 1U) total = 1U;
     if(total > 20U) total = 20U;
     return (uint8_t)total;
 }
 
 static bool dnd_backup_core_name(
-    const char* filename, uint32_t profile, uint8_t* level, char* stem, size_t stem_size) {
+    const char* filename,
+    uint32_t profile,
+    uint8_t* level,
+    char* stem,
+    size_t stem_size) {
     if(!filename) return false;
     char prefix[32];
     snprintf(prefix, sizeof(prefix), "ch_%lu_", (unsigned long)profile);
@@ -99,7 +104,8 @@ static bool dnd_backup_core_name(
         return false;
     const char* end = filename + len - 4U;
     const char* underscore = end;
-    while(underscore > filename && underscore[-1] != '_') --underscore;
+    while(underscore > filename && underscore[-1] != '_')
+        --underscore;
     if(underscore <= filename || underscore == end) return false;
     uint16_t parsed = 0U;
     for(const char* p = underscore; p < end; ++p) {
@@ -162,7 +168,9 @@ uint8_t dnd_backup_storage_list_core_files(
 }
 
 bool dnd_backup_storage_export_bundle(
-    Storage* storage, uint32_t profile, const char* destination_dir) {
+    Storage* storage,
+    uint32_t profile,
+    const char* destination_dir) {
     if(!storage || !dnd_backup_storage_valid_directory(destination_dir)) return false;
     DndSaveData* data = calloc(1U, sizeof(DndSaveData));
     if(!data) return false;
@@ -205,11 +213,7 @@ bool dnd_backup_storage_export_bundle(
         int marker_length = snprintf(marker_name, sizeof(marker_name), "%s_bundle.shd", stem);
         ok = marker_length > 0 && (size_t)marker_length < sizeof(marker_name) &&
              dnd_fs_child_path(
-                 marker_source,
-                 sizeof(marker_source),
-                 DND_BACKUP_DATA_DIR,
-                 NULL,
-                 marker_name) &&
+                 marker_source, sizeof(marker_source), DND_BACKUP_DATA_DIR, NULL, marker_name) &&
              dnd_fs_child_path(
                  marker_destination,
                  sizeof(marker_destination),
@@ -237,8 +241,10 @@ bool dnd_backup_storage_export_bundle(
                     break;
                 }
                 char source[DND_FS_LONG_PATH_LEN], destination[DND_FS_LONG_PATH_LEN];
-                if(!dnd_fs_child_path(source, sizeof(source), DND_BACKUP_DATA_DIR, NULL, filename) ||
-                   !dnd_fs_child_path(destination, sizeof(destination), destination_dir, NULL, filename)) {
+                if(!dnd_fs_child_path(
+                       source, sizeof(source), DND_BACKUP_DATA_DIR, NULL, filename) ||
+                   !dnd_fs_child_path(
+                       destination, sizeof(destination), destination_dir, NULL, filename)) {
                     ok = false;
                     break;
                 }
@@ -288,7 +294,7 @@ static bool dnd_backup_collect_names(
     storage_file_free(dir);
     if(!count) return false;
 
-    char (*names)[DND_BACKUP_CORE_NAME_LEN] = calloc(count, DND_BACKUP_CORE_NAME_LEN);
+    char(*names)[DND_BACKUP_CORE_NAME_LEN] = calloc(count, DND_BACKUP_CORE_NAME_LEN);
     if(!names) return false;
     dir = storage_file_alloc(storage);
     if(!dir || !storage_dir_open(dir, directory)) {
@@ -335,18 +341,16 @@ bool dnd_backup_storage_restore_bundle(
     memcpy(source_dir, core_shd_path, source_len);
     source_dir[source_len] = '\0';
 
-    char (*source_names)[DND_BACKUP_CORE_NAME_LEN] = NULL;
+    char(*source_names)[DND_BACKUP_CORE_NAME_LEN] = NULL;
     uint8_t source_count = 0U;
-    if(!dnd_backup_collect_names(
-           storage, source_dir, stem, &source_names, &source_count))
+    if(!dnd_backup_collect_names(storage, source_dir, stem, &source_names, &source_count))
         return false;
 
     /* Preserve every existing internal file for this exact bundle stem so an
        interrupted/invalid external import cannot damage SHD history. */
-    char (*old_names)[DND_BACKUP_CORE_NAME_LEN] = NULL;
+    char(*old_names)[DND_BACKUP_CORE_NAME_LEN] = NULL;
     uint8_t old_count = 0U;
-    (void)dnd_backup_collect_names(
-        storage, DND_BACKUP_DATA_DIR, stem, &old_names, &old_count);
+    (void)dnd_backup_collect_names(storage, DND_BACKUP_DATA_DIR, stem, &old_names, &old_count);
 
     bool ok = true;
     for(uint8_t i = 0U; ok && i < old_count; ++i) {
@@ -355,8 +359,13 @@ bool dnd_backup_storage_restore_bundle(
             ok = false;
             break;
         }
-        snprintf(backup, sizeof(backup), "%s/.dndbak_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                 (unsigned)profile, (unsigned)i);
+        snprintf(
+            backup,
+            sizeof(backup),
+            "%s/.dndbak_%u_%u.tmp",
+            DND_BACKUP_DATA_DIR,
+            (unsigned)profile,
+            (unsigned)i);
         storage_common_remove(storage, backup);
         ok = dnd_backup_copy_file(storage, current, backup);
     }
@@ -366,8 +375,13 @@ bool dnd_backup_storage_restore_bundle(
             ok = false;
             break;
         }
-        snprintf(stage, sizeof(stage), "%s/.dndin_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                 (unsigned)profile, (unsigned)i);
+        snprintf(
+            stage,
+            sizeof(stage),
+            "%s/.dndin_%u_%u.tmp",
+            DND_BACKUP_DATA_DIR,
+            (unsigned)profile,
+            (unsigned)i);
         storage_common_remove(storage, stage);
         ok = dnd_backup_copy_file(storage, source, stage);
     }
@@ -375,19 +389,26 @@ bool dnd_backup_storage_restore_bundle(
     if(ok) {
         for(uint8_t i = 0U; i < old_count; ++i) {
             char current[DND_FS_LONG_PATH_LEN];
-            if(!dnd_fs_child_path(current, sizeof(current), DND_BACKUP_DATA_DIR, NULL, old_names[i])) {
-            ok = false;
-            break;
-        }
+            if(!dnd_fs_child_path(
+                   current, sizeof(current), DND_BACKUP_DATA_DIR, NULL, old_names[i])) {
+                ok = false;
+                break;
+            }
             if(storage_file_exists(storage, current))
                 ok = storage_common_remove(storage, current) == FSE_OK && ok;
         }
     }
     for(uint8_t i = 0U; ok && i < source_count; ++i) {
         char stage[DND_FS_LONG_PATH_LEN], destination[DND_FS_LONG_PATH_LEN];
-        snprintf(stage, sizeof(stage), "%s/.dndin_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                 (unsigned)profile, (unsigned)i);
-        if(!dnd_fs_child_path(destination, sizeof(destination), DND_BACKUP_DATA_DIR, NULL, source_names[i])) {
+        snprintf(
+            stage,
+            sizeof(stage),
+            "%s/.dndin_%u_%u.tmp",
+            DND_BACKUP_DATA_DIR,
+            (unsigned)profile,
+            (unsigned)i);
+        if(!dnd_fs_child_path(
+               destination, sizeof(destination), DND_BACKUP_DATA_DIR, NULL, source_names[i])) {
             ok = false;
             break;
         }
@@ -404,23 +425,36 @@ bool dnd_backup_storage_restore_bundle(
         /* Remove imported files, then put the previous internal history back. */
         for(uint8_t i = 0U; i < source_count; ++i) {
             char destination[DND_FS_LONG_PATH_LEN], stage[DND_FS_LONG_PATH_LEN];
-            if(!dnd_fs_child_path(destination, sizeof(destination), DND_BACKUP_DATA_DIR, NULL, source_names[i])) {
-            ok = false;
-            break;
-        }
-            snprintf(stage, sizeof(stage), "%s/.dndin_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                     (unsigned)profile, (unsigned)i);
-            if(storage_file_exists(storage, destination)) storage_common_remove(storage, destination);
+            if(!dnd_fs_child_path(
+                   destination, sizeof(destination), DND_BACKUP_DATA_DIR, NULL, source_names[i])) {
+                ok = false;
+                break;
+            }
+            snprintf(
+                stage,
+                sizeof(stage),
+                "%s/.dndin_%u_%u.tmp",
+                DND_BACKUP_DATA_DIR,
+                (unsigned)profile,
+                (unsigned)i);
+            if(storage_file_exists(storage, destination))
+                storage_common_remove(storage, destination);
             storage_common_remove(storage, stage);
         }
         for(uint8_t i = 0U; i < old_count; ++i) {
             char current[DND_FS_LONG_PATH_LEN], backup[DND_FS_LONG_PATH_LEN];
-            if(!dnd_fs_child_path(current, sizeof(current), DND_BACKUP_DATA_DIR, NULL, old_names[i])) {
-            ok = false;
-            break;
-        }
-            snprintf(backup, sizeof(backup), "%s/.dndbak_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                     (unsigned)profile, (unsigned)i);
+            if(!dnd_fs_child_path(
+                   current, sizeof(current), DND_BACKUP_DATA_DIR, NULL, old_names[i])) {
+                ok = false;
+                break;
+            }
+            snprintf(
+                backup,
+                sizeof(backup),
+                "%s/.dndbak_%u_%u.tmp",
+                DND_BACKUP_DATA_DIR,
+                (unsigned)profile,
+                (unsigned)i);
             if(storage_file_exists(storage, backup))
                 (void)storage_common_rename(storage, backup, current);
         }
@@ -428,14 +462,24 @@ bool dnd_backup_storage_restore_bundle(
 
     for(uint8_t i = 0U; i < old_count; ++i) {
         char backup[DND_FS_LONG_PATH_LEN];
-        snprintf(backup, sizeof(backup), "%s/.dndbak_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                 (unsigned)profile, (unsigned)i);
+        snprintf(
+            backup,
+            sizeof(backup),
+            "%s/.dndbak_%u_%u.tmp",
+            DND_BACKUP_DATA_DIR,
+            (unsigned)profile,
+            (unsigned)i);
         storage_common_remove(storage, backup);
     }
     for(uint8_t i = 0U; i < source_count; ++i) {
         char stage[DND_FS_LONG_PATH_LEN];
-        snprintf(stage, sizeof(stage), "%s/.dndin_%u_%u.tmp", DND_BACKUP_DATA_DIR,
-                 (unsigned)profile, (unsigned)i);
+        snprintf(
+            stage,
+            sizeof(stage),
+            "%s/.dndin_%u_%u.tmp",
+            DND_BACKUP_DATA_DIR,
+            (unsigned)profile,
+            (unsigned)i);
         storage_common_remove(storage, stage);
     }
     free(old_names);

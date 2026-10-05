@@ -57,9 +57,9 @@ void dndolphins_rules_character_apply_level_increase(
 }
 
 int8_t dndolphins_rules_character_initiative_modifier(const DndCharacter* character) {
-    return (int8_t)(dnd_rules_core_ability_modifier(
-                        character->ability_scores[DndAbilityDexterity]) +
-                    character->initiative_misc + dnd_rules_core_exhaustion_penalty(character));
+    return (
+        int8_t)(dnd_rules_core_ability_modifier(character->ability_scores[DndAbilityDexterity]) +
+                character->initiative_misc + dnd_rules_core_exhaustion_penalty(character));
 }
 
 int16_t dndolphins_rules_character_effective_speed(const DndCharacter* character) {
@@ -99,8 +99,8 @@ int16_t dndolphins_rules_character_spend_class_hit_die(
        class_level->hit_dice_current == 0U)
         return -1;
     uint8_t roll = dnd_rules_core_roll_die(class_level->hit_die);
-    int16_t healing = roll + dnd_rules_core_ability_modifier(
-                                 character->ability_scores[DndAbilityConstitution]);
+    int16_t healing =
+        roll + dnd_rules_core_ability_modifier(character->ability_scores[DndAbilityConstitution]);
     if(healing < 1) healing = 1;
     int16_t missing = character->hp_max - character->hp_current;
     int16_t regained = healing < missing ? healing : missing;

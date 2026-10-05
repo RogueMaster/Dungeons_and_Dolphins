@@ -8,7 +8,9 @@
 
 bool dnd_backup_storage_valid_directory(const char* path);
 bool dnd_backup_storage_export_bundle(
-    Storage* storage, uint32_t profile, const char* destination_dir);
+    Storage* storage,
+    uint32_t profile,
+    const char* destination_dir);
 bool dnd_backup_storage_restore_bundle(
     Storage* storage,
     uint32_t profile,

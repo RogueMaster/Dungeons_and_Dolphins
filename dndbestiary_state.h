@@ -48,10 +48,7 @@ uint16_t dndbestiary_state_recent_count(Storage* storage);
 bool dndbestiary_state_recent_at(Storage* storage, uint16_t index, char* id, size_t size);
 
 uint16_t dndbestiary_state_filter_count(Storage* storage);
-bool dndbestiary_state_filter_at(
-    Storage* storage,
-    uint16_t index,
-    DndBestiaryFilterPreset* output);
+bool dndbestiary_state_filter_at(Storage* storage, uint16_t index, DndBestiaryFilterPreset* output);
 bool dndbestiary_state_filter_save(Storage* storage, const DndBestiaryFilterPreset* preset);
 bool dndbestiary_state_filter_delete(Storage* storage, uint16_t index);
 

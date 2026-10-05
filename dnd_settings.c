@@ -5,8 +5,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#define DND_SETTINGS_PATH DND_CHARACTER_DATA_ROOT "/settings.txt"
-#define DND_SETTINGS_TEMP_PATH DND_CHARACTER_DATA_ROOT "/settings.tmp"
+#define DND_SETTINGS_PATH        DND_CHARACTER_DATA_ROOT "/settings.txt"
+#define DND_SETTINGS_TEMP_PATH   DND_CHARACTER_DATA_ROOT "/settings.tmp"
 #define DND_SETTINGS_BACKUP_PATH DND_CHARACTER_DATA_ROOT "/settings.bak"
 
 static bool dnd_settings_write_value_line(File* file, const char* key, uint8_t value) {
@@ -39,10 +39,7 @@ void dnd_settings_shared_defaults(DndSharedSettings* settings) {
     settings->homebrew = 1U;
 }
 
-static bool dnd_settings_apply_bool(
-    const char* line,
-    const char* key,
-    uint8_t* target) {
+static bool dnd_settings_apply_bool(const char* line, const char* key, uint8_t* target) {
     if(!line || !key || !target) return false;
     size_t key_length = strlen(key);
     size_t line_length = strlen(line);
@@ -111,8 +108,9 @@ bool dnd_settings_load_shared(Storage* storage, DndSharedSettings* settings) {
         if(!(found & DndSharedFoundDebug) &&
            dnd_settings_apply_bool(line, "Debug", &settings->debug))
             found |= DndSharedFoundDebug;
-        else if(!(found & DndSharedFoundHomebrew) &&
-                dnd_settings_apply_bool(line, "Homebrew", &settings->homebrew))
+        else if(
+            !(found & DndSharedFoundHomebrew) &&
+            dnd_settings_apply_bool(line, "Homebrew", &settings->homebrew))
             found |= DndSharedFoundHomebrew;
     }
     storage_file_close(file);
@@ -228,8 +226,7 @@ bool dnd_settings_save(Storage* storage, const DndSettings* settings) {
         if(had_live) storage_common_remove(storage, DND_SETTINGS_BACKUP_PATH);
         return true;
     }
-    if(had_live)
-        (void)storage_common_rename(storage, DND_SETTINGS_BACKUP_PATH, DND_SETTINGS_PATH);
+    if(had_live) (void)storage_common_rename(storage, DND_SETTINGS_BACKUP_PATH, DND_SETTINGS_PATH);
     storage_common_remove(storage, DND_SETTINGS_TEMP_PATH);
     return false;
 }

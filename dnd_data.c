@@ -163,8 +163,8 @@ static bool dnd_data_resize_spell_storage(DndCharacter* character, uint8_t next)
 bool dnd_data_reserve_spells(DndCharacter* character, uint8_t required) {
     if(required <= character->spell_capacity) return true;
     if(required > DND_RESIDENT_RECORD_LIMIT) return false;
-    uint8_t next = dnd_data_next_capacity(
-        character->spell_capacity, required, DND_RESIDENT_RECORD_LIMIT);
+    uint8_t next =
+        dnd_data_next_capacity(character->spell_capacity, required, DND_RESIDENT_RECORD_LIMIT);
     return dnd_data_resize_spell_storage(character, next);
 }
 
@@ -498,11 +498,13 @@ void dnd_data_sanitize(DndSaveData* data) {
     bool have_grapple = false;
     bool have_shove = false;
     for(uint8_t i = 0U; i < character->attack_template_count; ++i) {
-        have_grapple = have_grapple || character->attack_templates[i].type == DndAttackTemplateGrapple;
+        have_grapple = have_grapple ||
+                       character->attack_templates[i].type == DndAttackTemplateGrapple;
         have_shove = have_shove || character->attack_templates[i].type == DndAttackTemplateShove;
     }
     if(!have_grapple && character->attack_template_count < DND_MAX_ATTACK_TEMPLATES) {
-        DndAttackTemplate* grapple = &character->attack_templates[character->attack_template_count++];
+        DndAttackTemplate* grapple =
+            &character->attack_templates[character->attack_template_count++];
         memset(grapple, 0, sizeof(*grapple));
         dnd_data_copy(grapple->name, sizeof(grapple->name), "Grapple");
         grapple->type = DndAttackTemplateGrapple;
@@ -510,7 +512,8 @@ void dnd_data_sanitize(DndSaveData* data) {
         grapple->save_ability = DndAbilityStrength;
     }
     if(!have_shove && character->attack_template_count < DND_MAX_ATTACK_TEMPLATES) {
-        DndAttackTemplate* shove = &character->attack_templates[character->attack_template_count++];
+        DndAttackTemplate* shove =
+            &character->attack_templates[character->attack_template_count++];
         memset(shove, 0, sizeof(*shove));
         dnd_data_copy(shove->name, sizeof(shove->name), "Shove");
         shove->type = DndAttackTemplateShove;

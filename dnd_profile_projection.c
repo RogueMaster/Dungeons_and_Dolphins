@@ -284,13 +284,15 @@ static bool dnd_projection_load_common(
         }
         if(spellbook && !strcmp(key, "SpellSlotsCurrent")) {
             size_t count = dnd_projection_parse_numbers(value, n, DND_SLOT_COUNT);
-            for(size_t i = 0U; i < count; ++i) spellbook->spell_slots_current[i] = (uint8_t)n[i];
+            for(size_t i = 0U; i < count; ++i)
+                spellbook->spell_slots_current[i] = (uint8_t)n[i];
             if(count) recognized = true;
             continue;
         }
         if(spellbook && !strcmp(key, "SpellSlotsMax")) {
             size_t count = dnd_projection_parse_numbers(value, n, DND_SLOT_COUNT);
-            for(size_t i = 0U; i < count; ++i) spellbook->spell_slots_max[i] = (uint8_t)n[i];
+            for(size_t i = 0U; i < count; ++i)
+                spellbook->spell_slots_max[i] = (uint8_t)n[i];
             if(count) recognized = true;
             continue;
         }
@@ -479,7 +481,6 @@ bool dnd_profile_projection_save_inventory_owned(
     return ok;
 }
 
-
 static bool dnd_projection_write_u8_values(
     File* file,
     const char* key,
@@ -490,12 +491,8 @@ static bool dnd_projection_write_u8_values(
     int used = snprintf(line, sizeof(line), "%s=", key);
     if(used <= 0 || (size_t)used >= sizeof(line)) return false;
     for(size_t i = 0U; i < count; ++i) {
-        int written = snprintf(
-            line + used,
-            sizeof(line) - (size_t)used,
-            "%s%u",
-            i ? "," : "",
-            values[i]);
+        int written =
+            snprintf(line + used, sizeof(line) - (size_t)used, "%s%u", i ? "," : "", values[i]);
         if(written <= 0 || (size_t)written >= sizeof(line) - (size_t)used) return false;
         used += written;
     }

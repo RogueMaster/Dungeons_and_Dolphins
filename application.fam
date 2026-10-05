@@ -1,6 +1,6 @@
 # Suite release label. FAP's binary manifest stores numeric major/minor only.
-DND_RELEASE_VERSION = "4.19.1"
-DND_FAP_VERSION = (4, 19)
+DND_RELEASE_VERSION = "4.20.0"
+DND_FAP_VERSION = (4, 20)
 DND_RELEASE_DEFINES = [("DND_RELEASE_VERSION", '\\"' + DND_RELEASE_VERSION + '\\"')]
 
 App(

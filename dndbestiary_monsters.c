@@ -70,7 +70,7 @@ static bool dndbestiary_monsters_parse_i8(const char* text, int8_t* output) {
             return false;
         value = (uint16_t)(value * 10U + digit);
     }
-    *output = negative ? (value == 128U ? INT8_MIN : (int8_t)-(int16_t)value) : (int8_t)value;
+    *output = negative ? (value == 128U ? INT8_MIN : (int8_t) - (int16_t)value) : (int8_t)value;
     return true;
 }
 
@@ -485,8 +485,7 @@ static void dndbestiary_monsters_validate_paths(
             if(length > 2U && line[0] == '[' && line[length - 1U] == ']') {
                 if(active) {
                     ++section_total;
-                    if((present_fields & DndMonsterRequiredFields) ==
-                       DndMonsterRequiredFields)
+                    if((present_fields & DndMonsterRequiredFields) == DndMonsterRequiredFields)
                         ++valid_total;
                 }
                 active = true;
@@ -655,7 +654,7 @@ static bool dndbestiary_monsters_initiative_modifier_path(
                     if(!all_tens) {
                         int16_t delta = (int16_t)abilities[1] - 10;
                         fallback_modifier = delta >= 0 ? (int8_t)(delta / 2) :
-                                                         (int8_t)-((1 - delta) / 2);
+                                                         (int8_t) - ((1 - delta) / 2);
                         fallback_valid = true;
                     }
                 }
@@ -1289,10 +1288,8 @@ bool dndbestiary_monsters_migrate_legacy_custom(Storage* storage, uint16_t* copi
     return true;
 }
 
-static bool dndbestiary_monsters_format_summary(
-    const DndMonsterSummary* summary,
-    char* line,
-    size_t size) {
+static bool
+    dndbestiary_monsters_format_summary(const DndMonsterSummary* summary, char* line, size_t size) {
     int length = snprintf(
         line,
         size,
@@ -1310,8 +1307,7 @@ static bool dndbestiary_monsters_format_summary(
     return length > 0 && (size_t)length < size;
 }
 
-static bool
-    dndbestiary_monsters_write_block_section(File* block, const DndMonsterDetail* detail) {
+static bool dndbestiary_monsters_write_block_section(File* block, const DndMonsterDetail* detail) {
     bool ok = true;
     char line[MONSTER_LINE_LEN];
 #define MONSTER_WRITE_FIELD(key, value)                                \
@@ -1361,7 +1357,7 @@ static bool
         int8_t initiative = detail->initiative_modifier;
         if(!detail->initiative_present) {
             int16_t delta = (int16_t)detail->abilities[1] - 10;
-            initiative = delta >= 0 ? (int8_t)(delta / 2) : (int8_t)-((1 - delta) / 2);
+            initiative = delta >= 0 ? (int8_t)(delta / 2) : (int8_t) - ((1 - delta) / 2);
         }
         int length = snprintf(line, sizeof(line), "Initiative=%d\n", initiative);
         ok = length > 0 && (size_t)length < sizeof(line) &&
@@ -1694,8 +1690,7 @@ static bool dndbestiary_monsters_plan_add(
         if(!allow_repeats || plan->quantities[(uint8_t)existing] == UINT8_MAX) return false;
         ++plan->quantities[(uint8_t)existing];
     } else {
-        if(plan->count >= maximum_types || plan->count >= DND_MONSTER_ENCOUNTER_MAX)
-            return false;
+        if(plan->count >= maximum_types || plan->count >= DND_MONSTER_ENCOUNTER_MAX) return false;
         plan->candidates[plan->count] = candidate_index;
         plan->quantities[plan->count++] = 1U;
     }
@@ -1720,8 +1715,7 @@ bool dndbestiary_monsters_generate(
     enum {
         MonsterCandidateWindow = 16U
     };
-    DndMonsterSummary* candidates =
-        malloc(MonsterCandidateWindow * sizeof(DndMonsterSummary));
+    DndMonsterSummary* candidates = malloc(MonsterCandidateWindow * sizeof(DndMonsterSummary));
     if(!candidates) return false;
     MonsterGenerateFilter filter = {
         .budget = output->budget,
@@ -1797,8 +1791,7 @@ void dndbestiary_monsters_simulate(
         else
             output->spent += record_xp;
     }
-    output->low_budget =
-        dndbestiary_monsters_xp_budget(party_level, party_size, DndEncounterLow);
+    output->low_budget = dndbestiary_monsters_xp_budget(party_level, party_size, DndEncounterLow);
     output->moderate_budget =
         dndbestiary_monsters_xp_budget(party_level, party_size, DndEncounterModerate);
     output->high_budget =
@@ -1807,8 +1800,7 @@ void dndbestiary_monsters_simulate(
     if(output->spent > output->low_budget) output->classification = DndEncounterModerate;
     if(output->spent > output->moderate_budget) output->classification = DndEncounterHigh;
     encounter->spent = output->spent;
-    encounter->budget = output->classification == DndEncounterLow ? output->low_budget :
-                        output->classification == DndEncounterModerate ?
-                                                                       output->moderate_budget :
-                                                                       output->high_budget;
+    encounter->budget = output->classification == DndEncounterLow      ? output->low_budget :
+                        output->classification == DndEncounterModerate ? output->moderate_budget :
+                                                                         output->high_budget;
 }

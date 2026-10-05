@@ -23,17 +23,12 @@ typedef struct {
 } DndProgressReader;
 
 void dndolphins_progression_store_feature_path(char* out, size_t size, uint32_t profile) {
-    snprintf(
-        out, size, "%s/feats_%lu.txt", DND_CHARACTER_DATA_ROOT, (unsigned long)profile);
+    snprintf(out, size, "%s/feats_%lu.txt", DND_CHARACTER_DATA_ROOT, (unsigned long)profile);
 }
 
 void dndolphins_progression_store_applied_path(char* out, size_t size, uint32_t profile) {
     snprintf(
-        out,
-        size,
-        "%s/appliedgrants_%lu.txt",
-        DND_CHARACTER_DATA_ROOT,
-        (unsigned long)profile);
+        out, size, "%s/appliedgrants_%lu.txt", DND_CHARACTER_DATA_ROOT, (unsigned long)profile);
 }
 
 static void dndolphins_progression_store_work_path(
@@ -43,13 +38,7 @@ static void dndolphins_progression_store_work_path(
     const char* kind,
     const char* suffix) {
     snprintf(
-        out,
-        size,
-        "%s/%s_%lu.%s",
-        DND_CHARACTER_DATA_ROOT,
-        kind,
-        (unsigned long)profile,
-        suffix);
+        out, size, "%s/%s_%lu.%s", DND_CHARACTER_DATA_ROOT, kind, (unsigned long)profile, suffix);
 }
 
 static bool dndolphins_progression_store_write_raw(File* file, const char* text) {
@@ -228,11 +217,9 @@ static bool dndolphins_progression_store_parse_feature(char* line, DndFeature* f
     int32_t values[7];
     if(!dndolphins_progression_store_parse_i32(fields[2], INT16_MIN, INT16_MAX, &values[0]) ||
        !dndolphins_progression_store_parse_i32(fields[3], INT16_MIN, INT16_MAX, &values[1]) ||
-       !dndolphins_progression_store_parse_i32(
-           fields[4], 0, DND_MAX_CLASSES - 1U, &values[2]) ||
+       !dndolphins_progression_store_parse_i32(fields[4], 0, DND_MAX_CLASSES - 1U, &values[2]) ||
        !dndolphins_progression_store_parse_i32(fields[5], 0, 20, &values[3]) ||
-       !dndolphins_progression_store_parse_i32(
-           fields[6], 0, DndRechargeCount - 1U, &values[4]) ||
+       !dndolphins_progression_store_parse_i32(fields[6], 0, DndRechargeCount - 1U, &values[4]) ||
        !dndolphins_progression_store_parse_i32(
            fields[7], 0, DndResourceFormulaCount - 1U, &values[5]) ||
        !dndolphins_progression_store_parse_i32(fields[8], 0, DndAbilityCharisma, &values[6]))
@@ -877,8 +864,7 @@ static bool dndolphins_progression_store_copy_one(
     char backup[DND_PROGRESS_PATH_LEN];
     int tn = snprintf(temporary, sizeof(temporary), "%s.ptmp", destination);
     int bn = snprintf(backup, sizeof(backup), "%s.pbak", destination);
-    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) ||
-       (size_t)bn >= sizeof(backup))
+    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) || (size_t)bn >= sizeof(backup))
         return false;
     storage_common_remove(storage, temporary);
 

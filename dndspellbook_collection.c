@@ -21,28 +21,25 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TAG                                            "DndSpellbook"
-#define DNDSPELLBOOK_COLLECTION_VIEW_MAIN              0U
-#define DNDSPELLBOOK_COLLECTION_VIEW_TEXT              1U
-#define DNDSPELLBOOK_COLLECTION_VIEW_NUMBER            2U
-#define DNDSPELLBOOK_COLLECTION_ROWS                   5U
-#define DNDSPELLBOOK_COLLECTION_SEARCH_MIN_CHARS              3U
-#define DNDSPELLBOOK_COLLECTION_CATALOG_PAGE           10U
-#define DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_PAGES   64U
-#define DNDSPELLBOOK_COLLECTION_LINE_MAX               256U
-#define DNDSPELLBOOK_COLLECTION_CATALOG_READ_BUFFER    128U
-#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG \
-    "/ext/apps_assets/dndolphins/catalogs/spells.txt"
+#define TAG                                          "DndSpellbook"
+#define DNDSPELLBOOK_COLLECTION_VIEW_MAIN            0U
+#define DNDSPELLBOOK_COLLECTION_VIEW_TEXT            1U
+#define DNDSPELLBOOK_COLLECTION_VIEW_NUMBER          2U
+#define DNDSPELLBOOK_COLLECTION_ROWS                 5U
+#define DNDSPELLBOOK_COLLECTION_SEARCH_MIN_CHARS     3U
+#define DNDSPELLBOOK_COLLECTION_CATALOG_PAGE         10U
+#define DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_PAGES 64U
+#define DNDSPELLBOOK_COLLECTION_LINE_MAX             256U
+#define DNDSPELLBOOK_COLLECTION_CATALOG_READ_BUFFER  128U
+#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG        "/ext/apps_assets/dndolphins/catalogs/spells.txt"
 #define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL \
     "/ext/apps_assets/dndolphins/catalogs/spells_All.txt"
-#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_LEGACY \
-    APP_ASSETS_PATH("catalogs/spells.txt")
-#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL_LEGACY \
-    APP_ASSETS_PATH("catalogs/spells_All.txt")
-#define DNDSPELLBOOK_COLLECTION_CATALOG_SOURCE_ALL 0x80000000UL
-#define DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_MASK    0x7FFFFFFFUL
-#define DNDSPELLBOOK_COLLECTION_SORT_LINE_MAX          1280U
-#define DNDSPELLBOOK_COLLECTION_SORT_COPY_BUFFER       256U
+#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_LEGACY     APP_ASSETS_PATH("catalogs/spells.txt")
+#define DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL_LEGACY APP_ASSETS_PATH("catalogs/spells_All.txt")
+#define DNDSPELLBOOK_COLLECTION_CATALOG_SOURCE_ALL       0x80000000UL
+#define DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_MASK      0x7FFFFFFFUL
+#define DNDSPELLBOOK_COLLECTION_SORT_LINE_MAX            1280U
+#define DNDSPELLBOOK_COLLECTION_SORT_COPY_BUFFER         256U
 
 typedef enum {
     DndSpellbookCollectionScreenNoCharacter,
@@ -728,8 +725,8 @@ static bool dndspellbook_collection_load_page(DndSpellbookCollectionApp* app, ui
         &app->record_offset_valid_pages);
     if(ok) {
         dndspellbook_collection_clear_page(&app->data.character);
-    free(app->search_matches);
-    app->search_matches = NULL;
+        free(app->search_matches);
+        app->search_matches = NULL;
         app->data.character.spell_storage = io->spell_storage;
         app->data.character.spells = io->spells;
         app->data.character.spell_known = io->spell_known;
@@ -1280,7 +1277,8 @@ static bool dndspellbook_collection_sort_spellbook(DndSpellbookCollectionApp* ap
 }
 
 static bool dndspellbook_collection_use_all_catalog(const DndSpellbookCollectionApp* app);
-static uint32_t dndspellbook_collection_catalog_offset_encode(bool all_catalog, uint32_t raw_offset);
+static uint32_t
+    dndspellbook_collection_catalog_offset_encode(bool all_catalog, uint32_t raw_offset);
 
 static void dndspellbook_collection_reset_catalog_offsets(DndSpellbookCollectionApp* app) {
     if(!app) return;
@@ -1319,9 +1317,8 @@ static void dndspellbook_collection_status_prefilter_mark(uint8_t* bits, const c
     bits[second >> 3U] |= (uint8_t)(1U << (second & 7U));
 }
 
-static bool dndspellbook_collection_status_prefilter_maybe_has(
-    const uint8_t* bits,
-    const char* name) {
+static bool
+    dndspellbook_collection_status_prefilter_maybe_has(const uint8_t* bits, const char* name) {
     uint32_t hash = dndspellbook_collection_name_hash(name);
     uint16_t first = (uint16_t)(hash & 1023U);
     uint16_t second = (uint16_t)(((hash >> 16U) ^ (hash * 33U)) & 1023U);
@@ -1343,7 +1340,8 @@ static bool dndspellbook_collection_status_prefilter_visitor(
     DndSpellbookStatusPrefilterContext* prefilter = context;
     if(!prefilter || !prefilter->bits || !spell) return true;
     bool matched = prefilter->filter == 1U ? spell->prepared != 0U :
-                   prefilter->filter == 2U ? known != 0U : always_prepared != 0U;
+                   prefilter->filter == 2U ? known != 0U :
+                                             always_prepared != 0U;
     if(matched) dndspellbook_collection_status_prefilter_mark(prefilter->bits, spell->name);
     return true;
 }
@@ -1441,17 +1439,17 @@ static bool dndspellbook_collection_use_all_catalog(const DndSpellbookCollection
     return app && app->settings.catalog_all && app->catalog_all_available;
 }
 
-static const char* dndspellbook_collection_catalog_path(
-    const DndSpellbookCollectionApp* app,
-    bool all_catalog) {
+static const char*
+    dndspellbook_collection_catalog_path(const DndSpellbookCollectionApp* app, bool all_catalog) {
     if(app && app->canonical_catalog_available)
         return all_catalog ? DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL :
-                         DNDSPELLBOOK_COLLECTION_SPELL_CATALOG;
+                             DNDSPELLBOOK_COLLECTION_SPELL_CATALOG;
     return all_catalog ? DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL_LEGACY :
-                     DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_LEGACY;
+                         DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_LEGACY;
 }
 
-static uint32_t dndspellbook_collection_catalog_offset_encode(bool all_catalog, uint32_t raw_offset) {
+static uint32_t
+    dndspellbook_collection_catalog_offset_encode(bool all_catalog, uint32_t raw_offset) {
     return (raw_offset & DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_MASK) |
            (all_catalog ? DNDSPELLBOOK_COLLECTION_CATALOG_SOURCE_ALL : 0U);
 }
@@ -1575,7 +1573,8 @@ static bool dndspellbook_collection_load_catalog(DndSpellbookCollectionApp* app)
                 uint16_t next_page = matched / DNDSPELLBOOK_COLLECTION_CATALOG_PAGE;
                 if(next_page < DNDSPELLBOOK_COLLECTION_CATALOG_OFFSET_PAGES) {
                     app->catalog_page_offsets[next_page] =
-                        dndspellbook_collection_catalog_offset_encode(all_catalog, reader.raw_offset);
+                        dndspellbook_collection_catalog_offset_encode(
+                            all_catalog, reader.raw_offset);
                     if(app->catalog_offset_valid_pages <= next_page)
                         app->catalog_offset_valid_pages = (uint8_t)(next_page + 1U);
                 }
@@ -1871,15 +1870,13 @@ static void dndspellbook_collection_format_detail(
         break;
     case 16:
         dndspellbook_collection_copy(
-            out, size,
-            spell->favorite ? "Favorite: Yes" : "Favorite: No");
+            out, size, spell->favorite ? "Favorite: Yes" : "Favorite: No");
         break;
     default:
         dndspellbook_collection_copy(out, size, "Delete spell");
         break;
     }
 }
-
 
 static uint8_t dndspellbook_magic_total_level(const DndSpellbookCharacterState* character) {
     if(!character) return 1U;
@@ -1898,13 +1895,14 @@ static uint8_t dndspellbook_magic_proficiency_bonus(const DndSpellbookCharacterS
 
 static int8_t dndspellbook_magic_ability_modifier(int8_t score) {
     int16_t delta = (int16_t)score - 10;
-    return delta >= 0 ? (int8_t)(delta / 2) : (int8_t)-(((-delta) + 1) / 2);
+    return delta >= 0 ? (int8_t)(delta / 2) : (int8_t) - (((-delta) + 1) / 2);
 }
 
 static bool dndspellbook_magic_has_wizard(const DndSpellbookCharacterState* character) {
     if(!character) return false;
     for(uint8_t i = 0U; i < character->class_count && i < DND_MAX_CLASSES; ++i)
-        if(!strcmp(character->classes[i].name, "Wizard") && character->classes[i].level) return true;
+        if(!strcmp(character->classes[i].name, "Wizard") && character->classes[i].level)
+            return true;
     return false;
 }
 
@@ -1914,7 +1912,8 @@ static int8_t dndspellbook_magic_attack_modifier(const DndSpellbookCharacterStat
                           character->spellcasting_ability :
                           DndAbilityIntelligence;
     return (int8_t)(dndspellbook_magic_ability_modifier(character->ability_scores[ability]) +
-                    dndspellbook_magic_proficiency_bonus(character) + character->spell_attack_misc);
+                    dndspellbook_magic_proficiency_bonus(character) +
+                    character->spell_attack_misc);
 }
 
 static int8_t dndspellbook_magic_save_dc(const DndSpellbookCharacterState* character) {
@@ -1926,9 +1925,8 @@ static int8_t dndspellbook_magic_save_dc(const DndSpellbookCharacterState* chara
                     dndspellbook_magic_proficiency_bonus(character) + character->spell_save_misc);
 }
 
-static uint16_t dndspellbook_magic_class_knowable(
-    const DndClassLevel* class_level,
-    uint16_t granted_count) {
+static uint16_t
+    dndspellbook_magic_class_knowable(const DndClassLevel* class_level, uint16_t granted_count) {
     if(!class_level || class_level->spellcasting_mode == DndSpellcastingNone) return granted_count;
     uint16_t base = class_level->cantrip_limit;
     if(!strcmp(class_level->name, "Wizard"))
@@ -1983,11 +1981,13 @@ static bool dndspellbook_magic_save(DndSpellbookCollectionApp* app) {
 }
 
 static void dndspellbook_collection_draw_magic(Canvas* canvas, DndSpellbookCollectionApp* app) {
-    static const char* const abilities[DND_ABILITY_COUNT] = {"STR", "DEX", "CON", "INT", "WIS", "CHA"};
+    static const char* const abilities[DND_ABILITY_COUNT] = {
+        "STR", "DEX", "CON", "INT", "WIS", "CHA"};
     DndSpellbookCharacterState* character = &app->data.character;
     char rows[17][48];
     const char* row_ptrs[17];
-    for(uint8_t i = 0U; i < 17U; ++i) row_ptrs[i] = rows[i];
+    for(uint8_t i = 0U; i < 17U; ++i)
+        row_ptrs[i] = rows[i];
     dndspellbook_collection_copy(rows[0], sizeof(rows[0]), "Open Spellbook");
     uint8_t ability = character->spellcasting_ability < DND_ABILITY_COUNT ?
                           character->spellcasting_ability :
@@ -2120,7 +2120,8 @@ static void dndspellbook_magic_input(DndSpellbookCollectionApp* app, const Input
             uint8_t level = (uint8_t)(app->selection - 7U);
             int16_t value = (int16_t)character->spell_slots_current[level] + delta;
             if(value < 0) value = 0;
-            if(value > character->spell_slots_max[level]) value = character->spell_slots_max[level];
+            if(value > character->spell_slots_max[level])
+                value = character->spell_slots_max[level];
             character->spell_slots_current[level] = (uint8_t)value;
         } else {
             return;
@@ -2129,8 +2130,8 @@ static void dndspellbook_magic_input(DndSpellbookCollectionApp* app, const Input
         return;
     }
     if(event->type == InputTypeLong &&
-       (event->key == InputKeyLeft || event->key == InputKeyRight) &&
-       app->selection >= 8U && app->selection <= 16U) {
+       (event->key == InputKeyLeft || event->key == InputKeyRight) && app->selection >= 8U &&
+       app->selection <= 16U) {
         int8_t delta = event->key == InputKeyRight ? 1 : -1;
         uint8_t level = (uint8_t)(app->selection - 7U);
         int16_t value = (int16_t)character->spell_slots_max[level] + delta;
@@ -2176,8 +2177,8 @@ static void dndspellbook_magic_input(DndSpellbookCollectionApp* app, const Input
             dndspellbook_collection_set_status(
                 app,
                 !dndspellbook_magic_has_wizard(character) ? "Arcane Recovery: no Wizard" :
-                character->arcane_recovery_used ? "Arcane Recovery already used" :
-                                                  "Use Short Rest in DNDCombat");
+                character->arcane_recovery_used           ? "Arcane Recovery already used" :
+                                                            "Use Short Rest in DNDCombat");
         } else if(app->selection >= 8U && app->selection <= 16U) {
             uint8_t level = (uint8_t)(app->selection - 7U);
             (void)dndspellbook_magic_begin_number(
@@ -2251,8 +2252,7 @@ static bool dndspellbook_collection_build_search(DndSpellbookCollectionApp* app)
     dndspellbook_collection_clear_search(app);
     DndSpellbookSearchContext count = {.term = app->search_term};
     if(!dnd_storage_visit_spells(
-           app->storage, app->profile,
-           dndspellbook_collection_search_count_visitor, &count, NULL))
+           app->storage, app->profile, dndspellbook_collection_search_count_visitor, &count, NULL))
         return false;
     if(!count.count) return true;
     if(count.count > 512U) count.count = 512U;
@@ -2265,8 +2265,11 @@ static bool dndspellbook_collection_build_search(DndSpellbookCollectionApp* app)
         .count = 0U,
     };
     if(!dnd_storage_visit_spells(
-           app->storage, app->profile,
-           dndspellbook_collection_search_collect_visitor, &collect, NULL)) {
+           app->storage,
+           app->profile,
+           dndspellbook_collection_search_collect_visitor,
+           &collect,
+           NULL)) {
         dndspellbook_collection_clear_search(app);
         return false;
     }
@@ -2274,9 +2277,7 @@ static bool dndspellbook_collection_build_search(DndSpellbookCollectionApp* app)
     return true;
 }
 
-static void dndspellbook_collection_draw_search(
-    Canvas* canvas,
-    DndSpellbookCollectionApp* app) {
+static void dndspellbook_collection_draw_search(Canvas* canvas, DndSpellbookCollectionApp* app) {
     char title[32];
     snprintf(title, sizeof(title), "Search: %.20s", app->search_term);
     dndspellbook_collection_draw_header(canvas, app, title, app->status);
@@ -2296,7 +2297,8 @@ static void dndspellbook_collection_draw_search(
             dndspellbook_collection_source_tag(&app->data.character, spell, source_tag);
             char status_mark = app->data.character.spell_always_prepared[local] ? 'A' :
                                spell->prepared                                  ? 'P' :
-                               app->data.character.spell_known[local]           ? 'K' : '-';
+                               app->data.character.spell_known[local]           ? 'K' :
+                                                                                  '-';
             snprintf(text, sizeof(text), "%c L%u %.42s", status_mark, spell->level, spell->name);
         } else {
             dndspellbook_collection_copy(text, sizeof(text), "Read error");
@@ -2970,9 +2972,7 @@ static bool dndspellbook_collection_input(InputEvent* event, void* context) {
             (event->type == InputTypeShort || event->type == InputTypeLong) &&
             app->selection == 0U)
             (void)dndspellbook_collection_add_blank(app);
-        else if(
-            event->key == InputKeyOk && event->type == InputTypeShort &&
-            app->selection == magic) {
+        else if(event->key == InputKeyOk && event->type == InputTypeShort && app->selection == magic) {
             app->magic_direct_launch = 0U;
             app->magic_return_selection = app->selection;
             app->magic_return_scroll = app->scroll;
@@ -3016,13 +3016,12 @@ static bool dndspellbook_collection_input(InputEvent* event, void* context) {
         dndspellbook_magic_input(app, event);
     } else if(app->screen == DndSpellbookCollectionScreenSearch) {
         if(move && event->key == InputKeyUp && app->search_match_count) {
-            app->search_selection =
-                app->search_selection ? app->search_selection - 1U :
-                                        app->search_match_count - 1U;
+            app->search_selection = app->search_selection ? app->search_selection - 1U :
+                                                            app->search_match_count - 1U;
         } else if(move && event->key == InputKeyDown && app->search_match_count) {
-            app->search_selection =
-                app->search_selection + 1U < app->search_match_count ?
-                    app->search_selection + 1U : 0U;
+            app->search_selection = app->search_selection + 1U < app->search_match_count ?
+                                        app->search_selection + 1U :
+                                        0U;
         } else if(event->type == InputTypeLong && event->key == InputKeyDown) {
             app->filter_return_screen = DndSpellbookCollectionScreenList;
             dndspellbook_collection_begin_text(
@@ -3038,11 +3037,9 @@ static bool dndspellbook_collection_input(InputEvent* event, void* context) {
                 app->screen = DndSpellbookCollectionScreenDetail;
             }
         }
-        if(app->search_selection < app->search_scroll)
-            app->search_scroll = app->search_selection;
+        if(app->search_selection < app->search_scroll) app->search_scroll = app->search_selection;
         if(app->search_selection >= app->search_scroll + DNDSPELLBOOK_COLLECTION_ROWS)
-            app->search_scroll =
-                app->search_selection - (DNDSPELLBOOK_COLLECTION_ROWS - 1U);
+            app->search_scroll = app->search_selection - (DNDSPELLBOOK_COLLECTION_ROWS - 1U);
     } else if(app->screen == DndSpellbookCollectionScreenDetail) {
         uint8_t count = dndspellbook_collection_detail_count();
         if(move && event->key == InputKeyUp)
@@ -3171,13 +3168,13 @@ static DndSpellbookCollectionApp* dndspellbook_collection_alloc(const char* args
     if(!dnd_settings_load(app->storage, &app->settings)) dnd_settings_defaults(&app->settings);
     app->canonical_catalog_available =
         storage_file_exists(app->storage, DNDSPELLBOOK_COLLECTION_SPELL_CATALOG) ? 1U : 0U;
-    app->catalog_all_available =
-        storage_file_exists(
-            app->storage,
-            app->canonical_catalog_available ? DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL :
-                                               DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL_LEGACY) ?
-            1U :
-            0U;
+    app->catalog_all_available = storage_file_exists(
+                                     app->storage,
+                                     app->canonical_catalog_available ?
+                                         DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL :
+                                         DNDSPELLBOOK_COLLECTION_SPELL_CATALOG_ALL_LEGACY) ?
+                                     1U :
+                                     0U;
 
     /* Reserve the complete fixed UI/runtime footprint before character and spell
        parsing can make variable heap allocations. This mirrors Adventure's startup

@@ -7,14 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DNDINVENTORY_DEFAULT_CLASS_EQUIPMENT APP_ASSETS_PATH("equipment/default_class.txt")
-#define DNDINVENTORY_DEFAULT_CLASS_EQUIPMENT_ALL \
-    APP_ASSETS_PATH("equipment/default_class_All.txt")
-#define DNDINVENTORY_DEFAULT_RACE_EQUIPMENT APP_ASSETS_PATH("equipment/default_race.txt")
-#define DNDINVENTORY_DEFAULT_BACKGROUND_EQUIPMENT APP_ASSETS_PATH("equipment/default_background.txt")
+#define DNDINVENTORY_DEFAULT_CLASS_EQUIPMENT     APP_ASSETS_PATH("equipment/default_class.txt")
+#define DNDINVENTORY_DEFAULT_CLASS_EQUIPMENT_ALL APP_ASSETS_PATH("equipment/default_class_All.txt")
+#define DNDINVENTORY_DEFAULT_RACE_EQUIPMENT      APP_ASSETS_PATH("equipment/default_race.txt")
+#define DNDINVENTORY_DEFAULT_BACKGROUND_EQUIPMENT \
+    APP_ASSETS_PATH("equipment/default_background.txt")
 #define DNDINVENTORY_DEFAULT_BACKGROUND_EQUIPMENT_ALL \
     APP_ASSETS_PATH("equipment/default_background_All.txt")
-#define DNDINVENTORY_DEFAULT_TRINKETS APP_ASSETS_PATH("equipment/trinkets.txt")
+#define DNDINVENTORY_DEFAULT_TRINKETS     APP_ASSETS_PATH("equipment/trinkets.txt")
 #define DNDINVENTORY_DEFAULT_TRINKETS_ALL APP_ASSETS_PATH("equipment/trinkets_All.txt")
 
 static const char* dndinventory_items_catalog_asset(
@@ -120,7 +120,10 @@ bool dndinventory_items_initialize_inventory(
         snprintf(trinket_key, sizeof(trinket_key), "%u", trinket_roll);
         DndDolphinsItemSeedAsset fallback = {
             .path = dndinventory_items_catalog_asset(
-                storage, &settings, DNDINVENTORY_DEFAULT_TRINKETS, DNDINVENTORY_DEFAULT_TRINKETS_ALL),
+                storage,
+                &settings,
+                DNDINVENTORY_DEFAULT_TRINKETS,
+                DNDINVENTORY_DEFAULT_TRINKETS_ALL),
             .match = trinket_key,
         };
         created = false;

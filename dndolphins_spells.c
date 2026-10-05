@@ -21,8 +21,7 @@ static bool dndolphins_spells_count_record(
     (void)free_casts_current;
     (void)free_casts_max;
     DndDolphinsSpellCountContext* count_context = context;
-    if(!count_context || !count_context->counts || !spell ||
-       spell->class_index >= DND_MAX_CLASSES)
+    if(!count_context || !count_context->counts || !spell || spell->class_index >= DND_MAX_CLASSES)
         return true;
     uint8_t class_index = spell->class_index;
     if(known && count_context->counts->known[class_index] < UINT16_MAX)
@@ -56,9 +55,8 @@ bool dndolphins_spells_class_counts(
         storage, profile, dndolphins_spells_count_record, &context, total_count);
 }
 
-uint8_t dndolphins_spells_casting_ability_for(
-    const DndCharacter* character,
-    const DndSpell* spell) {
+uint8_t
+    dndolphins_spells_casting_ability_for(const DndCharacter* character, const DndSpell* spell) {
     if(spell) {
         uint8_t class_index = spell->class_index;
         if(class_index < character->class_count &&
@@ -66,14 +64,12 @@ uint8_t dndolphins_spells_casting_ability_for(
            character->classes[class_index].spellcasting_ability < DND_ABILITY_COUNT)
             return character->classes[class_index].spellcasting_ability;
     }
-    return character->spellcasting_ability < DND_ABILITY_COUNT ?
-               character->spellcasting_ability :
-               DndAbilityIntelligence;
+    return character->spellcasting_ability < DND_ABILITY_COUNT ? character->spellcasting_ability :
+                                                                 DndAbilityIntelligence;
 }
 
-int8_t dndolphins_spells_attack_modifier_for(
-    const DndCharacter* character,
-    const DndSpell* spell) {
+int8_t
+    dndolphins_spells_attack_modifier_for(const DndCharacter* character, const DndSpell* spell) {
     uint8_t ability = dndolphins_spells_casting_ability_for(character, spell);
     return (int8_t)(dnd_rules_core_ability_modifier(character->ability_scores[ability]) +
                     dnd_rules_core_proficiency_bonus(character) + character->spell_attack_misc +
@@ -416,7 +412,7 @@ bool dndolphins_spells_apply_level_progression(DndCharacter* character, uint8_t 
         }
     } else if(
         mode == DndSpellcastingNone && (dndolphins_spells_class_name_is(c, "Fighter") ||
-                                           dndolphins_spells_class_name_is(c, "Rogue"))) {
+                                        dndolphins_spells_class_name_is(c, "Rogue"))) {
         if(c->cantrip_limit) {
             c->cantrip_limit = 0U;
             changed = true;
@@ -563,7 +559,7 @@ uint8_t dndolphins_spells_build_cast_options(
     uint8_t count = 0U;
     bool normal_cast =
         dndolphins_spells_normal_combat_cast_allowed(character, spell, known, always_prepared);
-#define DND_ADD_CAST_OPTION(lvl, kind, cls)  \
+#define DND_ADD_CAST_OPTION(lvl, kind, cls)     \
     do {                                        \
         if(options && count < capacity) {       \
             options[count].level = (lvl);       \
@@ -577,8 +573,7 @@ uint8_t dndolphins_spells_build_cast_options(
         DND_ADD_CAST_OPTION(0U, DndSpellCastCantrip, spell->class_index);
         return count;
     }
-    if(free_casts_current)
-        DND_ADD_CAST_OPTION(spell->level, DndSpellCastFree, spell->class_index);
+    if(free_casts_current) DND_ADD_CAST_OPTION(spell->level, DndSpellCastFree, spell->class_index);
     if(!normal_cast) return count;
     for(uint8_t level = spell->level; level < DND_SLOT_COUNT; ++level)
         if(character->spell_slots_current[level])
@@ -695,9 +690,9 @@ static bool dndolphins_spells_utility_spell_index_visitor(
         dnd_rules_core_total_level(scan->character),
         ability_modifier,
         &damage);
-    bool attack_roll = mapped &&
-        (damage.resolution == DndSpellResolutionAttack ||
-         damage.secondary_resolution == DndSpellResolutionAttack || damage.attack_rolls);
+    bool attack_roll = mapped && (damage.resolution == DndSpellResolutionAttack ||
+                                  damage.secondary_resolution == DndSpellResolutionAttack ||
+                                  damage.attack_rolls);
     if(attack_roll) return true;
     if(scan->count >= scan->start && scan->count - scan->start < scan->capacity)
         scan->indices[scan->count - scan->start] = logical_index;

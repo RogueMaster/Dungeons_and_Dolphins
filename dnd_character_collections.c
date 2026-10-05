@@ -23,21 +23,13 @@ static void dnd_character_copy(char* output, size_t size, const char* input) {
 void dnd_character_languages_path(char* output, size_t size, uint32_t profile) {
     if(!output || !size) return;
     snprintf(
-        output,
-        size,
-        "%s/languages_%lu.txt",
-        DND_CHARACTER_DATA_ROOT,
-        (unsigned long)profile);
+        output, size, "%s/languages_%lu.txt", DND_CHARACTER_DATA_ROOT, (unsigned long)profile);
 }
 
 void dnd_character_proficiencies_path(char* output, size_t size, uint32_t profile) {
     if(!output || !size) return;
     snprintf(
-        output,
-        size,
-        "%s/proficiencies_%lu.txt",
-        DND_CHARACTER_DATA_ROOT,
-        (unsigned long)profile);
+        output, size, "%s/proficiencies_%lu.txt", DND_CHARACTER_DATA_ROOT, (unsigned long)profile);
 }
 
 static bool dnd_character_append_line(

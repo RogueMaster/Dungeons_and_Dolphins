@@ -30,14 +30,11 @@ typedef struct {
     uint16_t granted[DND_MAX_CLASSES];
 } DndDolphinsSpellClassCounts;
 
-uint8_t dndolphins_spells_casting_ability_for(
-    const DndCharacter* character,
-    const DndSpell* spell);
+uint8_t
+    dndolphins_spells_casting_ability_for(const DndCharacter* character, const DndSpell* spell);
 int8_t dndolphins_spells_attack_modifier(const DndCharacter* character);
 int8_t dndolphins_spells_save_dc(const DndCharacter* character);
-int8_t dndolphins_spells_attack_modifier_for(
-    const DndCharacter* character,
-    const DndSpell* spell);
+int8_t dndolphins_spells_attack_modifier_for(const DndCharacter* character, const DndSpell* spell);
 int8_t dndolphins_spells_save_dc_for(const DndCharacter* character, const DndSpell* spell);
 
 void dndolphins_spells_recalculate_shared_slots(

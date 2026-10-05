@@ -23,21 +23,21 @@
 #define DND_INITIATIVE_LAUNCH_FROM_COMBAT      "from=combat"
 #define DND_INITIATIVE_LAUNCH_FROM_BESTIARY    "from=bestiary"
 #define DND_BESTIARY_LAUNCH_FROM_INITIATIVE    "from=initiative;monster="
-#define DNDOLPHINS_FAP_PATH                   "/ext/apps/Games/dndolphins.fap"
-#define DNDJOURNAL_FAP_PATH                   "/ext/apps/Games/dndjournal.fap"
-#define DNDADVENTURE_FAP_PATH                 "/ext/apps/Games/dndadventure.fap"
-#define DNDINITIATIVE_FAP_PATH                "/ext/apps/Games/dndinitiative.fap"
-#define DNDCOMBAT_FAP_PATH                    "/ext/apps/Games/dndcombat.fap"
-#define DNDGRANTS_FAP_PATH                    "/ext/apps/Games/dndgrants.fap"
-#define DNDINVENTORY_FAP_PATH                 "/ext/apps/Games/dndinventory.fap"
-#define DNDSPELLBOOK_FAP_PATH                 "/ext/apps/Games/dndspellbook.fap"
-#define DNDBESTIARY_FAP_PATH                  "/ext/apps/Games/dndbestiary.fap"
+#define DNDOLPHINS_FAP_PATH                    "/ext/apps/Games/dndolphins.fap"
+#define DNDJOURNAL_FAP_PATH                    "/ext/apps/Games/dndjournal.fap"
+#define DNDADVENTURE_FAP_PATH                  "/ext/apps/Games/dndadventure.fap"
+#define DNDINITIATIVE_FAP_PATH                 "/ext/apps/Games/dndinitiative.fap"
+#define DNDCOMBAT_FAP_PATH                     "/ext/apps/Games/dndcombat.fap"
+#define DNDGRANTS_FAP_PATH                     "/ext/apps/Games/dndgrants.fap"
+#define DNDINVENTORY_FAP_PATH                  "/ext/apps/Games/dndinventory.fap"
+#define DNDSPELLBOOK_FAP_PATH                  "/ext/apps/Games/dndspellbook.fap"
+#define DNDBESTIARY_FAP_PATH                   "/ext/apps/Games/dndbestiary.fap"
 #define DNDCHARACTERSHEET_FAP_PATH             "/ext/apps/Games/dndcharactersheet.fap"
-#define DNDBACKUP_FAP_PATH                       "/ext/apps/Games/dndbackup.fap"
+#define DNDBACKUP_FAP_PATH                     "/ext/apps/Games/dndbackup.fap"
 #define DND_PROFILE_LAUNCH_ARGS_MAX            1536U
 #define DND_PROFILE_TRANSFER_MAX               23U
-#define DND_CHARACTER_DATA_ROOT        "/ext/apps_data/dndolphins"
-#define DND_JOURNAL_DATA_ROOT          "/ext/apps_data/dndjournal"
+#define DND_CHARACTER_DATA_ROOT                "/ext/apps_data/dndolphins"
+#define DND_JOURNAL_DATA_ROOT                  "/ext/apps_data/dndjournal"
 
 /* Read only DNDolphins' persisted Active= ID from custom_active_profile.txt.
    This lightweight reader does not scan, infer, validate or switch profiles. */

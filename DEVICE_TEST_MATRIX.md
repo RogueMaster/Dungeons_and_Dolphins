@@ -322,3 +322,16 @@
 - [ ] From Journal, convert an Item-category entry into an Inventory item while exercising an SD-card write interruption. After restart, confirm the pre-existing Inventory remains intact and no partial item row is visible; retry should add the item exactly once.
 - [ ] During external SHD backup, interrupt an SD-card read. Confirm the backup is reported failed and no bundle completeness marker is published for the partial copy.
 - [ ] Create a directory/non-file collision at a fresh `inventory_<id>.txt` path, then trigger starting-equipment initialization. Confirm initialization fails without removing the collision. Repeat with the next generated Adventure milestone Journal filename and confirm the choice rolls back while the collision remains untouched.
+
+### 2026-10-04 shared-core refactor acceptance
+
+These host-passing workflows remain unchecked on a physical device:
+
+- [ ] Cold-launch Hub, navigate in Text/Graphical modes and open/exit Quick Rolls; confirm no OOM/null runtime fault.
+- [ ] Create/switch/delete characters before using a collection; verify exact selected data and final deletion persistence.
+- [ ] Open Languages/Proficiencies first, alternate row kinds, and leave/reopen; check low-heap failure/retry behavior.
+- [ ] Confirm Catalog choice, Short Back and Hold Back preserve destination/selection and release memory.
+- [ ] Favorite Spell select/cast/Back round trip; attack mode survives Combat Magic statistics.
+- [ ] Select a catalog Feat in Hub, confirm save/teardown/Grants review and parent return.
+- [ ] Get Elevated toggle without previously loading Items; editor accept/cancel/Hold Back and repeated input hook lifetimes.
+- [ ] Build all eleven apps with the exact installed RM SDK/API and verify Loader/FAL, asset loading, cumulative stack high-water and repeated-session free heap.

@@ -14,21 +14,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define TAG                  "DndJournal"
-#define JOURNAL_NAME_LEN     32U
-#define JOURNAL_BODY_LEN     192U
-#define JOURNAL_FILE_LEN     48U
-#define JOURNAL_PATH_LEN     128U
-#define JOURNAL_CACHE_SIZE   8U
-#define JOURNAL_READ_BUFFER  256U
-#define JOURNAL_PROFILE_PATH APP_DATA_PATH("ch_%lu")
-#define JOURNAL_CLASS_MAX    4U
-#define JOURNAL_SEARCH_MIN   3U
-#define JOURNAL_SEARCH_MAX   32U
+#define TAG                    "DndJournal"
+#define JOURNAL_NAME_LEN       32U
+#define JOURNAL_BODY_LEN       192U
+#define JOURNAL_FILE_LEN       48U
+#define JOURNAL_PATH_LEN       128U
+#define JOURNAL_CACHE_SIZE     8U
+#define JOURNAL_READ_BUFFER    256U
+#define JOURNAL_PROFILE_PATH   APP_DATA_PATH("ch_%lu")
+#define JOURNAL_CLASS_MAX      4U
+#define JOURNAL_SEARCH_MIN     3U
+#define JOURNAL_SEARCH_MAX     32U
 #define JOURNAL_SEARCH_RESULTS 24U
 #define JOURNAL_NOTE_COLS      20U
 #define JOURNAL_NOTE_ROWS      6U
-#define JOURNAL_ITEM_PATH    DND_CHARACTER_DATA_ROOT "/inventory_%lu.txt"
+#define JOURNAL_ITEM_PATH      DND_CHARACTER_DATA_ROOT "/inventory_%lu.txt"
 
 typedef enum {
     JournalCategoryQuick,
@@ -711,8 +711,7 @@ static bool dndjournal_create_inventory_item(JournalApp* app) {
     char backup[JOURNAL_PATH_LEN];
     int tn = snprintf(temporary, sizeof(temporary), "%s.jtmp", path);
     int bn = snprintf(backup, sizeof(backup), "%s.jbak", path);
-    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) ||
-       (size_t)bn >= sizeof(backup))
+    if(tn <= 0 || bn <= 0 || (size_t)tn >= sizeof(temporary) || (size_t)bn >= sizeof(backup))
         return false;
     storage_common_remove(app->storage, temporary);
 
@@ -739,16 +738,14 @@ static bool dndjournal_create_inventory_item(JournalApp* app) {
         }
         if(ok) ok = storage_file_get_error(input) == FSE_OK;
     }
-    if(ok && existing_size == 0U)
-        ok = storage_file_write(output, "DNDItems=1\n", 11U) == 11U;
+    if(ok && existing_size == 0U) ok = storage_file_write(output, "DNDItems=1\n", 11U) == 11U;
     if(ok) ok = storage_file_write(output, "I|", 2U) == 2U;
     if(ok) ok = dndjournal_write_collection_field(output, app->current_entry.title);
     if(ok) ok = storage_file_write(output, "|", 1U) == 1U;
     if(ok) ok = dndjournal_write_collection_field(output, app->current_entry.body);
     if(ok) ok = storage_file_write(output, "||", 2U) == 2U;
     if(ok) {
-        const char* numeric =
-            "1,0,0,0,0,0,0,0,1,6,0,0,0,1,0,6,0,0,0,-1,0,0,0,-1,0\n";
+        const char* numeric = "1,0,0,0,0,0,0,0,1,6,0,0,0,1,0,6,0,0,0,-1,0,0,0,-1,0\n";
         size_t length = strlen(numeric);
         ok = storage_file_write(output, numeric, length) == length;
     }
@@ -1405,8 +1402,8 @@ static uint16_t dndjournal_note_prev_line(const char* text, uint16_t start) {
     return previous;
 }
 
-static uint16_t dndjournal_note_line_column(
-    const char* text, uint16_t line_start, uint16_t position) {
+static uint16_t
+    dndjournal_note_line_column(const char* text, uint16_t line_start, uint16_t position) {
     if(!text || position <= line_start) return 0U;
     uint16_t column = position - line_start;
     if(column > JOURNAL_NOTE_COLS) column = JOURNAL_NOTE_COLS;
@@ -1490,8 +1487,7 @@ static void dndjournal_draw_note_editor(Canvas* canvas, JournalApp* app) {
 
         uint16_t next = dndjournal_note_next_line(text, cursor);
         if(app->note_cursor >= cursor &&
-           (app->note_cursor < next ||
-            (!text[app->note_cursor] && app->note_cursor == next))) {
+           (app->note_cursor < next || (!text[app->note_cursor] && app->note_cursor == next))) {
             uint16_t column = dndjournal_note_line_column(text, cursor, app->note_cursor);
             uint8_t x = (uint8_t)(2U + column * 6U);
             uint8_t y = (uint8_t)(19U + row * 8U);
@@ -1812,12 +1808,7 @@ static void dndjournal_begin_search(JournalApp* app) {
     text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Search notes (3+ chars)");
     text_input_set_result_callback(
-        app->text_input,
-        dndjournal_text_done,
-        app,
-        app->edit_buffer,
-        JOURNAL_SEARCH_MAX,
-        false);
+        app->text_input, dndjournal_text_done, app, app->edit_buffer, JOURNAL_SEARCH_MAX, false);
     view_dispatcher_switch_to_view(app->dispatcher, JournalViewText);
 }
 
@@ -1876,8 +1867,7 @@ static bool dndjournal_input(InputEvent* event, void* context) {
         else if(event->type == InputTypeShort && event->key == InputKeyBack) {
             dndjournal_return_to_dnd(app);
             return true;
-        }
-        else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == 0U) {
                 app->screen = JournalScreenList;
                 app->selection = app->scroll = 0U;
@@ -1943,7 +1933,8 @@ static bool dndjournal_input(InputEvent* event, void* context) {
             return true;
         } else if(event->type == InputTypeLong && event->key == InputKeyLeft) {
             dndjournal_set_status(
-                app, dndjournal_note_delete_before(app) ? "Deleted previous" : "Nothing to delete");
+                app,
+                dndjournal_note_delete_before(app) ? "Deleted previous" : "Nothing to delete");
             dndjournal_note_keep_cursor_visible(app);
         } else if(event->type == InputTypeLong && event->key == InputKeyRight) {
             dndjournal_set_status(
@@ -1953,16 +1944,13 @@ static bool dndjournal_input(InputEvent* event, void* context) {
     } else if(app->screen == JournalScreenSearchResults) {
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
            event->key == InputKeyUp && app->search_count) {
-            app->selection =
-                app->selection ? (uint16_t)(app->selection - 1U) :
-                                 (uint16_t)(app->search_count - 1U);
+            app->selection = app->selection ? (uint16_t)(app->selection - 1U) :
+                                              (uint16_t)(app->search_count - 1U);
         } else if(
             (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
             event->key == InputKeyDown && app->search_count) {
             app->selection =
-                app->selection + 1U < app->search_count ?
-                    (uint16_t)(app->selection + 1U) :
-                    0U;
+                app->selection + 1U < app->search_count ? (uint16_t)(app->selection + 1U) : 0U;
         } else if(event->type == InputTypeShort && event->key == InputKeyBack) {
             free(app->search_results);
             app->search_results = NULL;
@@ -1976,11 +1964,8 @@ static bool dndjournal_input(InputEvent* event, void* context) {
             app->selection < app->search_count && app->search_results) {
             char file_name[JOURNAL_FILE_LEN];
             dndjournal_copy(
-                file_name,
-                sizeof(file_name),
-                app->search_results[app->selection].file_name);
-            if(dndjournal_read_entry(
-                   app->storage, app->profile, file_name, &app->current_entry)) {
+                file_name, sizeof(file_name), app->search_results[app->selection].file_name);
+            if(dndjournal_read_entry(app->storage, app->profile, file_name, &app->current_entry)) {
                 free(app->search_results);
                 app->search_results = NULL;
                 app->search_count = 0U;
@@ -1996,8 +1981,7 @@ static bool dndjournal_input(InputEvent* event, void* context) {
         }
         if(app->screen == JournalScreenSearchResults) {
             if(app->selection < app->scroll) app->scroll = app->selection;
-            if(app->selection >= app->scroll + 5U)
-                app->scroll = (uint16_t)(app->selection - 4U);
+            if(app->selection >= app->scroll + 5U) app->scroll = (uint16_t)(app->selection - 4U);
         }
     } else if(app->screen == JournalScreenList) {
         if((event->type == InputTypeShort || event->type == InputTypeRepeat) &&
@@ -2007,13 +1991,11 @@ static bool dndjournal_input(InputEvent* event, void* context) {
             (event->type == InputTypeShort || event->type == InputTypeRepeat) &&
             event->key == InputKeyDown)
             dndjournal_move_list(app, 1);
-        else if(event->type == InputTypeShort && event->key == InputKeyBack)
-        {
+        else if(event->type == InputTypeShort && event->key == InputKeyBack) {
             app->screen = JournalScreenMenu;
             app->selection = app->scroll = 0U;
             app->status[0] = '\0';
-        }
-        else if(event->type == InputTypeShort && event->key == InputKeyOk) {
+        } else if(event->type == InputTypeShort && event->key == InputKeyOk) {
             if(app->selection == app->count) {
                 if(!app->have_profile) {
                     dndjournal_set_status(app, "Create character in DNDolphins");

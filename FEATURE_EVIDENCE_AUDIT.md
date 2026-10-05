@@ -1,7 +1,7 @@
 # Feature Evidence Audit
 
 Checkpoint: 4.19.1 audit
-Date: 2026-09-05
+Date: 2026-10-04 (America/New_York)
 
 This matrix records current-source evidence for the retained feature history from 4.19 onward. Historical changelog bullets are not treated as proof by themselves; each row points to present implementation and/or regression coverage.
 
@@ -29,9 +29,13 @@ This matrix records current-source evidence for the retained feature history fro
 | Retry-safe Adventure campaign-pack install | `dndadventure_campaign_packs.c`; failure-injection retry regression | Verified |
 | Journal → Inventory handoff is failure-safe | `dndjournal.c` copies/publishes the Inventory sidecar transactionally; host failure injection preserves the prior file and validates retry | Verified |
 | Backup/progression copy reads reject I/O failure | `dnd_backup_storage.c` and `dndolphins_progression_store.c` check input file error state before commit; host read-failure injection covers export/copy rollback | Verified |
-| Draw callbacks avoid direct storage/heap mutation | Host audit currently checks 76 direct static draw helpers | Verified by static host gate; device behavior still requires device validation |
+| Draw callbacks avoid direct storage/heap mutation | Host audit currently checks 115 direct static draw helpers | Verified by static host gate; device behavior still requires device validation |
 
 ## Checkpoint 8 collision-ownership evidence
 
 - `dnd_storage_create_items_from_assets()` now records whether the first Inventory sidecar was actually opened before cleanup; a failed open caused by a directory/non-file collision leaves that path untouched. Host regression: `tests/host/test_storage.c`.
 - `dndadventure_write_milestone_journal()` applies the same ownership rule to generated Journal entries; failed milestone creation cannot delete a path it did not open, and Adventure choice/progress rollback is verified in `tests/host/test_adventure_flow.c`.
+
+## Current shared-core integration evidence
+
+The 2026-10-04 run validates `dnd_app_core.c` under each actual Hub/Combat/Grants build mode; it does not use the retired wrapper/`.inc` implementation. `tests/host/test_lifetimes.c` reproduces real input, first-use, profile, Catalog, Favorites, Feat handoff, Settings and editor transitions. It also injects optional allocation failures and measures draw calls for storage/allocation work. The common layout is regenerated at 3,416 B. See [INTEGRATION_AUDIT.md](INTEGRATION_AUDIT.md) for individual corrections and current target/device limits.

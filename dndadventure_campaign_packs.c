@@ -11,17 +11,17 @@
 #define CAMPAIGN_PACK_LINE_LEN    768U
 #define CAMPAIGN_PACK_READ_BUFFER 256U
 
-#define CAMPAIGN_REGISTRY       APP_DATA_PATH("packs/campaign_registry.txt")
-#define CAMPAIGN_REGISTRY_TEMP  APP_DATA_PATH("packs/campaign_registry.tmp")
+#define CAMPAIGN_REGISTRY        APP_DATA_PATH("packs/campaign_registry.txt")
+#define CAMPAIGN_REGISTRY_TEMP   APP_DATA_PATH("packs/campaign_registry.tmp")
 #define CAMPAIGN_REGISTRY_BACKUP APP_DATA_PATH("packs/campaign_registry.bak")
-#define CAMPAIGN_INBOX_MANIFEST APP_DATA_PATH("packs/campaign_inbox/manifest.txt")
-#define CAMPAIGN_INBOX_INDEX    APP_DATA_PATH("packs/campaign_inbox/index.txt")
-#define CAMPAIGN_INBOX_CONTENT  APP_DATA_PATH("packs/campaign_inbox/scenes.txt")
-#define CAMPAIGN_ENABLED_INDEX  APP_DATA_PATH("campaigns/enabled_index.txt")
-#define CAMPAIGN_ENABLED_TEMP   APP_DATA_PATH("campaigns/enabled_index.tmp")
-#define CAMPAIGN_ENABLED_BACKUP APP_DATA_PATH("campaigns/enabled_index.bak")
-#define CAMPAIGN_PACKAGED_INDEX APP_ASSETS_PATH("campaigns/index.txt")
-#define CAMPAIGN_CUSTOM_INDEX   APP_DATA_PATH("campaigns/custom_index.txt")
+#define CAMPAIGN_INBOX_MANIFEST  APP_DATA_PATH("packs/campaign_inbox/manifest.txt")
+#define CAMPAIGN_INBOX_INDEX     APP_DATA_PATH("packs/campaign_inbox/index.txt")
+#define CAMPAIGN_INBOX_CONTENT   APP_DATA_PATH("packs/campaign_inbox/scenes.txt")
+#define CAMPAIGN_ENABLED_INDEX   APP_DATA_PATH("campaigns/enabled_index.txt")
+#define CAMPAIGN_ENABLED_TEMP    APP_DATA_PATH("campaigns/enabled_index.tmp")
+#define CAMPAIGN_ENABLED_BACKUP  APP_DATA_PATH("campaigns/enabled_index.bak")
+#define CAMPAIGN_PACKAGED_INDEX  APP_ASSETS_PATH("campaigns/index.txt")
+#define CAMPAIGN_CUSTOM_INDEX    APP_DATA_PATH("campaigns/custom_index.txt")
 
 typedef struct {
     File* file;
@@ -48,8 +48,7 @@ static bool dndadventure_campaign_packs_publish(
     const char* temporary,
     const char* destination,
     const char* backup) {
-    if(storage_file_exists(storage, backup) &&
-       storage_common_remove(storage, backup) != FSE_OK) {
+    if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK) {
         storage_common_remove(storage, temporary);
         return false;
     }
@@ -623,7 +622,8 @@ bool dndadventure_campaign_packs_install_inbox(Storage* storage, char* status, s
         (void)dndadventure_campaign_packs_rebuild_from_records(storage, records, previous_count);
         storage_common_remove(storage, index_path);
         storage_common_remove(storage, content_path);
-        dndadventure_campaign_packs_status(status, status_size, "Pack enable write failed; rolled back");
+        dndadventure_campaign_packs_status(
+            status, status_size, "Pack enable write failed; rolled back");
         goto done;
     }
     dndadventure_campaign_packs_status(status, status_size, "Pack installed/enabled");

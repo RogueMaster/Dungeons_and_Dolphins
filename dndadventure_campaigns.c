@@ -127,7 +127,8 @@ static uint8_t dndadventure_campaigns_split(char* line, char** fields, uint8_t c
     return count;
 }
 
-static bool dndadventure_campaigns_parse(char* line, bool bundled, DndAdventureCampaignSummary* output) {
+static bool
+    dndadventure_campaigns_parse(char* line, bool bundled, DndAdventureCampaignSummary* output) {
     if(!line[0] || line[0] == '#') return false;
     char* fields[7];
     if(dndadventure_campaigns_split(line, fields, 7U) != 7U) return false;
@@ -259,7 +260,10 @@ uint16_t dndadventure_campaigns_count(Storage* storage) {
     return count > UINT16_MAX ? UINT16_MAX : (uint16_t)count;
 }
 
-bool dndadventure_campaigns_at(Storage* storage, uint16_t index, DndAdventureCampaignSummary* output) {
+bool dndadventure_campaigns_at(
+    Storage* storage,
+    uint16_t index,
+    DndAdventureCampaignSummary* output) {
     if(!output || !dndadventure_campaigns_cache_ensure(storage)) return false;
     if(index < campaign_cache.bundled.count)
         return dndadventure_campaigns_at_index(
@@ -302,7 +306,10 @@ static bool dndadventure_campaigns_find_path(
     return found;
 }
 
-bool dndadventure_campaigns_find(Storage* storage, const char* id, DndAdventureCampaignSummary* output) {
+bool dndadventure_campaigns_find(
+    Storage* storage,
+    const char* id,
+    DndAdventureCampaignSummary* output) {
     if(!id || !output || !dndadventure_campaigns_cache_ensure(storage)) return false;
     return dndadventure_campaigns_find_path(storage, CAMPAIGN_BUNDLED_INDEX, true, id, output) ||
            dndadventure_campaigns_find_path(storage, CAMPAIGN_USER_INDEX, false, id, output) ||
@@ -373,10 +380,8 @@ static bool dndadventure_campaigns_active_path(
     return length > 0 && (size_t)length < size;
 }
 
-static bool dndadventure_campaigns_recover_file(
-    Storage* storage,
-    const char* path,
-    const char* backup) {
+static bool
+    dndadventure_campaigns_recover_file(Storage* storage, const char* path, const char* backup) {
     if(storage_file_exists(storage, path)) return true;
     if(!storage_file_exists(storage, backup)) return true;
     return storage_common_rename(storage, backup, path) == FSE_OK;
@@ -393,7 +398,8 @@ static bool dndadventure_campaigns_publish_file(
     }
     bool had_live = storage_file_exists(storage, path);
     if(had_live) {
-        if(storage_file_exists(storage, backup) && storage_common_remove(storage, backup) != FSE_OK) {
+        if(storage_file_exists(storage, backup) &&
+           storage_common_remove(storage, backup) != FSE_OK) {
             storage_common_remove(storage, temporary);
             return false;
         }
@@ -485,8 +491,7 @@ bool dndadventure_campaigns_progress_save(
     storage_common_mkdir(storage, APP_DATA_PATH(""));
     storage_common_mkdir(storage, CAMPAIGN_PROGRESS_DIR);
     char path[DND_FS_PATH_LEN], temporary[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN], line[128];
-    if(!dndadventure_campaigns_progress_path(
-           path, sizeof(path), profile_id, campaign->id, "txt") ||
+    if(!dndadventure_campaigns_progress_path(path, sizeof(path), profile_id, campaign->id, "txt") ||
        !dndadventure_campaigns_progress_path(
            temporary, sizeof(temporary), profile_id, campaign->id, "tmp") ||
        !dndadventure_campaigns_progress_path(
@@ -535,8 +540,7 @@ bool dndadventure_campaigns_progress_load(
     dndadventure_campaigns_copy(
         progress->checkpoint, sizeof(progress->checkpoint), campaign->entry_scene);
     char path[DND_FS_PATH_LEN], backup[DND_FS_PATH_LEN];
-    if(!dndadventure_campaigns_progress_path(
-           path, sizeof(path), profile_id, campaign->id, "txt") ||
+    if(!dndadventure_campaigns_progress_path(path, sizeof(path), profile_id, campaign->id, "txt") ||
        !dndadventure_campaigns_progress_path(
            backup, sizeof(backup), profile_id, campaign->id, "bak") ||
        !dndadventure_campaigns_recover_file(storage, path, backup))
@@ -644,8 +648,7 @@ static void dndadventure_campaigns_validate_scenes(
                 ++output->duplicate_scene_ids;
                 dndadventure_campaigns_note_problem(output, campaign->id, "Duplicate scene ID");
             } else if(scene_count < CAMPAIGN_MAX_SCENES) {
-                dndadventure_campaigns_copy(
-                    scene_ids[scene_count++], DND_SHORT_LEN, fields[1]);
+                dndadventure_campaigns_copy(scene_ids[scene_count++], DND_SHORT_LEN, fields[1]);
             }
         }
     }

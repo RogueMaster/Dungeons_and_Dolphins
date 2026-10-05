@@ -8,6 +8,8 @@
 
 **Release: 4.19.1**
 
+The 2026-10-04 integration audit corrects shared-core compilation and lazy-state UI faults, restores Favorite Spells entry/casting and routes selected Feat review through DNDGrants. All eleven current-mode host builds and the sanitizer regressions pass; a fresh target build and device checks remain outstanding. See [INTEGRATION_AUDIT.md](INTEGRATION_AUDIT.md) and [RELEASE_AUDIT_STATUS.md](RELEASE_AUDIT_STATUS.md).
+
 DNDolphins is an offline 5E-compatible character, combat, campaign and encounter suite for Flipper Zero. It is split into eleven FAPs so the DNDolphins character hub, DNDCharacter Sheet, Grants, Combat, Inventory, Spellbook, Adventure, Journal, Initiative, Bestiary, and DNDBackup & Restore can each keep their own working set small while sharing the same active character where appropriate.
 
 A normal no-argument DNDolphins launch opens with the project's native 128×64 monochrome logo for 2 seconds. Companion return/deep-link launches that provide arguments skip the splash. DNDolphins private image assets are kept target-specific; only images actually used by the hub are linked.
@@ -261,7 +263,7 @@ Combat is presented in this order:
 24. **Death failure** — Adjusts death-save failures; Hold OK opens numeric entry.
 25. **Exhaustion** — Adjusts Exhaustion; Hold OK opens numeric entry.
 
-Weapon and spell attack lists are streamed in bounded eight-record windows and use a separate total count; they are not limited to the 25 Combat menu actions. Host regression coverage currently exercises 300 weapon records and 300 spell records, including the final record.
+Weapon and spell attack lists are streamed in bounded eight-record windows and use a separate total count; they are not limited to the 26 Combat menu actions. Host regression coverage currently exercises 300 weapon records and 300 spell records, including the final record.
 
 Weapon combat uses STR/DEX/finesse rules, proficiency, magic bonuses, versatile damage, extra dice, riders and critical dice doubling. For weapons with the Ammunition property, a weapon-local Ammo Current/Maximum counter is used first when configured; otherwise Combat consumes one quantity from the first non-weapon Inventory stack whose name or Ammo Group contains the required ammunition token, case-insensitively. Standard families normalize to `arrow`, `bolt`, `bullet` or `needle`, so **Fire Arrow**, **Silvered Arrows**, **Crossbow Bolt Bundle** and similar descriptive names can work without being named exactly `Arrows` or `Bolts`. Older/custom bows, crossbows, slings, blowguns, muskets and pistols can infer the standard ammunition family from the weapon name when Ammo Group is empty.
 
